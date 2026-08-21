@@ -37,9 +37,9 @@
   <a href="./CONTRIBUTING.md"><strong>Contributing</strong></a> •
   <a href="./CHANGELOG.md"><strong>Changelog</strong></a>
   <br/>
-  <a href="https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Bug%20Report"><strong>Report a Bug</strong></a> •
-  <a href="https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Feature%20Request"><strong>Request a Feature</strong></a> •
-  <a href="https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Enhancement%20Request"><strong>Request an Enhancement</strong></a>
+  <a href="https://gitlab.com/zillowe/zillwen/zusty/zoi/-/work_items/new?issuable_template=Bug%20Report"><strong>Report a Bug</strong></a> •
+  <a href="https://gitlab.com/zillowe/zillwen/zusty/zoi/-/work_items/new?issuable_template=Feature%20Request"><strong>Request a Feature</strong></a> •
+  <a href="https://gitlab.com/zillowe/zillwen/zusty/zoi/-/work_items/new?issuable_template=Enhancement%20Request"><strong>Request an Enhancement</strong></a>
   <br/>
   <a href="./CODE_OF_CONDUCT.md"><strong>Code of Conduct</strong></a> •
   <a href="./PACKAGING.md"><strong>Packaging</strong></a>

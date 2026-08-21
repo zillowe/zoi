@@ -50,7 +50,7 @@ zoi upgrade
 If you discover a security vulnerability, please follow these steps:
 
 1. **DO NOT** disclose the vulnerability publicly.
-2. Send a detailed report to: [GitLab Issues\*](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new), [GitHub Security Advisory](https://github.com/zillowe/zoi/security/advisories/new) or email\*: [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io).
+2. Send a detailed report to: [GitLab Issues\*](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/work_items/new), [GitHub Security Advisory](https://github.com/zillowe/zoi/security/advisories/new) or email\*: [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io).
 3. Include in your report:
    - A description of the vulnerability
    - Steps to reproduce the issue

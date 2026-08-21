@@ -390,40 +390,40 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
     You can create a `.pkg.lua` file that defines your package. This file includes metadata like the package name, version, description, and installation instructions. For a complete guide, please visit the [Creating Packages guide](/docs/zds/zoi/creating-packages).
   </Accordion>
 
-<Accordion title="How do I publish a package?">
-  To learn how to publish a package to the official repositories or your own,
-  please visit the [Publishing Packages
-  guide](/docs/zds/zoi/publishing-packages).
-</Accordion>
+  <Accordion title="How do I publish a package?">
+    To learn how to publish a package to the official repositories or your own,
+    please visit the [Publishing Packages
+    guide](/docs/zds/zoi/publishing-packages).
+  </Accordion>
 
   <Accordion title="How do I view a package's manual?">
     Use `zoi man <package-name>` to view it in your terminal. For uninstalled packages, Zoi will automatically fetch the manual from the registry.
   </Accordion>
 
-<Accordion title="How do I add a new repository?">
-  You can add a new repository using the `zoi repo add` command. You can run it
-  without arguments for an interactive prompt, or provide the name of the
-  repository to add it directly.
-</Accordion>
+  <Accordion title="How do I add a new repository?">
+    You can add a new repository using the `zoi repo add` command. You can run it
+    without arguments for an interactive prompt, or provide the name of the
+    repository to add it directly.
+  </Accordion>
 
-<Accordion title="What platforms does Zoi support?">
-  Zoi is designed to be cross-platform. Mainly supports Linux, macOS and
-  Windows, and amd64 and arm64 architectures.
-</Accordion>
+  <Accordion title="What platforms does Zoi support?">
+    Zoi is designed to be cross-platform. Mainly supports Linux, macOS and
+    Windows, and amd64 and arm64 architectures.
+  </Accordion>
 
-<Accordion title="Can I install packages from other package managers?">
-  Yes, Zoi supports installing dependencies from a wide range of other package
-  managers like `brew`, `winget`, `scoop`, `npm`, `cargo`, `pip`, and many more.
-  These are defined in the `dependencies` section of a packags's `.pkg.lua`
-  file.
-</Accordion>
+  <Accordion title="Can I install packages from other package managers?">
+    Yes, Zoi supports installing dependencies from a wide range of other package
+    managers like `brew`, `winget`, `scoop`, `npm`, `cargo`, `pip`, and many more.
+    These are defined in the `dependencies` section of a packags's `.pkg.lua`
+    file.
+  </Accordion>
 
-<Accordion title="How do I install a specific version or channel?">
-  You can append a version or channel after an '@' in the source string.
-  Examples: `zoi install my-app@1.2.3` or use channels defined in `versions`
-  like `my-app@stable`. You can also pin a resolved version to prevent updates:
-  `zoi pin my-app VERSION` and later `zoi unpin my-app`.
-</Accordion>
+  <Accordion title="How do I install a specific version or channel?">
+    You can append a version or channel after an '@' in the source string.
+    Examples: `zoi install my-app@1.2.3` or use channels defined in `versions`
+    like `my-app@stable`. You can also pin a resolved version to prevent updates:
+    `zoi pin my-app VERSION` and later `zoi unpin my-app`.
+  </Accordion>
 
   <Accordion title="How do I run a tool without installing it?">
     Use `zoi exec <package>`. Zoi resolves the package and its dependencies
@@ -432,13 +432,13 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
     are automatically wrapped with `bwrap`.
   </Accordion>
 
-<Accordion title="What is 'zoi dev' and how does it differ from 'zoi env'?">
-  `zoi dev` is used to enter a persistent development subshell. It automatically
-  ensures all packages in your `zoi.yaml` are installed locally and sets up
-  environment variables like `PATH`, `LD_LIBRARY_PATH`, and `CPATH` so you can
-  immediately start compiling or running your code. `zoi env` is more focused on
-  running specific setup scripts or one-off environment configurations.
-</Accordion>
+  <Accordion title="What is 'zoi dev' and how does it differ from 'zoi env'?">
+    `zoi dev` is used to enter a persistent development subshell. It automatically
+    ensures all packages in your `zoi.yaml` are installed locally and sets up
+    environment variables like `PATH`, `LD_LIBRARY_PATH`, and `CPATH` so you can
+    immediately start compiling or running your code. `zoi env` is more focused on
+    running specific setup scripts or one-off environment configurations.
+  </Accordion>
 
   <Accordion title="How do I use a custom git package repository?">
     Add it with `zoi repo add https://github.com/you/your-zoi-repo.git`.
@@ -453,15 +453,15 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
     If commands are not found, run `zoi shell <shell>` to configure your shell, or add `~/.zoi/pkgs/bin` to your PATH manually.
   </Accordion>
 
-<Accordion title="How do I accept all prompts (non-interactive)?">
-  Pass `--yes` to installation commands to auto-accept confirmations and
-  optional dependency prompts. To install all optional dependencies without
-  being prompted, use `--all-optional`.
-</Accordion>
+  <Accordion title="How do I accept all prompts (non-interactive)?">
+    Pass `--yes` to installation commands to auto-accept confirmations and
+    optional dependency prompts. To install all optional dependencies without
+    being prompted, use `--all-optional`.
+  </Accordion>
 
-<Accordion title="How do I install from a nested repository path?">
-  Use the full path in the source, e.g. `@core/linux/amd64/nvidia-driver`.
-</Accordion>
+  <Accordion title="How do I install from a nested repository path?">
+    Use the full path in the source, e.g. `@core/linux/amd64/nvidia-driver`.
+  </Accordion>
 
   <Accordion title="How do I update Zoi itself?">
     Run `zoi upgrade`. You can use `zoi upgrade --force` to upgrade even if you are on the latest version, and `zoi upgrade --tag <tag>` or `zoi upgrade --branch <branch>` to target a specific release.
@@ -471,11 +471,11 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
     If an update causes issues, you can revert to the previously installed version using `zoi rollback <package-name>`. Zoi automatically creates a backup before upgrading a package.
   </Accordion>
 
-<Accordion title="How can I back up and restore my installed packages?">
-  Zoi automatically keeps a record of all your installed packages in a JSON file
-  at `~/.zoi/pkgs/zoi.lock`. You can back up this file. To restore all your
-  packages on a new system, simply run `zoi install /path/to/your/zoi.lock`.
-</Accordion>
+  <Accordion title="How can I back up and restore my installed packages?">
+    Zoi automatically keeps a record of all your installed packages in a JSON file
+    at `~/.zoi/pkgs/zoi.lock`. You can back up this file. To restore all your
+    packages on a new system, simply run `zoi install /path/to/your/zoi.lock`.
+  </Accordion>
 
   <Accordion title="Does Zoi collect your data?">
     We believe in privacy by design. Zoi does **not** collect any data by
