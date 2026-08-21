@@ -39,12 +39,12 @@ you don't want to use GitLab but GitLab is still the preferred method.
 ### Reporting Bugs or Requesting Features
 
 If you find a bug or have an idea for a new feature, please check our
-[**issue tracker**](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues) to
+[**issue tracker**](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/work_items) to
 see if it has already been reported. If not, feel free to open a new issue.
 
-- [Report a Bug](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Bug%20Report)
-- [Request a Feature](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Feature%20Request)
-- [Request an Enhancement](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Enhancement%20Request)
+- [Report a Bug](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/work_items/new?issuable_template=Bug%20Report)
+- [Request a Feature](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/work_items/new?issuable_template=Feature%20Request)
+- [Request an Enhancement](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/work_items/new?issuable_template=Enhancement%20Request)
 
 ### Contributing Code
 
@@ -72,11 +72,13 @@ To get started with developing Zoi, you'll need to set up your local environment
 You can find instructions at [rust-lang.org](https://www.rust-lang.org/tools/install).
 - **Just:** The `just` command is required for our Justfile-based build process.
 
+See [`PACKAGING.md`](./PACKAGING.md) for more information.
+
 ### First-Time Setup
 
 Because Zoi is used to manage its own development, you must first build and
 install it manually using `just` (Or you can install
-[pre-compiled binaries](/README.md#-installation) instead):
+[pre-compiled binaries](./INSTALL.md) instead):
 
 1. **Configure the build:**
 
@@ -162,7 +164,7 @@ When adding a new build step or a useful script, you should add it to the
 #### Passing Arguments to Commands
 
 To pass arguments to the underlying script, add them after the command alias.
-Use `--` to separate the arguments from Zoi's own options if needed.
+Use `--` to separate the arguments from Zoi's own options.
 
 ```sh
 # This runs 'cargo check --tests'
