@@ -4447,9 +4447,9 @@ dependencies = [
 
 [[package]]
 name = "zbsdiff"
-version = "1.5.2"
+version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e14e07ec5df48b4ccd4166cb5c199f1e0768d2f4823d2eb42bfb4e0e2ae155dc"
+checksum = "643ce96ee09a8101426af34f62bfa921cdd8875fad1f561b967606d367d5ca90"
 dependencies = [
  "bzip2",
  "rayon",
