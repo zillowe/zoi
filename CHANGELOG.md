@@ -4,6 +4,32 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod. Release 1.26.0] - 2026-08-25
+
+### ⏩ Merged
+
+- Branch 'minor-release' into 'main'
+
+### ♻️ Refactor
+
+- Enhance packaging security, service management, and directory copying
+
+## [Prod. Release 1.25.5] - 2026-08-22
+
+### ⏩ Merged
+
+- Branch 'fix-zoi' into 'main'
+
+### 🛡️ Dependencies
+
+- Update zbsdiff to v1.5.3
+
+## [Prod. Release 1.25.2] - 2026-08-16
+
+### 🛠️ Build
+
+- Fix COPR RPM spec
+
 ## [Prod. Release 1.25.0] - 2026-08-15
 
 ### ⏩ Merged
