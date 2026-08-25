@@ -40,15 +40,15 @@ fn get_completion_path(shell: Shell, scope: SetupScope) -> Result<PathBuf> {
             }
         })
     } else {
+        let config_dir = crate::pkg::utils::get_user_config_dir()?;
+        let data_dir = crate::pkg::utils::get_user_data_dir()?;
         let home = dirs::home_dir()
             .ok_or_else(|| anyhow!("Home directory not found"))?;
         Ok(match shell {
-            Shell::Bash => {
-                home.join(".local/share/bash-completion/completions/zoi")
-            }
+            Shell::Bash => data_dir.join("bash-completion/completions/zoi"),
             Shell::Zsh => home.join(".zsh/completions/_zoi"),
-            Shell::Fish => home.join(".config/fish/completions/zoi.fish"),
-            Shell::Elvish => home.join(".config/elvish/completions/zoi.elv"),
+            Shell::Fish => config_dir.join("fish/completions/zoi.fish"),
+            Shell::Elvish => config_dir.join("elvish/completions/zoi.elv"),
             Shell::PowerShell => {
                 if cfg!(windows) {
                     home.join(
@@ -288,11 +288,7 @@ pub fn run(shell: Shell, scope: SetupScope) -> Result<()> {
 /// Returns the directory for package completions for a given scope and shell.
 fn get_completions_dir(scope: SetupScope, shell: &str) -> Result<PathBuf> {
     match scope {
-        SetupScope::User => {
-            let home = dirs::home_dir()
-                .ok_or_else(|| anyhow!("Home directory not found"))?;
-            Ok(home.join(".zoi/pkgs/shell").join(shell))
-        }
+        SetupScope::User => crate::pkg::utils::get_user_completions_dir(shell),
         SetupScope::System => {
             if cfg!(target_os = "windows") {
                 Ok(PathBuf::from(format!(

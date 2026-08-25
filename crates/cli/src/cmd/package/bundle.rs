@@ -42,5 +42,6 @@ pub fn run(args: BundleCommand) -> Result<()> {
         args.sign,
         args.version_override.as_deref(),
         args.build_type.as_deref()
-    )
+    )?;
+    Ok(())
 }

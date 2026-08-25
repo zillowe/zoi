@@ -14,6 +14,22 @@ use zoi_plugins::PluginManager;
 use zoi_resolver as resolver;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
+/// Resolves a template-relative destination without allowing the template to
+/// write outside the app directory.
+fn create_destination_path(
+    destination_dir: &Path,
+    relative_path: &str
+) -> Result<std::path::PathBuf> {
+    let relative_path = Path::new(relative_path);
+    if !utils::is_safe_path(destination_dir, relative_path) {
+        return Err(anyhow!(
+            "App template destination escapes the app directory: {}",
+            relative_path.display()
+        ));
+    }
+    Ok(destination_dir.join(relative_path))
+}
+
 /// Extracts an app from a ZPA archive to a destination directory.
 fn install_app_from_archive(
     archive_path: &Path,
@@ -60,13 +76,16 @@ fn install_app_from_archive(
         for mapped_dir in &scope_mapping.dirs {
             if let Some(rel) = mapped_dir.path.strip_prefix("${createpkgdir}/")
             {
-                fs::create_dir_all(destination_dir.join(rel))?;
+                fs::create_dir_all(create_destination_path(
+                    destination_dir,
+                    rel
+                )?)?;
             }
         }
         for mapped_file in &scope_mapping.files {
             if let Some(rel) = mapped_file.dest.strip_prefix("${createpkgdir}/")
             {
-                let dest_path = destination_dir.join(rel);
+                let dest_path = create_destination_path(destination_dir, rel)?;
                 if let Some(parent) = dest_path.parent() {
                     fs::create_dir_all(parent)?;
                 }
@@ -76,7 +95,7 @@ fn install_app_from_archive(
         for mapped_link in &scope_mapping.symlinks {
             if let Some(rel) = mapped_link.link.strip_prefix("${createpkgdir}/")
             {
-                let dest_path = destination_dir.join(rel);
+                let dest_path = create_destination_path(destination_dir, rel)?;
                 if let Some(parent) = dest_path.parent() {
                     fs::create_dir_all(parent)?;
                 }
@@ -203,4 +222,16 @@ pub fn run(
     println!("\n{}", "App created successfully.".green());
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_destination_should_reject_parent_traversal() {
+        let destination = Path::new("/tmp/zoi-create-test");
+
+        assert!(create_destination_path(destination, "../outside").is_err());
+    }
 }

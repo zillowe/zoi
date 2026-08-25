@@ -20,7 +20,7 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Explicit Scope Control:** Restrict package installation to specific scopes (`user`, `system`, or `project`) using the `scopes` metadata field. Zoi automatically enforces these constraints during installation and updates.
 
-- **Scope-Aware Registry Sync:** Synchronize package metadata to either your user directory (`~/.zoi`) or the system-wide store (`/var/lib/zoi`). Zoi automatically detects the correct scope when running as root or with a sysroot (`--root`).
+- **Scope-Aware Registry Sync:** Synchronize package metadata to either the user data directory or the system-wide store (`/var/lib/zoi` on Linux). Zoi automatically detects the correct scope when running as root or with a sysroot (`--root`).
 
 - **Sysroot Support (`--root`):** Operates on a different root directory, allowing you to bootstrap entire OS images, containers, or embedded systems from the outside.
 
@@ -60,7 +60,7 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your current project (`zoi.yaml`), global configuration, or legacy files (like `.nvmrc` and `.python-version`) via its extensible Lua plugin system. Replaces static symlinks with intelligent shims that resolve the correct version at runtime.
 
-- **Shell Completions via `zshell()`**: Bundle shell completion scripts (Bash, Zsh, Fish, Elvish) with your packages using the `zshell()` lifecycle function. Zoi automatically symlinks completions into per-package directories under `~/.zoi/pkgs/shell/` and cleans them up on uninstall. Supports versioned completions since each package version's files are stored separately in the Zoi store.
+- **Shell Completions via `zshell()`**: Bundle shell completion scripts (Bash, Zsh, Fish, Elvish) with your packages using the `zshell()` lifecycle function. Zoi automatically symlinks completions into per-package directories under the user data directory and cleans them up on uninstall. Supports versioned completions since each package version's files are stored separately in the Zoi store.
 
 - **Manual Pages via `zman()`**: Bundle manual pages with your packages using the `zman()` lifecycle function. Zoi automatically places them in standard locations (e.g. `/usr/share/man/` for system scope) and supports viewing them via `zoi man`, even for uninstalled packages.
 
@@ -117,7 +117,7 @@ Zoi is packed with features designed to make package management and environment 
 - **Split Packages:** Define a package that can be split into multiple, independently installable sub-packages. This is perfect for large projects like the Linux kernel, where you can separate the kernel, headers, and docs. Zoi manages these components granularly; uninstalling or rolling back one sub-package will not interfere with other installed components from the same base project.
 
 - **Local Package Development:** A dedicated `zoi package` command set streamlines the creation and testing of packages locally:
-  - `zoi package build`: Build a distributable package archive (`.zpa`). Supports `--pure` for isolated builds using a clean sysroot.
+  - `zoi package build`: Build a distributable package archive (`.zpa`). Automatically bundles the package into a source archive (`.zsa`) first and builds from it; use `--no-zsa` to build directly from the `.pkg.lua` file. Supports `--pure` for isolated builds using a clean sysroot.
   - `zoi package bundle`: Bundle a package and its local assets into a source archive (`.zsa`).
   - `zoi package install`: Install a package from a local archive for testing.
   - `zoi package doctor`: Lint and validate `.pkg.lua` definitions before testing/building.
@@ -380,6 +380,10 @@ Installs one or more packages. For split packages, you can specify a sub-package
 
 Zoi resolves dependencies, checks for conflicts, and then sequentially downloads and installs each package, showing progress bars for both download and installation phases.
 
+If a requested package is already installed in the target scope at the same version and revision, Zoi skips it with an "already installed" message instead of reinstalling.
+If an older version is installed, Zoi skips it and prints a hint pointing to zoi update <package>.
+If the package is installed in a different scope than requested, Zoi notes that but proceeds installing into the requested scope. `--force` bypasses these checks entirely and reinstalls.
+
 **Arguments:**
 
 - `[SOURCES]...`: Package names (e.g. `my-pkg`, `my-pkg:sub`), local paths, or URLs to `.pkg.lua` files.
@@ -387,7 +391,7 @@ Zoi resolves dependencies, checks for conflicts, and then sequentially downloads
 **Options:**
 
 - `--purl <PURL>`: Install a package by its Package URL (PURL), e.g. `pkg:zoi/zoidberg/core/curl`.
-- `--repo <REPO>`: Install from a git repository (e.g. 'Zillowe/Hello', 'gl:Zillowe/Hello').
+- `--repo <REPO>`: Install from a git repository (e.g. 'zillowe/hello', 'gh:zillowe/hello').
 - `--force`: Force re-installation even if the package is already installed.
 - `--all-optional`: Accept all optional dependencies.
 - `--scope <user|system|project>`: The scope to install the package to.
@@ -492,9 +496,11 @@ Build, create, and manage Zoi packages.
 **Subcommands:**
 
 - `build <package_file>`: Build a package from a `.pkg.lua` file.
+  - By default, Zoi uses a two-stage build: it first bundles the package into a source archive (`.zsa`) in a temporary location, then builds the distributable archive (`.zpa`) from that bundle. The intermediate `.zsa` is discarded after the build; use `zoi package bundle --sign` if you need a signed, distributable `.zsa`.
   - `--type <TYPE>`: The type of package to build (e.g. `source`, `pre-compiled`). If omitted, Zoi chooses `pre-compiled`, then `source`, then the first listed type.
   - `-p`, `--platform <PLATFORM>`: The platform to build for (default: `current`).
   - `-o`, `--output-dir <DIR>`: Directory to output the built package to.
+  - `--no-zsa`: Skip creating the intermediate source bundle and build directly from the `.pkg.lua` file.
   - `--sign <KEY>`: Sign the package with the given PGP key.
   - `--sub <SUB_PACKAGES...>`: For a split package, build only the specified sub-packages.
   - `--test`: Run package tests before building.

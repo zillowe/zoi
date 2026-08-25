@@ -19,8 +19,8 @@ use sequoia_openpgp::types::RevocationStatus;
 // - Package Authenticity: Pre-built archives are verified against maintainer
 //   keys.
 //
-// This module handles local keyring management (`~/.zoi/pgps/`) and provides
-// utilities for importing, searching, and verifying signatures.
+// This module handles local keyring management in Zoi's user data directory and
+// provides utilities for importing, searching, and verifying signatures.
 
 include!(concat!(env!("OUT_DIR"), "/generated_pgp_keys.rs"));
 
@@ -114,17 +114,15 @@ pub fn validate_cert(cert: &Cert) -> Result<()> {
 
 /// Returns the path to the local PGP keyring directory.
 ///
-/// This usually resides at `~/.zoi/pgps/`. The directory is created if it does
-/// not exist.
+/// This resides in Zoi's user data directory under `pgps/`. The directory is
+/// created if it does not exist.
 ///
 /// # Errors
 ///
 /// Returns an error if the home directory cannot be found or the PGP directory
 /// cannot be created.
 pub fn get_pgp_dir() -> Result<PathBuf> {
-    let home_dir = crate::utils::get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory."))?;
-    let pgp_dir = home_dir.join(".zoi").join("pgps");
+    let pgp_dir = crate::utils::get_user_data_dir()?.join("pgps");
     fs::create_dir_all(&pgp_dir)?;
     Ok(pgp_dir)
 }

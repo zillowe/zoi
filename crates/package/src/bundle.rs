@@ -20,6 +20,8 @@ use zstd::stream::write::Encoder as ZstdEncoder;
 
 /// Bundles a package and its dependencies into a `.zsa` archive.
 ///
+/// Returns the path of the created archive.
+///
 /// # Errors
 ///
 /// Returns an error if:
@@ -32,7 +34,7 @@ pub fn run(
     sign: Option<String>,
     version_override: Option<&str>,
     build_type: Option<&str>
-) -> Result<()> {
+) -> Result<PathBuf> {
     let pkg_dir = package_file
         .parent()
         .ok_or_else(|| anyhow!("Could not get parent directory"))?;
@@ -416,5 +418,5 @@ pub fn run(
         );
     }
 
-    Ok(())
+    Ok(output_path)
 }

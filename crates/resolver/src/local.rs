@@ -283,6 +283,10 @@ pub fn get_installed_manifests_in_scope(
 
 /// Finds installed manifests matching a package request in a specific scope.
 ///
+/// Name, repo, and registry handle comparisons are case-insensitive because
+/// source strings are normalized to lowercase during parsing while manifests
+/// store the original casing from package metadata.
+///
 /// # Errors
 ///
 /// Returns an error if installed manifests cannot be retrieved.
@@ -294,16 +298,15 @@ pub fn find_installed_manifests_matching(
     Ok(manifests
         .into_iter()
         .filter(|manifest| {
-            manifest.name == request.name
+            manifest.name.eq_ignore_ascii_case(&request.name)
                 && manifest.sub_package == request.sub_package
-                && request
-                    .handle
-                    .as_ref()
-                    .is_none_or(|handle| manifest.registry_handle == *handle)
+                && request.handle.as_ref().is_none_or(|handle| {
+                    manifest.registry_handle.eq_ignore_ascii_case(handle)
+                })
                 && request
                     .repo
                     .as_ref()
-                    .is_none_or(|repo| manifest.repo == *repo)
+                    .is_none_or(|repo| manifest.repo.eq_ignore_ascii_case(repo))
                 && request
                     .version_spec
                     .as_ref()

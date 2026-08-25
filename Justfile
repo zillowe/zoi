@@ -6,6 +6,7 @@ set dotenv-load
 set dotenv-filename := "config.just"
 
 PREFIX := env("PREFIX", "/usr/local")
+PROFILE := env("PROFILE", "release")
 OS_NAME := env("OS_NAME", shell("uname -s | tr '[:upper:]' '[:lower:]'"))
 ARCH_NAME := env("ARCH_NAME", shell("uname -m"))
 WITH_BIN := env("WITH_BIN", "both")
@@ -21,9 +22,9 @@ DAEMON_NAME := "zoid"
 COMMIT_HASH := shell("git rev-parse --short=10 HEAD")
 IS_WINDOWS := if OS_NAME == "windows" { "1" } else { "0" }
 EXE_EXT := if IS_WINDOWS == "1" { ".exe" } else { "" }
-SRC_BIN := "target/release/" + NAME + EXE_EXT
-MINI_SRC_BIN := "target/release/" + MINI_NAME + EXE_EXT
-DAEMON_SRC_BIN := "target/release/" + DAEMON_NAME + EXE_EXT
+SRC_BIN := "target/" + PROFILE + "/" + NAME + EXE_EXT
+MINI_SRC_BIN := "target/" + PROFILE + "/" + MINI_NAME + EXE_EXT
+DAEMON_SRC_BIN := "target/" + PROFILE + "/" + DAEMON_NAME + EXE_EXT
 DEBUG_SRC_BIN := "target/debug/" + NAME + EXE_EXT
 MINI_DEBUG_SRC_BIN := "target/debug/" + MINI_NAME + EXE_EXT
 DAEMON_DEBUG_SRC_BIN := "target/debug/" + DAEMON_NAME + EXE_EXT
@@ -38,18 +39,18 @@ default: help
 build:
     @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
     @if ! command -v clang >/dev/null 2>&1; then echo "Error: 'clang' is not installed. It is required for bindgen."; exit 1; fi
-    @echo "Building Zoi targets: {{ WITH_BIN }} in release mode (commit: {{ COMMIT_HASH }})..."; \
+    @echo "Building Zoi targets: {{ WITH_BIN }} in {{ PROFILE }} mode (commit: {{ COMMIT_HASH }})..."; \
     set -a; source .env 2>/dev/null; export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; \
     if [ "{{ WITH_BIN }}" = "zoi" ]; then \
-        cargo build --bin zoi --release; \
+        cargo build --bin zoi --profile {{ PROFILE }}; \
     elif [ "{{ WITH_BIN }}" = "zoi-mini" ]; then \
-        cargo build --bin zoi-mini --release; \
+        cargo build --bin zoi-mini --profile {{ PROFILE }}; \
     elif [ "{{ WITH_BIN }}" = "zoid" ]; then \
-        cargo build --bin zoid --release; \
+        cargo build --bin zoid --profile {{ PROFILE }}; \
     elif [ "{{ WITH_BIN }}" = "both" ]; then \
-        cargo build --bin zoi --bin zoi-mini --release; \
+        cargo build --bin zoi --bin zoi-mini --profile {{ PROFILE }}; \
     else \
-        cargo build --bin zoi --bin zoi-mini --bin zoid --release; \
+        cargo build --bin zoi --bin zoi-mini --bin zoid --profile {{ PROFILE }}; \
     fi
     @echo "Build complete for {{ OS_NAME }} ({{ ARCH_NAME }})."
 

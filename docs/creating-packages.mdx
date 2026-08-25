@@ -512,6 +512,10 @@ Once a package with a service is installed, you can manage it using the `zoi ser
 - `zoi service status <package>`
 - `zoi service list`
 
+Zoi refreshes its managed unit or plist whenever you run a service action, so
+service settings changed by a package update are applied without manually
+removing the previous definition.
+
 ---
 
 ## 10. CI Runner Support
@@ -595,7 +599,7 @@ To get rich autocomplete, type checking, and hover documentation for Zoi's Lua A
 zoi package init-lsp
 ```
 
-This command creates a `.luarc.json` file in your directory and installs EmmyLua type definitions to `~/.zoi/lsp/`.
+This command creates a `.luarc.json` file in your directory and installs EmmyLua type definitions to Zoi's user data directory under `zoi/lsp/`.
 
 ### Step 5: Test Your Package
 
@@ -639,11 +643,13 @@ temp/
 
 Once your tests are passing, build the final `.zpa` archive. You can build directly from a `.pkg.lua` script or from a `.zsa` bundle.
 
+By default, when you pass a `.pkg.lua` file, Zoi uses a two-stage build: it first bundles your package into a source archive (`.zsa`) in a temporary location, then builds the distributable archive (`.zpa`) from that bundle. The intermediate bundle is discarded after the build. If you need a signed or reusable source archive, create one explicitly with `zoi package bundle`.
+
 ```sh
-# Build from script
+# Build from script (bundles into a temporary .zsa first, then builds the .zpa)
 zoi package build --type <build-type> /path/to/your-package.pkg.lua
 
-# Build from source bundle
+# Build from an existing source bundle
 zoi package build /path/to/your-package.zsa
 ```
 
@@ -657,6 +663,7 @@ zoi package build --type <build-type> --test /path/to/your-package.pkg.lua
 
 - `--type <TYPE>`: The build type to use (e.g. `source`). If omitted, Zoi chooses `pre-compiled`, then `source`, then the first listed type.
 - `--platform <PLATFORM>`: Build for a specific platform (e.g. `linux-arm64`). Defaults to your current platform.
+- `--no-zsa`: Skip creating the intermediate source bundle and build directly from the `.pkg.lua` file.
 - `--sub <SUB_PACKAGE...>`: For a split package, build only the specified sub-packages.
 - `--sign <KEY>`: Sign the resulting archive with a PGP key from your Zoi keyring.
 - `--test`: Run the `test()` function before building the archive.

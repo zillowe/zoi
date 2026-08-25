@@ -11,7 +11,7 @@ use std::time::SystemTime;
 /// - Integrity Issues: Mismatches between the store and the lockfile.
 /// - Path Configuration: Missing Zoi binary directories in the host PATH.
 /// - Registry Staleness: Repositories that haven't been synced recently.
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use rayon::prelude::*;
 use walkdir::WalkDir;
 use zoi_core::types::{InstallReason, Scope};
@@ -21,11 +21,7 @@ use zoi_resolver::{local, resolve};
 /// Returns the root directory for binary shims for a given scope.
 fn get_bin_root(scope: Scope) -> Result<PathBuf> {
     match scope {
-        Scope::User => {
-            let home_dir = utils::get_user_home()
-                .ok_or_else(|| anyhow!("Could not find home directory."))?;
-            Ok(sysroot::apply_sysroot(home_dir.join(".zoi/pkgs/bin")))
-        }
+        Scope::User => utils::get_user_bin_dir(),
         Scope::System => {
             if cfg!(target_os = "windows") {
                 Ok(sysroot::apply_sysroot(PathBuf::from(
@@ -87,9 +83,7 @@ pub fn check_broken_symlinks() -> Result<Vec<PathBuf>> {
 ///
 /// Returns an error if the user's home directory cannot be found.
 pub fn check_path_configuration() -> Result<Option<String>> {
-    if let Some(home) = utils::get_user_home() {
-        let zoi_bin_dir =
-            sysroot::apply_sysroot(home.join(".zoi").join("pkgs").join("bin"));
+    if let Ok(zoi_bin_dir) = utils::get_user_bin_dir() {
         if !zoi_bin_dir.exists() {
             return Ok(None);
         }

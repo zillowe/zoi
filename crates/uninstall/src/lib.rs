@@ -23,11 +23,7 @@ use zoi_telemetry as telemetry;
 /// Gets the root directory for binaries based on the installation scope.
 fn get_bin_root(scope: types::Scope) -> anyhow::Result<PathBuf> {
     match scope {
-        types::Scope::User => {
-            let home_dir = core_utils::get_user_home()
-                .ok_or_else(|| anyhow!("Could not find home directory."))?;
-            Ok(sysroot::apply_sysroot(home_dir.join(".zoi/pkgs/bin")))
-        }
+        types::Scope::User => core_utils::get_user_bin_dir(),
         types::Scope::System => {
             if cfg!(target_os = "windows") {
                 Ok(sysroot::apply_sysroot(PathBuf::from(
@@ -51,13 +47,7 @@ fn get_completions_root(
     shell: &str
 ) -> anyhow::Result<PathBuf> {
     match scope {
-        types::Scope::User => {
-            let home_dir = core_utils::get_user_home()
-                .ok_or_else(|| anyhow!("Could not find home directory."))?;
-            Ok(sysroot::apply_sysroot(
-                home_dir.join(".zoi/pkgs/shell").join(shell)
-            ))
-        }
+        types::Scope::User => core_utils::get_user_completions_dir(shell),
         types::Scope::System => {
             if cfg!(target_os = "windows") {
                 Ok(sysroot::apply_sysroot(PathBuf::from(format!(
@@ -792,17 +782,37 @@ pub fn run(
                 continue;
             }
 
-            if file_path.exists() {
-                if file_path.is_dir() {
-                    // Only remove if empty to be safe
-                    if fs::read_dir(&file_path)
-                        .is_ok_and(|mut e| e.next().is_none())
-                    {
-                        let _ = fs::remove_dir(&file_path);
-                    }
-                } else {
-                    let _ = fs::remove_file(&file_path);
+            // Use symlink_metadata so links are removed even when they dangle
+            // or point to a non-empty directory; only the link is deleted.
+            let Ok(meta) = fs::symlink_metadata(&file_path) else {
+                continue;
+            };
+
+            if let Some(pkg_id) = pkg_id_opt
+                && let Ok(conn) = db::open_connection("local")
+                && let Ok(true) =
+                    db::has_other_owners(&conn, file_path_str, pkg_id)
+            {
+                if !quiet {
+                    println!(
+                        "Keeping {} as it is still owned by other packages.",
+                        file_path_str.dimmed()
+                    );
                 }
+                continue;
+            }
+
+            if meta.file_type().is_symlink() {
+                let _ = fs::remove_file(&file_path);
+            } else if meta.is_dir() {
+                // Only remove if empty to be safe
+                if fs::read_dir(&file_path)
+                    .is_ok_and(|mut e| e.next().is_none())
+                {
+                    let _ = fs::remove_dir(&file_path);
+                }
+            } else {
+                let _ = fs::remove_file(&file_path);
             }
         }
 

@@ -24,6 +24,22 @@ pub enum ServiceAction {
     Disable
 }
 
+/// Runs a service-manager command and turns a non-zero exit code into an
+/// error instead of reporting a successful service action.
+fn run_service_command(cmd: &mut Command, description: &str) -> Result<()> {
+    let status = cmd
+        .status()
+        .with_context(|| format!("Failed to run {description}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "{description} failed with exit code {:?}",
+            status.code()
+        ))
+    }
+}
+
 /// Manages a service for a given package.
 ///
 /// # Errors
@@ -121,9 +137,8 @@ pub fn cleanup_service(package_name: &str, scope: types::Scope) -> Result<()> {
                     if is_user {
                         cmd.arg("--user");
                     }
-                    cmd.arg("daemon-reload")
-                        .status()
-                        .context("Failed to run systemctl daemon-reload")?;
+                    cmd.arg("daemon-reload");
+                    run_service_command(&mut cmd, "systemctl daemon-reload")?;
                 }
             }
         }
@@ -295,10 +310,6 @@ fn ensure_linux_unit_file(
         )))
     };
 
-    if unit_path.exists() {
-        return Ok(());
-    }
-
     let mut content = String::from(
         "[Unit]
 Description=Zoi managed service: "
@@ -352,9 +363,8 @@ WorkingDirectory="
         if is_user {
             cmd.arg("--user");
         }
-        cmd.arg("daemon-reload")
-            .status()
-            .context("Failed to run systemctl daemon-reload")?;
+        cmd.arg("daemon-reload");
+        run_service_command(&mut cmd, "systemctl daemon-reload")?;
     }
 
     Ok(())
@@ -376,31 +386,27 @@ fn manage_macos_service(
 
     match action {
         ServiceAction::Start | ServiceAction::Enable => {
-            Command::new("launchctl")
-                .arg("bootstrap")
+            let mut cmd = Command::new("launchctl");
+            cmd.arg("bootstrap")
                 .arg(if is_user { "gui" } else { "system" })
-                .arg(plist_path)
-                .status()
-                .context("Failed to run launchctl bootstrap")?;
+                .arg(plist_path);
+            run_service_command(&mut cmd, "launchctl bootstrap")?;
         }
         ServiceAction::Stop | ServiceAction::Disable => {
-            Command::new("launchctl")
-                .arg("bootout")
+            let mut cmd = Command::new("launchctl");
+            cmd.arg("bootout")
                 .arg(if is_user { "gui" } else { "system" })
-                .arg(plist_path)
-                .status()
-                .context("Failed to run launchctl bootout")?;
+                .arg(plist_path);
+            run_service_command(&mut cmd, "launchctl bootout")?;
         }
         ServiceAction::Restart => {
             manage_macos_service(name, service, ServiceAction::Stop, scope)?;
             manage_macos_service(name, service, ServiceAction::Start, scope)?;
         }
         ServiceAction::Status => {
-            Command::new("launchctl")
-                .arg("list")
-                .arg(name)
-                .status()
-                .context("Failed to run launchctl list")?;
+            let mut cmd = Command::new("launchctl");
+            cmd.arg("list").arg(name);
+            run_service_command(&mut cmd, "launchctl list")?;
         }
     }
 
@@ -426,10 +432,6 @@ fn ensure_macos_plist(
             "/Library/LaunchDaemons/{name}.plist"
         )))
     };
-
-    if plist_path.exists() {
-        return Ok(plist_path);
-    }
 
     let mut content = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -517,59 +519,62 @@ fn manage_windows_service(
             if !service_exists_windows(name)? {
                 create_windows_service(name, service)?;
             }
-            Command::new("sc")
-                .arg("start")
-                .arg(name)
-                .status()
-                .context("Failed to run sc start")?;
+            let mut cmd = Command::new("sc");
+            cmd.arg("start").arg(name);
+            run_service_command(&mut cmd, "sc start")?;
         }
         ServiceAction::Stop => {
-            Command::new("sc")
-                .arg("stop")
-                .arg(name)
-                .status()
-                .context("Failed to run sc stop")?;
+            let mut cmd = Command::new("sc");
+            cmd.arg("stop").arg(name);
+            run_service_command(&mut cmd, "sc stop")?;
         }
         ServiceAction::Restart => {
-            Command::new("sc")
-                .arg("stop")
-                .arg(name)
-                .status()
-                .context("Failed to run sc stop (restart)")?;
-            Command::new("sc")
-                .arg("start")
-                .arg(name)
-                .status()
-                .context("Failed to run sc start (restart)")?;
+            let mut stop = Command::new("sc");
+            stop.arg("stop").arg(name);
+            run_service_command(&mut stop, "sc stop (restart)")?;
+            let mut start = Command::new("sc");
+            start.arg("start").arg(name);
+            run_service_command(&mut start, "sc start (restart)")?;
         }
         ServiceAction::Status => {
-            Command::new("sc")
-                .arg("query")
-                .arg(name)
-                .status()
-                .context("Failed to run sc query")?;
+            let mut cmd = Command::new("sc");
+            cmd.arg("query").arg(name);
+            run_service_command(&mut cmd, "sc query")?;
         }
         ServiceAction::Enable => {
             if !service_exists_windows(name)? {
                 create_windows_service(name, service)?;
             }
-            Command::new("sc")
-                .arg("config")
-                .arg(name)
-                .arg("start=auto")
-                .status()?;
-            Command::new("sc").arg("start").arg(name).status()?;
+            let mut configure = Command::new("sc");
+            configure.arg("config").arg(name).arg("start=auto");
+            run_service_command(&mut configure, "sc config")?;
+            let mut start = Command::new("sc");
+            start.arg("start").arg(name);
+            run_service_command(&mut start, "sc start")?;
         }
         ServiceAction::Disable => {
-            Command::new("sc").arg("stop").arg(name).status()?;
-            Command::new("sc")
-                .arg("config")
-                .arg(name)
-                .arg("start=disabled")
-                .status()?;
+            let mut stop = Command::new("sc");
+            stop.arg("stop").arg(name);
+            run_service_command(&mut stop, "sc stop")?;
+            let mut configure = Command::new("sc");
+            configure.arg("config").arg(name).arg("start=disabled");
+            run_service_command(&mut configure, "sc config")?;
         }
     }
     Ok(())
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use std::process::Command;
+
+    use super::run_service_command;
+
+    #[test]
+    fn service_command_reports_non_zero_exit_status() {
+        let mut command = Command::new("false");
+        assert!(run_service_command(&mut command, "test command").is_err());
+    }
 }
 
 /// Checks if a Windows service exists.

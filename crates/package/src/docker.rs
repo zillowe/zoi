@@ -111,10 +111,22 @@ pub fn run(
     let package_filename = abs_package_file
         .file_name()
         .ok_or_else(|| anyhow!("Invalid package file name"))?
-        .to_string_lossy();
+        .to_string_lossy()
+        .into_owned();
+    let build_args = build_command_args(
+        package_filename,
+        build_type,
+        platforms,
+        sign_key,
+        container_output_dir,
+        version_override,
+        sub_packages,
+        fakeroot,
+        install_deps,
+        test
+    );
 
-    let mut inner_cmd = format!(
-        "if ! command -v sudo >/dev/null 2>&1 && [ \"$(id -u)\" -eq 0 ]; then \
+    let inner_script = "if ! command -v sudo >/dev/null 2>&1 && [ \"$(id -u)\" -eq 0 ]; then \
             if command -v pacman >/dev/null 2>&1; then pacman -Sy --noconfirm sudo gnupg; \
             elif command -v apt-get >/dev/null 2>&1; then apt-get update && apt-get install -y sudo gnupg; \
             elif command -v dnf >/dev/null 2>&1; then dnf install -y sudo gnupg; \
@@ -127,51 +139,13 @@ pub fn run(
          curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash && \
          export PATH=\"$HOME/.local/bin:$PATH\" && \
          zoi sync && \
-         zoi package build {package_filename} --output-dir {container_output_dir}",
-    );
-
-    if let Some(bt) = build_type {
-        use std::fmt::Write;
-        let _ = write!(inner_cmd, " --type {bt}");
-    }
-
-    for p in platforms {
-        use std::fmt::Write;
-        let _ = write!(inner_cmd, " --platform {p}");
-    }
-
-    if let Some(sk) = sign_key {
-        use std::fmt::Write;
-        let _ = write!(inner_cmd, " --sign {sk}");
-    }
-
-    if let Some(v) = version_override {
-        use std::fmt::Write;
-        let _ = write!(inner_cmd, " --version-override {v}");
-    }
-
-    if let Some(subs) = sub_packages {
-        for s in subs {
-            use std::fmt::Write;
-            let _ = write!(inner_cmd, " --sub {s}");
-        }
-    }
-
-    if fakeroot {
-        inner_cmd.push_str(" --fakeroot");
-    }
-
-    if install_deps {
-        inner_cmd.push_str(" --install-deps");
-    }
-
-    if test {
-        inner_cmd.push_str(" --test");
-    }
+         exec zoi package build \"$@\"";
 
     docker_args.push("bash".to_string());
     docker_args.push("-c".to_string());
-    docker_args.push(inner_cmd);
+    docker_args.push(inner_script.to_string());
+    docker_args.push("zoi-package-build".to_string());
+    docker_args.extend(build_args);
 
     println!("Running docker command: {}", "docker".cyan());
     let status = Command::new("docker").args(&docker_args).status()?;
@@ -186,4 +160,87 @@ pub fn run(
     println!("{}", "Docker build successful!".green());
 
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+/// Builds the argument vector forwarded by the Docker bootstrap shell.
+fn build_command_args(
+    package_filename: String,
+    build_type: Option<&str>,
+    platforms: &[String],
+    sign_key: Option<String>,
+    output_dir: &str,
+    version_override: Option<&str>,
+    sub_packages: Option<Vec<String>>,
+    fakeroot: bool,
+    install_deps: bool,
+    test: bool
+) -> Vec<String> {
+    let mut args = vec![
+        package_filename,
+        "--output-dir".to_string(),
+        output_dir.to_string(),
+    ];
+
+    if let Some(build_type) = build_type {
+        args.extend(["--type".to_string(), build_type.to_string()]);
+    }
+    for platform in platforms {
+        args.extend(["--platform".to_string(), platform.clone()]);
+    }
+    if let Some(sign_key) = sign_key {
+        args.extend(["--sign".to_string(), sign_key]);
+    }
+    if let Some(version_override) = version_override {
+        args.extend([
+            "--version-override".to_string(),
+            version_override.to_string()
+        ]);
+    }
+    if let Some(sub_packages) = sub_packages {
+        for sub_package in sub_packages {
+            args.extend(["--sub".to_string(), sub_package]);
+        }
+    }
+    if fakeroot {
+        args.push("--fakeroot".to_string());
+    }
+    if install_deps {
+        args.push("--install-deps".to_string());
+    }
+    if test {
+        args.push("--test".to_string());
+    }
+
+    args
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_command_args;
+
+    #[test]
+    fn build_arguments_keep_shell_syntax_as_data() {
+        let args = build_command_args(
+            "package; touch /tmp/pwned.pkg.lua".to_string(),
+            Some("source; id"),
+            &["linux-amd64; id".to_string()],
+            Some("key; id".to_string()),
+            "/output",
+            Some("1.0.0; id"),
+            Some(vec!["sub; id".to_string()]),
+            true,
+            true,
+            true
+        );
+
+        assert!(
+            args.contains(&"package; touch /tmp/pwned.pkg.lua".to_string())
+        );
+        assert!(args.contains(&"source; id".to_string()));
+        assert!(args.contains(&"linux-amd64; id".to_string()));
+        assert!(args.contains(&"key; id".to_string()));
+        assert!(args.contains(&"1.0.0; id".to_string()));
+        assert!(args.contains(&"sub; id".to_string()));
+    }
 }

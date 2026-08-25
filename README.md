@@ -143,7 +143,7 @@ Thanks you all for helping with developing Zoi.
 Getting started with Zoi is simple. Just follow these three steps:
 
 1. **Install Zoi:**
-   Choose one of the [installation methods](#-installation) below.
+   Choose one of the [installation methods](#installation) below.
 
 2. **Sync Repositories:**
    Before you can install packages, you need to sync the package repositories.

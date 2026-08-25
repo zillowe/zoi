@@ -105,7 +105,11 @@ pub fn command_exists(command: &str) -> bool {
     } else {
         Command::new("bash")
             .arg("-c")
-            .arg(format!("command -v {command}"))
+            // Pass the command as a positional argument so metadata supplied
+            // names cannot alter the shell program being executed.
+            .arg("command -v -- \"$1\"")
+            .arg("zoi-command-exists")
+            .arg(command)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
@@ -166,6 +170,138 @@ pub fn get_user_home() -> Option<PathBuf> {
     home::home_dir()
 }
 
+/// Returns Zoi's user configuration directory according to the XDG Base
+/// Directory specification.
+///
+/// # Errors
+///
+/// Returns an error if no suitable user configuration directory can be found.
+pub fn get_user_config_dir() -> Result<PathBuf> {
+    let root =
+        xdg_or_platform_dir("XDG_CONFIG_HOME", dirs::config_dir, |home| {
+            home.join(".config")
+        })?;
+    Ok(crate::sysroot::apply_sysroot(root.join("zoi")))
+}
+
+/// Returns Zoi's user data directory according to the XDG Base Directory
+/// specification.
+///
+/// # Errors
+///
+/// Returns an error if no suitable user data directory can be found.
+pub fn get_user_data_dir() -> Result<PathBuf> {
+    let root =
+        xdg_or_platform_dir("XDG_DATA_HOME", dirs::data_local_dir, |home| {
+            home.join(".local/share")
+        })?;
+    Ok(crate::sysroot::apply_sysroot(root.join("zoi")))
+}
+
+/// Returns Zoi's user cache directory according to the XDG Base Directory
+/// specification.
+///
+/// # Errors
+///
+/// Returns an error if no suitable user cache directory can be found.
+pub fn get_user_cache_dir() -> Result<PathBuf> {
+    let root =
+        xdg_or_platform_dir("XDG_CACHE_HOME", dirs::cache_dir, |home| {
+            home.join(".cache")
+        })?;
+    Ok(crate::sysroot::apply_sysroot(root.join("zoi")))
+}
+
+/// Returns Zoi's user state directory, honoring `XDG_STATE_HOME` first.
+///
+/// # Errors
+///
+/// Returns an error if no suitable user state directory can be found.
+pub fn get_user_state_dir() -> Result<PathBuf> {
+    let root =
+        xdg_or_platform_dir("XDG_STATE_HOME", dirs::data_local_dir, |home| {
+            home.join(".local/state")
+        })?;
+    Ok(crate::sysroot::apply_sysroot(root.join("zoi")))
+}
+
+/// Resolves an XDG directory, falling back to the native platform convention.
+fn xdg_or_platform_dir(
+    variable: &str,
+    platform_dir: impl FnOnce() -> Option<PathBuf>,
+    unix_fallback: impl FnOnce(PathBuf) -> PathBuf
+) -> Result<PathBuf> {
+    if let Some(path) =
+        std::env::var_os(variable).filter(|path| !path.is_empty())
+    {
+        let path = PathBuf::from(path);
+        if path.is_absolute() {
+            return Ok(path);
+        }
+    }
+    if cfg!(unix) && !cfg!(target_os = "macos") {
+        return get_user_home()
+            .map(unix_fallback)
+            .ok_or_else(|| anyhow!("Could not find home directory."));
+    }
+    platform_dir()
+        .ok_or_else(|| anyhow!("Could not determine platform directory."))
+}
+
+/// Returns the directory used for user-installed command shims.
+///
+/// # Errors
+///
+/// Returns an error if the user data directory cannot be determined.
+pub fn get_user_bin_dir() -> Result<PathBuf> {
+    Ok(get_user_data_dir()?.join("pkgs").join("bin"))
+}
+
+/// Returns the directory used for user shell-completion files.
+///
+/// # Errors
+///
+/// Returns an error if the user data directory cannot be determined.
+pub fn get_user_completions_dir(shell: &str) -> Result<PathBuf> {
+    Ok(get_user_data_dir()?.join("pkgs").join("shell").join(shell))
+}
+
+/// Returns the platform-native directory for system-wide Zoi data.
+pub fn get_system_data_dir() -> PathBuf {
+    let path = if cfg!(target_os = "windows") {
+        PathBuf::from("C:\\ProgramData\\zoi")
+    } else if cfg!(target_os = "macos") {
+        PathBuf::from("/Library/Application Support/zoi")
+    } else {
+        PathBuf::from("/var/lib/zoi")
+    };
+    crate::sysroot::apply_sysroot(path)
+}
+
+/// Returns the platform-native directory for system-wide Zoi configuration.
+pub fn get_system_config_dir() -> PathBuf {
+    let path = if cfg!(target_os = "windows") {
+        PathBuf::from("C:\\ProgramData\\zoi")
+    } else if cfg!(target_os = "macos") {
+        PathBuf::from("/Library/Application Support/zoi")
+    } else {
+        PathBuf::from("/etc/zoi")
+    };
+    crate::sysroot::apply_sysroot(path)
+}
+
+/// Returns the platform-native directory for system-wide Zoi cache files.
+pub fn get_system_cache_dir() -> PathBuf {
+    let path = if cfg!(target_os = "windows") {
+        PathBuf::from("C:\\ProgramData\\zoi\\cache")
+    } else if cfg!(target_os = "macos") {
+        PathBuf::from("/Library/Caches/zoi")
+    } else {
+        PathBuf::from("/var/cache/zoi")
+    };
+    crate::sysroot::apply_sysroot(path)
+}
+
 /// Returns the root directory for the package database.
 ///
 /// # Errors
@@ -175,15 +311,13 @@ pub fn get_db_root() -> Result<std::path::PathBuf> {
     if let Ok(path) = std::env::var("ZOI_DB_DIR") {
         return Ok(std::path::PathBuf::from(path));
     }
-    let home_dir = get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("db"))
+    Ok(get_user_data_dir()?.join("pkgs").join("db"))
 }
 
 /// Returns the root directory of the package store for a given scope.
 ///
 /// Store Locations:
-/// - `User`: `~/.zoi/pkgs/store/`
+/// - `User`: `$XDG_DATA_HOME/zoi/pkgs/store/`, or the native fallback.
 /// - `System`: `/var/lib/zoi/pkgs/store/` (Linux) or
 ///   `C:\ProgramData\zoi\pkgs\store` (Windows)
 /// - `Project`: `./.zoi/pkgs/store/` (Relative to current project root)
@@ -195,22 +329,10 @@ pub fn get_db_root() -> Result<std::path::PathBuf> {
 pub fn get_store_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
     match scope {
         crate::types::Scope::User => {
-            let home_dir = get_user_home()
-                .ok_or_else(|| anyhow!("Could not find home directory."))?;
-            Ok(crate::sysroot::apply_sysroot(
-                home_dir.join(".zoi").join("pkgs").join("store")
-            ))
+            Ok(get_user_data_dir()?.join("pkgs").join("store"))
         }
         crate::types::Scope::System => {
-            if cfg!(target_os = "windows") {
-                Ok(crate::sysroot::apply_sysroot(PathBuf::from(
-                    "C:\\ProgramData\\zoi\\pkgs\\store"
-                )))
-            } else {
-                Ok(crate::sysroot::apply_sysroot(PathBuf::from(
-                    "/var/lib/zoi/pkgs/store"
-                )))
-            }
+            Ok(get_system_data_dir().join("pkgs").join("store"))
         }
         crate::types::Scope::Project => {
             let current_dir = std::env::current_dir()?;
@@ -228,22 +350,10 @@ pub fn get_store_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
 pub fn get_db_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
     match scope {
         crate::types::Scope::User => {
-            let home_dir = get_user_home()
-                .ok_or_else(|| anyhow!("Could not find home directory."))?;
-            Ok(crate::sysroot::apply_sysroot(
-                home_dir.join(".zoi").join("pkgs").join("db")
-            ))
+            Ok(get_user_data_dir()?.join("pkgs").join("db"))
         }
         crate::types::Scope::System => {
-            if cfg!(target_os = "windows") {
-                Ok(crate::sysroot::apply_sysroot(PathBuf::from(
-                    "C:\\ProgramData\\zoi\\pkgs\\db"
-                )))
-            } else {
-                Ok(crate::sysroot::apply_sysroot(PathBuf::from(
-                    "/var/lib/zoi/pkgs/db"
-                )))
-            }
+            Ok(get_system_data_dir().join("pkgs").join("db"))
         }
         crate::types::Scope::Project => {
             let current_dir = std::env::current_dir()?;
@@ -261,22 +371,10 @@ pub fn get_db_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
 pub fn get_git_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
     match scope {
         crate::types::Scope::User => {
-            let home_dir = get_user_home()
-                .ok_or_else(|| anyhow!("Could not find home directory."))?;
-            Ok(crate::sysroot::apply_sysroot(
-                home_dir.join(".zoi").join("pkgs").join("git")
-            ))
+            Ok(get_user_data_dir()?.join("pkgs").join("git"))
         }
         crate::types::Scope::System => {
-            if cfg!(target_os = "windows") {
-                Ok(crate::sysroot::apply_sysroot(PathBuf::from(
-                    "C:\\ProgramData\\zoi\\pkgs\\git"
-                )))
-            } else {
-                Ok(crate::sysroot::apply_sysroot(PathBuf::from(
-                    "/var/lib/zoi/pkgs/git"
-                )))
-            }
+            Ok(get_system_data_dir().join("pkgs").join("git"))
         }
         crate::types::Scope::Project => {
             let current_dir = std::env::current_dir()?;
@@ -345,6 +443,19 @@ pub fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
         let ty = entry.file_type()?;
         if ty.is_dir() {
             copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
+        } else if ty.is_symlink() {
+            let target = fs::read_link(entry.path())?;
+            let destination = dst.join(entry.file_name());
+            #[cfg(unix)]
+            std::os::unix::fs::symlink(target, destination)?;
+            #[cfg(windows)]
+            {
+                if target.is_dir() {
+                    std::os::windows::fs::symlink_dir(target, destination)?;
+                } else {
+                    std::os::windows::fs::symlink_file(target, destination)?;
+                }
+            }
         } else {
             fs::copy(entry.path(), dst.join(entry.file_name()))?;
         }
@@ -1174,8 +1285,13 @@ pub fn confirm_untrusted_source(
     }
 }
 
-/// Expands standard Zoi path placeholders (e.g. `${pkgstore}`, `${usrhome}`) in
-/// a string.
+/// Expands standard Zoi path placeholders (e.g. `${pkgstore}`, `${usrhome}`)
+/// in a string.
+///
+/// Note that `${createpkgdir}` is deliberately not expanded here: it depends
+/// on the directory Zoi was invoked from during installation, so resolving it
+/// at cleanup time could target an unrelated path. Pooled installations
+/// record the absolute location for these entries instead.
 ///
 /// # Errors
 ///

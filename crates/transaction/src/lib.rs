@@ -33,13 +33,7 @@ pub(crate) fn get_completions_root(
     shell: &str
 ) -> Result<std::path::PathBuf> {
     match scope {
-        types::Scope::User => {
-            let home_dir = zoi_core::utils::get_user_home()
-                .ok_or_else(|| anyhow!("Could not find home directory."))?;
-            Ok(zoi_core::sysroot::apply_sysroot(
-                home_dir.join(".zoi/pkgs/shell").join(shell)
-            ))
-        }
+        types::Scope::User => zoi_core::utils::get_user_completions_dir(shell),
         types::Scope::System => {
             if cfg!(target_os = "windows") {
                 Ok(zoi_core::sysroot::apply_sysroot(std::path::PathBuf::from(
@@ -108,16 +102,22 @@ pub struct TransactionMetadata {
 
 /// Gets the directory where transaction logs are stored.
 fn get_transactions_dir() -> Result<PathBuf> {
-    let home_dir = zoi_core::utils::get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory."))?;
-    let dir = zoi_core::sysroot::apply_sysroot(home_dir.join(".zoi"))
-        .join("transactions");
+    let dir = zoi_core::utils::get_user_state_dir()?.join("transactions");
     fs::create_dir_all(&dir)?;
     Ok(dir)
 }
 
+/// Validates an externally supplied transaction identifier before using it in
+/// a filesystem path.
+fn validate_transaction_id(id: &str) -> Result<()> {
+    Uuid::parse_str(id)
+        .map(|_| ())
+        .map_err(|_| anyhow!("Invalid transaction ID: {id}"))
+}
+
 /// Gets the path to a specific transaction log file.
 fn get_transaction_path(id: &str) -> Result<PathBuf> {
+    validate_transaction_id(id)?;
     let dir = get_transactions_dir()?;
     let active_path = dir.join(format!("{id}.json"));
     if active_path.exists() {
@@ -206,6 +206,7 @@ pub fn record_operation(
 /// Returns an error if the transaction directory cannot be accessed or if
 /// the log file cannot be moved to the history directory.
 pub fn commit(transaction_id: &str) -> Result<()> {
+    validate_transaction_id(transaction_id)?;
     let dir = get_transactions_dir()?;
     let path = dir.join(format!("{transaction_id}.json"));
     if !path.exists() {
@@ -360,11 +361,7 @@ fn install_source_for_manifest(manifest: &types::InstallManifest) -> String {
 fn restore_shims(manifest: &types::InstallManifest) -> Result<()> {
     if let Some(bins) = &manifest.bins {
         let bin_root = match manifest.scope {
-            types::Scope::User => {
-                let home = zoi_core::utils::get_user_home()
-                    .ok_or_else(|| anyhow!("Could not find home directory."))?;
-                sysroot::apply_sysroot(home.join(".zoi/pkgs/bin"))
-            }
+            types::Scope::User => zoi_core::utils::get_user_bin_dir()?,
             types::Scope::System => {
                 if cfg!(target_os = "windows") {
                     sysroot::apply_sysroot(PathBuf::from(
@@ -413,6 +410,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
     let transaction: types::Transaction = serde_json::from_str(&content)?;
 
     println!("\n{} Starting Rollback...", "::".bold().blue());
+    let mut rollback_failed = false;
 
     for operation in transaction.operations.iter().rev() {
         match operation {
@@ -436,6 +434,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                         manifest.name,
                         e
                     );
+                    rollback_failed = true;
                 }
             }
             types::TransactionOperation::Uninstall { manifest } => {
@@ -460,6 +459,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                             "Error:".red().bold(),
                             e
                         );
+                        rollback_failed = true;
                         continue;
                     }
                 };
@@ -487,8 +487,17 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                             manifest.name,
                             e
                         );
+                        rollback_failed = true;
                     }
-                    let _ = restore_shims(manifest);
+                    if let Err(e) = restore_shims(manifest) {
+                        eprintln!(
+                            "{} Failed to restore shims for '{}': {}",
+                            "Error:".red().bold(),
+                            manifest.name,
+                            e
+                        );
+                        rollback_failed = true;
+                    }
                     continue;
                 }
 
@@ -518,6 +527,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                                 manifest.name,
                                 e
                             );
+                            rollback_failed = true;
                             continue;
                         }
                     };
@@ -536,6 +546,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                             manifest.name,
                             e
                         );
+                        rollback_failed = true;
                         continue;
                     }
                 };
@@ -550,6 +561,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                             manifest.name,
                             e
                         );
+                        rollback_failed = true;
                         continue;
                     }
                 };
@@ -572,6 +584,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                                 manifest.name,
                                 e
                             );
+                            rollback_failed = true;
                         }
                     }
                 }
@@ -601,6 +614,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                         new_manifest.name,
                         e
                     );
+                    rollback_failed = true;
                 }
 
                 let version_dir = match local::get_package_version_dir(
@@ -618,6 +632,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                             "Error:".red().bold(),
                             e
                         );
+                        rollback_failed = true;
                         continue;
                     }
                 };
@@ -645,8 +660,17 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                             old_manifest.name,
                             e
                         );
+                        rollback_failed = true;
                     }
-                    let _ = restore_shims(old_manifest);
+                    if let Err(e) = restore_shims(old_manifest) {
+                        eprintln!(
+                            "{} Failed to restore shims for '{}': {}",
+                            "Error:".red().bold(),
+                            old_manifest.name,
+                            e
+                        );
+                        rollback_failed = true;
+                    }
                     continue;
                 }
 
@@ -676,6 +700,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                                 old_manifest.name,
                                 e
                             );
+                            rollback_failed = true;
                             continue;
                         }
                     };
@@ -694,6 +719,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                             old_manifest.name,
                             e
                         );
+                        rollback_failed = true;
                         continue;
                     }
                 };
@@ -708,6 +734,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                             old_manifest.name,
                             e
                         );
+                        rollback_failed = true;
                         continue;
                     }
                 };
@@ -730,11 +757,19 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                                 old_manifest.name,
                                 e
                             );
+                            rollback_failed = true;
                         }
                     }
                 }
             }
         }
+    }
+
+    if rollback_failed {
+        return Err(anyhow!(
+            "Rollback for transaction '{transaction_id}' was incomplete; its \
+             log was retained for recovery"
+        ));
     }
 
     println!("{}", ":: Rollback Complete".bold().blue());

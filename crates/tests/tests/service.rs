@@ -49,7 +49,7 @@ fn test_linux_service_lifecycle() {
     };
 
     let manifest = types::InstallManifest {
-        name: "test-svc".to_string(),
+        name: pkg_name.to_string(),
         version: "1.0.0".to_string(),
         epoch: 0,
         revision: "1".to_string(),
@@ -125,6 +125,34 @@ fn test_linux_service_lifecycle() {
             "Unit file should be created at {}",
             unit_path.display()
         );
+
+        let mut updated_manifest = manifest.clone();
+        updated_manifest.service = Some(types::Service {
+            run: "/usr/bin/test-pkg --updated".to_string(),
+            working_dir: Some("/tmp".to_string()),
+            env: Some(
+                [("ZOI_DEBUG".to_string(), "2".to_string())]
+                    .iter()
+                    .cloned()
+                    .collect()
+            ),
+            log_path: Some("/tmp/test.log".to_string()),
+            error_log_path: Some("/tmp/test-err.log".to_string()),
+            run_at_load: true
+        });
+        fs::write(
+            &manifest_path,
+            serde_yaml::to_string(&updated_manifest)
+                .expect("updated manifest should serialize")
+        )
+        .expect("updated manifest should be written");
+
+        service::manage_service(pkg_name, service::ServiceAction::Start)
+            .expect("updated service configuration should be applied");
+        let unit_content = fs::read_to_string(&unit_path)
+            .expect("unit file should be readable");
+        assert!(unit_content.contains("ExecStart=/usr/bin/test-pkg --updated"));
+        assert!(unit_content.contains("Environment=\"ZOI_DEBUG=2\""));
 
         service::cleanup_service(pkg_name, types::Scope::User)
             .expect("Failed to cleanup service");

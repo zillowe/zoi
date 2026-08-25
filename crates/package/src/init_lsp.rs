@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 
 /// The content of the Zoi Lua API definitions for LSP.
 const ZOI_LUA_DEFINITIONS: &str = include_str!("./builtin/lsp/zoi.lua");
@@ -39,9 +39,7 @@ pub fn setup_lsp_workspace(path: &Path) -> Result<()> {
 ///
 /// Returns an error if the user's home directory cannot be found.
 pub fn get_lsp_definitions_dir() -> Result<PathBuf> {
-    let home_dir = zoi_core::utils::get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("lsp"))
+    Ok(zoi_core::utils::get_user_data_dir()?.join("lsp"))
 }
 
 /// Generates the content for a `.luarc.json` file that includes Zoi

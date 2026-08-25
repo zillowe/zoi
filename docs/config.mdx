@@ -19,8 +19,8 @@ The files are loaded and merged in the following order of precedence (lower numb
    - **Windows:** `C:\ProgramData\zoi\config.yaml`
 
 2. **User:** User-specific configuration. This is the most common file for users to edit.
-   - **Linux/macOS:** `~/.zoi/pkgs/config.yaml`
-   - **Windows:** `%USERPROFILE%\.zoi\pkgs\config.yaml`
+   - **Linux and other Unix:** `$XDG_CONFIG_HOME/zoi/config.yaml`, or `~/.config/zoi/config.yaml` when unset.
+   - **macOS and Windows:** `$XDG_CONFIG_HOME/zoi/config.yaml` when set, otherwise the platform-native configuration directory under `zoi`.
 
 3. **Project Policy:** Project-specific overrides for system behavior.
    - **Path:** `./.zoi/pkgs/config.yaml` (relative to the current directory)
@@ -90,7 +90,7 @@ A list of supplementary package registries to sync with, in addition to the `def
 
 ### `git_repos`
 
-A list of raw Git repository URLs that contain Zoi packages. These are cloned into `~/.zoi/pkgs/git/` and can be used for personal or third-party package collections that are not full registries.
+A list of raw Git repository URLs that contain Zoi packages. These are cloned into the user data directory under `zoi/pkgs/git/` and can be used for personal or third-party package collections that are not full registries.
 
 - **Type:** `list` of `string`
 - **Example:**
@@ -138,7 +138,7 @@ Enables or disables Zoi's opt-in anonymous telemetry. See the [Telemetry page](/
 
 ### `audit_log_enabled`
 
-Enables or disables persistent audit logging of all package operations (install, uninstall, upgrade). Logs are stored in `~/.zoi/audit.json` and can be viewed with `zoi history`.
+Enables or disables persistent audit logging of all package operations (install, uninstall, upgrade). Logs are stored in Zoi's user state directory under `zoi/audit/audit.json` and can be viewed with `zoi history`.
 
 - **Type:** `boolean`
 - **Default:** `false`
@@ -162,7 +162,7 @@ The number of parallel jobs to use during package installation. This can speed u
 
 ### `protect_db`
 
-If `true`, Zoi will make the package database directory (`~/.zoi/pkgs/db`) read-only after a `zoi sync` operation. Before syncing, it will automatically make it writable. This is a security feature to prevent accidental or malicious modification of package definitions.
+If `true`, Zoi will make the package database directory in the user data directory under `zoi/pkgs/db` read-only after a `zoi sync` operation. Before syncing, it will automatically make it writable. This is a security feature to prevent accidental or malicious modification of package definitions.
 
 - **Type:** `boolean`
 - **Default:** `false`

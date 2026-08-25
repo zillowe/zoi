@@ -195,13 +195,31 @@ pub fn elevate_uninstall(
     }
 
     for file_path_str in &manifest.installed_files {
-        let file_path = Path::new(file_path_str);
-        if file_path.exists() {
-            if file_path.is_dir() {
-                let _ = std::fs::remove_dir_all(file_path);
-            } else {
-                let _ = std::fs::remove_file(file_path);
+        // Manifest entries use placeholders such as ${usrroot}, so they must
+        // be expanded before any filesystem lookup.
+        let expanded = crate::pkg::utils::expand_placeholders(
+            file_path_str,
+            &version_dir,
+            scope
+        )?;
+        let file_path = PathBuf::from(expanded);
+        // Use symlink_metadata so links are removed even when they dangle
+        // or point to a directory; only the link is deleted.
+        let Ok(meta) = std::fs::symlink_metadata(&file_path) else {
+            continue;
+        };
+        if meta.file_type().is_symlink() {
+            let _ = std::fs::remove_file(&file_path);
+        } else if meta.is_dir() {
+            // Only remove if empty to be safe: a populated directory may
+            // contain files that no longer belong to this package.
+            if std::fs::read_dir(&file_path)
+                .is_ok_and(|mut entries| entries.next().is_none())
+            {
+                let _ = std::fs::remove_dir(&file_path);
             }
+        } else {
+            let _ = std::fs::remove_file(&file_path);
         }
     }
 

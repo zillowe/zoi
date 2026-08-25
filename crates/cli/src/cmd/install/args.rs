@@ -15,8 +15,8 @@ pub struct InstallArgs {
     )]
     pub sources: Vec<String>,
 
-    /// Install from a git repository (e.g. 'Zillowe/Hello',
-    /// 'gl:Zillowe/Hello')
+    /// Install from a git repository (e.g. 'zillowe/hello',
+    /// 'gh:zillowe/hello')
     #[arg(long, value_name = "REPO", conflicts_with = "sources")]
     pub repo: Option<String>,
 

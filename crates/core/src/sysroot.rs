@@ -11,7 +11,7 @@
 ///
 /// When a sysroot is set, Zoi transparently redirects all absolute and
 /// relative paths to reside within this target directory.
-use std::path::PathBuf;
+use std::path::{Component, PathBuf};
 use std::sync::{OnceLock, RwLock};
 
 /// Provides thread-safe access to the optional global sysroot path.
@@ -45,13 +45,24 @@ pub fn get_sysroot() -> Option<PathBuf> {
 pub fn apply_sysroot(path: impl Into<PathBuf>) -> PathBuf {
     let path = path.into();
     if let Some(root) = get_sysroot() {
-        if path.is_absolute() {
-            let mut components = path.components();
-            components.next();
-            root.join(components.as_path())
-        } else {
-            root.join(path)
+        let mut applied = root.clone();
+        for component in path.components() {
+            match component {
+                Component::Prefix(_)
+                | Component::RootDir
+                | Component::CurDir => {}
+                Component::ParentDir => {
+                    // Never allow a relative path to pop above the configured
+                    // sysroot. This keeps callers safe even when metadata
+                    // contains `..` components.
+                    if applied != root {
+                        applied.pop();
+                    }
+                }
+                Component::Normal(name) => applied.push(name)
+            }
         }
+        applied
     } else {
         path
     }

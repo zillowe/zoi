@@ -9,10 +9,11 @@ Zoi includes a robust rollback system designed to recover from failed installati
 
 Every operation that modifies your Zoi installation (install, uninstall, upgrade) is wrapped in a **transaction**.
 
-1. **Transaction Begin**: Zoi generates a UUID v7 transaction ID and creates a temporary JSON log in `~/.zoi/transactions/`.
-2. **Recording Operations**: Package install, uninstall, and upgrade operations are recorded with their manifests, including the files listed in those manifests.
-3. **Atomic Commits**: If all steps in the operation succeed, Zoi commits by deleting the transaction log.
-4. **Rollback on Failure**: If an install, uninstall, or update fails after a transaction starts, Zoi attempts to revert the operations recorded in the current transaction.
+- **Transaction Begin**: Zoi generates a UUID v7 transaction ID and creates a temporary JSON log in the user state directory under `zoi/transactions/`.
+- **Recording Operations**: Package install, uninstall, and upgrade operations are recorded with their manifests, including the files listed in those manifests.
+- **Atomic Commits**: If all steps in the operation succeed, Zoi moves the transaction log to its history directory.
+- **Rollback on Failure**: If an install, uninstall, or update fails after a transaction starts, Zoi attempts to revert the operations recorded in the current transaction.
+- **Incomplete Rollback**: If any rollback step fails, Zoi retains the active transaction log and returns an error. After correcting the underlying problem, you can retry the rollback instead of losing the recovery record.
 
 ### The Last Transaction
 

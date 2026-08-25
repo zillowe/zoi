@@ -19,13 +19,13 @@ The lower-level modules under `pkg::`, `cmd::`, and `project::` remain useful fo
 
 ## Zoi Store Structure
 
-Zoi follows a structured, collision-resistant layout for managing package installations. By default, the Zoi home directory is located at `~/.zoi`.
+Zoi follows a structured, collision-resistant layout for managing package installations. User paths use XDG directories first, with platform-native fallbacks. See [Storage Locations](/docs/zds/zoi/storage).
 
 ### Store Root
 
-All installed packages are stored in the `pkgs/store` directory within the Zoi home:
+All installed packages are stored in the `pkgs/store` directory within Zoi's data directory:
 
-- **User Scope:** `~/.zoi/pkgs/store/`
+- **User Scope:** `$XDG_DATA_HOME/zoi/pkgs/store/`, or `~/.local/share/zoi/pkgs/store/` on Unix when unset.
 - **System Scope:**
   - **Linux/macOS:** `/var/lib/zoi/pkgs/store/`
   - **Windows:** `C:\ProgramData\zoi\pkgs\store`
@@ -67,7 +67,7 @@ Zoi implements simple reference counting using the `dependents/` directory. When
 
 ### Binary Linking
 
-Binaries are not added to the system `PATH` individually. Instead, Zoi maintains a global `bin` directory (`~/.zoi/pkgs/bin`) and creates symlinks to the binaries located inside the specific `{version}/bin/` directories in the store.
+Binaries are not added to the system `PATH` individually. Instead, Zoi maintains a global `bin` directory under its user data directory (`zoi/pkgs/bin`) and creates symlinks to the binaries located inside the specific `{version}/bin/` directories in the store.
 
 ---
 
@@ -101,7 +101,7 @@ Zoi supports searching for files across all active registries, even for packages
 
 Zoi uses a dedicated keyring for package and registry verification, separate from the system's GPG keyring.
 
-- **Key Storage:** `~/.zoi/pgps/`
+- **Key Storage:** the user data directory under `zoi/pgps/`
 - **Format:** Public keys are stored as standard ASCII-armored `.asc` files.
 
 ### Built-in Keyring
@@ -116,7 +116,7 @@ Zoi ensures system integrity by wrapping all state-changing operations (install,
 
 ### Transaction Logs
 
-Transaction logs are stored as JSON files in `~/.zoi/transactions/`. They are named using **UUID v7**, which provides both uniqueness and chronological ordering.
+Transaction logs are stored as JSON files in the user state directory under `zoi/transactions/`. They are named using **UUID v7**, which provides both uniqueness and chronological ordering.
 
 ### Log Format
 
@@ -135,7 +135,7 @@ A transaction log records the starting time and a sequential list of operations.
           "repo": "community",
           "registry_handle": "zoidberg",
           "scope": "user",
-          "installed_files": ["/home/user/.zoi/pkgs/store/.../1.0.0/bin/hello"]
+          "installed_files": ["/home/user/.local/share/zoi/pkgs/store/.../1.0.0/bin/hello"]
         }
       }
     }

@@ -9,8 +9,8 @@ Zoi makes it easy to keep your development environment portable. Since Zoi track
 
 Every time you install or uninstall a package globally (in `user` or `system` scope), Zoi updates a master record of your environment.
 
-- **Linux/macOS:** `~/.zoi/pkgs/zoi.lock`
-- **Windows:** `%USERPROFILE%\.zoi\pkgs\zoi.lock`
+- **Linux and other Unix:** `$XDG_STATE_HOME/zoi/pkgs/zoi.lock`, or `~/.local/state/zoi/pkgs/zoi.lock` when unset.
+- **macOS and Windows:** Zoi's platform-native user state directory under `zoi/pkgs/zoi.lock`.
 
 This file contains a detailed manifest of every package you have installed, including its origin (registry/repo), version, and chosen optional dependencies.
 
@@ -19,7 +19,7 @@ This file contains a detailed manifest of every package you have installed, incl
 To back up your Zoi environment, simply copy the `zoi.lock` file to a safe location (e.g. a cloud drive, a git repository, or your dotfiles manager).
 
 ```sh
-cp ~/.zoi/pkgs/zoi.lock ~/my-backups/zoi-backup.json
+cp "${XDG_STATE_HOME:-$HOME/.local/state}/zoi/pkgs/zoi.lock" ~/my-backups/zoi-backup.json
 ```
 
 ### Restoring
@@ -63,7 +63,7 @@ Zoi will detect the `zoi.yaml` and `zoi.lock` files and provision the project-lo
 
 Don't forget to also back up your `config.yaml` and PGP keys if you have custom settings or trusted keys.
 
-- **Config:** `~/.zoi/pkgs/config.yaml`
-- **PGP Keys:** `~/.zoi/pgps/`
+- **Config:** the user configuration directory under `zoi/config.yaml`
+- **PGP Keys:** the user data directory under `zoi/pgps/`
 
 You can use a Zoi [Extension](/docs/zds/zoi/extensions) to bundle your custom configuration and keys into a single package, making it even easier to bootstrap new machines.

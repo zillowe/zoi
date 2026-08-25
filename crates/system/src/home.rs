@@ -138,7 +138,7 @@ pub fn apply_home_config(config: &HomeConfig) -> Result<()> {
     }
 
     // Apply Environment Variables
-    let zoi_env_path = home_dir.join(".zoi/env");
+    let zoi_env_path = zoi_core::utils::get_user_config_dir()?.join("env");
     let mut env_content = String::from(
         "# Zoi Environment Variables\n# Generated from home.lua\n\n"
     );

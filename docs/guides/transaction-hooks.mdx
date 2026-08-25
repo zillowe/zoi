@@ -20,7 +20,7 @@ In a standard package manager, if you install 50 packages that all contain fonts
 Hooks are defined using simple YAML files. They can be placed in:
 
 - **System:** `/etc/zoi/hooks/`
-- **User:** `~/.zoi/hooks/`
+- **User:** the user data directory under `zoi/hooks/`
 - **Extensions:** Distributed via Zoi [Extensions](/docs/zds/zoi/extensions).
 
 ### Example: update-icon-cache.hook.yaml
@@ -86,4 +86,4 @@ Zoi ships with several essential builtin hooks for Linux systems:
 
 ## Overriding Hooks
 
-Zoi follows a hierarchical loading order. If a hook in your user directory (`~/.zoi/hooks/`) has the same **name** as a builtin or system hook, your user hook will take precedence and override the others. This allows you to easily customize or disable standard system behaviors.
+Zoi follows a hierarchical loading order. If a hook in your user data directory under `zoi/hooks/` has the same **name** as a builtin or system hook, your user hook will take precedence and override the others. This allows you to easily customize or disable standard system behaviors.

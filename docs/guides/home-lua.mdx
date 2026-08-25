@@ -9,7 +9,7 @@ The `~/.config/zoi/home.lua` file allows ZoiOS users to manage their personal en
 
 ### `packages(table)`
 
-Defines the set of packages installed in the user scope (`~/.zoi/pkgs/store`). You can provide a simple list of names or a table for advanced pinning and option selection.
+Defines the set of packages installed in the user scope (the user data directory under `zoi/pkgs/store`). You can provide a simple list of names or a table for advanced pinning and option selection.
 
 ```lua
 packages({
@@ -56,7 +56,7 @@ dotfiles({
 
 ### `env(table)`
 
-Defines personal environment variables. Zoi writes these to `~/.zoi/env`, which you can source in your shell profile.
+Defines personal environment variables. Zoi writes these to the user configuration directory under `zoi/env`, which you can source in your shell profile.
 
 ```lua
 env({
@@ -81,7 +81,7 @@ Zoi will:
 
 1. **Resolve and install** the listed packages to your user store.
 2. **Create symlinks** for your dotfiles.
-3. **Generate `~/.zoi/env`** with your decrypted environment variables.
+3. **Generate the user configuration `zoi/env` file** with your decrypted environment variables.
 
 ### Shell Integration
 
@@ -89,7 +89,7 @@ To ensure your environment variables are always active, add this to your `.bashr
 
 ```bash
 # Source Zoi user environment
-if [ -f "$HOME/.zoi/env" ]; then
-    source "$HOME/.zoi/env"
+if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/zoi/env" ]; then
+    source "${XDG_CONFIG_HOME:-$HOME/.config}/zoi/env"
 fi
 ```

@@ -79,9 +79,9 @@ pub struct MinimalPerson<'a> {
 
 /// Returns the path to the file where the anonymous client ID is stored.
 fn get_client_id_path() -> Result<std::path::PathBuf, Box<dyn Error>> {
-    let home = zoi_core::utils::get_user_home()
-        .ok_or("Could not find home directory")?;
-    Ok(home.join(".zoi").join("telemetry").join("client_id"))
+    Ok(zoi_core::utils::get_user_state_dir()?
+        .join("telemetry")
+        .join("client_id"))
 }
 
 /// Returns the anonymous client ID, or "unknown" if it cannot be retrieved.
@@ -138,8 +138,8 @@ struct Batch<'a> {
 ///
 /// Privacy Guarantee:
 /// - No IP addresses, hostnames, or personal data are ever collected.
-/// - The `client_id` is a randomly generated UUID v7 stored in
-///   `~/.zoi/telemetry/client_id`.
+/// - The `client_id` is a randomly generated UUID v7 stored in the Zoi user
+///   state directory under `telemetry/client_id`.
 /// - Telemetry is strictly opt-in. This function returns `false` immediately if
 ///   `telemetry_enabled` is not set to `true` in the user's config.
 ///

@@ -44,12 +44,12 @@ pub fn download_and_cache_archive(
     let archive_cache_root = cache::get_archive_cache_root()?;
     fs::create_dir_all(&archive_cache_root)?;
 
-    let archive_filename = details
-        .info
-        .final_url
-        .split('/')
-        .next_back()
-        .unwrap_or("archive.zpa");
+    let archive_filename = util::get_filename_from_url(&details.info.final_url);
+    let archive_filename = if archive_filename.is_empty() {
+        "archive.zpa"
+    } else {
+        archive_filename
+    };
     let cached_archive_path = archive_cache_root.join(archive_filename);
     let sig_filename = format!("{archive_filename}.sig");
     let cached_sig_path = archive_cache_root.join(&sig_filename);
@@ -119,14 +119,20 @@ pub fn download_and_cache_archive(
             &node.pkg.repo
         )
         .unwrap_or(None)
-        .filter(|h| !h.is_empty())
-        .or_else(|| {
-            util::get_expected_hash(hash_url, Some(archive_filename)).ok()
-        });
+        .filter(|hash| !hash.is_empty());
+        let hash = match hash {
+            Some(hash) => hash,
+            None => util::get_expected_hash(hash_url, Some(archive_filename))
+                .map_err(|error| {
+                    anyhow!(
+                        "Unable to obtain the required checksum for '{}': \
+                         {error}",
+                        node.pkg.name
+                    )
+                })?
+        };
 
-        if let Some(ref hash) = hash
-            && !util::verify_file_hash(&archive_path, hash, pb)?
-        {
+        if !util::verify_file_hash(&archive_path, &hash, pb)? {
             return Err(anyhow!("Hash verification failed"));
         }
     }
@@ -148,6 +154,15 @@ pub fn download_and_cache_archive(
         .as_ref()
         .map(|p| p.trusted_keys.clone())
         .or_else(|| authorities.cloned());
+    let has_pgp_identifiers = pgp_identifiers
+        .as_ref()
+        .is_some_and(|keys| !keys.is_empty());
+
+    validate_signature_requirements(
+        signature_policy.is_some(),
+        details.info.pgp_url.is_some(),
+        has_pgp_identifiers
+    )?;
 
     if let Some(pgp_url) = &details.info.pgp_url {
         if let Some(ref identifiers) = pgp_identifiers
@@ -229,6 +244,51 @@ pub fn download_and_cache_archive(
     }
 
     Ok(archive_path)
+}
+
+/// Ensures that an enforced signature policy has everything needed to verify
+/// the downloaded archive before it is installed.
+fn validate_signature_requirements(
+    enforcement_enabled: bool,
+    has_signature_url: bool,
+    has_trusted_keys: bool
+) -> Result<()> {
+    if !enforcement_enabled {
+        return Ok(());
+    }
+    if !has_signature_url {
+        return Err(anyhow!(
+            "Signature enforcement is active, but no PGP URL was found for \
+             the package"
+        ));
+    }
+    if !has_trusted_keys {
+        return Err(anyhow!(
+            "Signature enforcement is active, but no trusted PGP keys are \
+             configured"
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_signature_requirements;
+
+    #[test]
+    fn signature_enforcement_requires_a_signature_url() {
+        assert!(validate_signature_requirements(true, false, true).is_err());
+    }
+
+    #[test]
+    fn signature_enforcement_requires_trusted_keys() {
+        assert!(validate_signature_requirements(true, true, false).is_err());
+    }
+
+    #[test]
+    fn disabled_signature_enforcement_allows_missing_metadata() {
+        assert!(validate_signature_requirements(false, false, false).is_ok());
+    }
 }
 
 /// Information about a package that has been prepared for installation.

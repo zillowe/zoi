@@ -95,9 +95,7 @@ pub struct AuditVerification {
 
 /// Returns the path to the audit log file.
 fn get_audit_log_path() -> Result<PathBuf> {
-    let home_dir = utils::get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory."))?;
-    let zoi_dir = zoi_core::sysroot::apply_sysroot(home_dir.join(".zoi"));
+    let zoi_dir = utils::get_user_state_dir()?.join("audit");
     if !zoi_dir.exists() {
         fs::create_dir_all(&zoi_dir)?;
     }

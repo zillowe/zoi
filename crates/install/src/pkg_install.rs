@@ -8,6 +8,7 @@ use colored::Colorize;
 use tar::Archive;
 use tempfile::Builder;
 use walkdir::WalkDir;
+use zoi_core::hash::{HashAlgorithm, calculate_file_hash};
 use zoi_core::types;
 use zoi_core::utils::{self, copy_dir_all};
 use zoi_resolver::local;
@@ -17,13 +18,7 @@ use zstd::stream::read::Decoder as ZstdDecoder;
 /// scope.
 fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
     match scope {
-        types::Scope::User => {
-            let home_dir = zoi_core::utils::get_user_home()
-                .ok_or_else(|| anyhow!("Could not find home directory."))?;
-            Ok(zoi_core::sysroot::apply_sysroot(
-                home_dir.join(".zoi/pkgs/bin")
-            ))
-        }
+        types::Scope::User => zoi_core::utils::get_user_bin_dir(),
         types::Scope::System => {
             if cfg!(target_os = "windows") {
                 Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(
@@ -48,13 +43,7 @@ fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
 /// given scope and shell.
 fn get_completions_root(scope: types::Scope, shell: &str) -> Result<PathBuf> {
     match scope {
-        types::Scope::User => {
-            let home_dir = zoi_core::utils::get_user_home()
-                .ok_or_else(|| anyhow!("Could not find home directory."))?;
-            Ok(zoi_core::sysroot::apply_sysroot(
-                home_dir.join(".zoi/pkgs/shell").join(shell)
-            ))
-        }
+        types::Scope::User => zoi_core::utils::get_user_completions_dir(shell),
         types::Scope::System => {
             if cfg!(target_os = "windows") {
                 Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(format!(
@@ -430,7 +419,11 @@ pub fn run(
                     .into_iter()
                     .filter_map(std::result::Result::ok)
                 {
-                    if entry.file_type().is_file() {
+                    // Symlinks are recreated by copy_dir_all and must be
+                    // tracked too, otherwise they survive uninstall.
+                    if entry.file_type().is_file()
+                        || entry.file_type().is_symlink()
+                    {
                         let rel_to_root =
                             entry.path().strip_prefix(&usrroot_src)?;
                         installed_files.push(format!(
@@ -456,7 +449,10 @@ pub fn run(
                     .into_iter()
                     .filter_map(std::result::Result::ok)
                 {
-                    if entry.file_type().is_file() {
+                    // Track symlinks here as well so cleanup stays complete.
+                    if entry.file_type().is_file()
+                        || entry.file_type().is_symlink()
+                    {
                         let rel_to_home =
                             entry.path().strip_prefix(&usrhome_src)?;
                         installed_files.push(format!(
@@ -477,7 +473,9 @@ pub fn run(
         .into_iter()
         .filter_map(std::result::Result::ok)
     {
-        if entry.file_type().is_file() {
+        // copy_dir_all preserves symlinks into the store, so they must be
+        // recorded here as well.
+        if entry.file_type().is_file() || entry.file_type().is_symlink() {
             let rel_path = entry.path().strip_prefix(staging_dir.path())?;
             installed_files.push(format!(
                 "${{pkgstore}}/{}",
@@ -769,6 +767,20 @@ fn extract_pooled_zpa(
     let mut conflicts = Vec::new();
     let mut owned_files = HashSet::new();
 
+    // ${createpkgdir} resolves to the invocation directory, so its absolute
+    // location is recorded at install time instead of the placeholder.
+    // Otherwise cleanup from a different directory could not find (or worse,
+    // could mis-target) these artifacts.
+    let track_dest = |dest: &str| -> Result<String> {
+        if dest.starts_with("${createpkgdir}") {
+            Ok(expand_pooled_path(dest, staging_dir.path(), scope)?
+                .to_string_lossy()
+                .to_string())
+        } else {
+            Ok(dest.to_string())
+        }
+    };
+
     for sub in &subs_to_install {
         let sub_opt = if sub.is_empty() {
             None
@@ -795,6 +807,9 @@ fn extract_pooled_zpa(
                 if !mapped_file.dest.starts_with("${pkgstore}")
                     && dest_path.exists()
                     && !owned_files.contains(&mapped_file.dest)
+                    // Older manifests may have recorded the expanded form.
+                    && !owned_files
+                        .contains(&dest_path.to_string_lossy().to_string())
                 {
                     conflicts.push(dest_path);
                 }
@@ -878,6 +893,33 @@ fn extract_pooled_zpa(
             if !pool_file.exists() {
                 return Err(anyhow!("Pool file missing: {}", mapped_file.hash));
             }
+            let expected_hash =
+                mapped_file.hash.strip_prefix("sha256-").ok_or_else(|| {
+                    anyhow!(
+                        "Unsupported pool hash format: {}",
+                        mapped_file.hash
+                    )
+                })?;
+            let pool_entry = pooled_manifest
+                .pool
+                .get(&mapped_file.hash)
+                .ok_or_else(|| {
+                    anyhow!("Pool manifest entry missing: {}", mapped_file.hash)
+                })?;
+            if pool_file.metadata()?.len() != pool_entry.size {
+                return Err(anyhow!(
+                    "Pool file size does not match manifest: {}",
+                    mapped_file.hash
+                ));
+            }
+            let actual_hash =
+                calculate_file_hash(&pool_file, HashAlgorithm::Sha256)?;
+            if actual_hash != expected_hash {
+                return Err(anyhow!(
+                    "Pool file hash does not match manifest: {}",
+                    mapped_file.hash
+                ));
+            }
 
             let dest_path = expand_pooled_path(
                 &mapped_file.dest,
@@ -905,7 +947,7 @@ fn extract_pooled_zpa(
                 }
             }
 
-            installed_files.push(mapped_file.dest.clone());
+            installed_files.push(track_dest(&mapped_file.dest)?);
         }
 
         // Step 3: Create symlinks
@@ -928,7 +970,7 @@ fn extract_pooled_zpa(
             let target = mapped_link.target.clone();
 
             utils::symlink_file(Path::new(&target), &dest_path)?;
-            installed_files.push(mapped_link.link.clone());
+            installed_files.push(track_dest(&mapped_link.link)?);
         }
     }
 
@@ -958,19 +1000,47 @@ fn expand_pooled_path(
     staging_path: &Path,
     _scope: types::Scope
 ) -> Result<PathBuf> {
+    let safe_join = |base: PathBuf, relative: &str| -> Result<PathBuf> {
+        let relative_path = Path::new(relative);
+        if !utils::is_safe_path(&base, relative_path) {
+            return Err(anyhow!(
+                "Pooled path escapes its destination root: {path}"
+            ));
+        }
+        Ok(base.join(relative_path))
+    };
+
     if let Some(rel) = path.strip_prefix("${pkgstore}/") {
-        Ok(staging_path.join(rel))
+        safe_join(staging_path.to_path_buf(), rel)
     } else if let Some(rel) = path.strip_prefix("${usrroot}/") {
-        Ok(zoi_core::sysroot::apply_sysroot(
-            PathBuf::from("/").join(rel)
-        ))
+        safe_join(zoi_core::sysroot::apply_sysroot(PathBuf::from("/")), rel)
     } else if let Some(rel) = path.strip_prefix("${usrhome}/") {
         let home_dir = zoi_core::utils::get_user_home()
             .ok_or_else(|| anyhow!("Home dir not found"))?;
-        Ok(home_dir.join(rel))
+        safe_join(home_dir, rel)
     } else if let Some(rel) = path.strip_prefix("${createpkgdir}/") {
-        Ok(std::env::current_dir()?.join(rel))
+        safe_join(std::env::current_dir()?, rel)
     } else {
         Err(anyhow!("Invalid pooled path placeholder: {path}"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pooled_paths_should_not_escape_their_roots() {
+        let staging =
+            tempfile::tempdir().expect("staging directory should exist");
+
+        assert!(
+            expand_pooled_path(
+                "${pkgstore}/../outside",
+                staging.path(),
+                types::Scope::User
+            )
+            .is_err()
+        );
     }
 }

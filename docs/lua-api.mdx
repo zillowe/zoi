@@ -39,7 +39,7 @@ These variables are automatically available in your script's scope.
 
 - `ZOI.VERSION`: The version of the package being built (resolved from metadata).
 - `ZOI.scope`: The currently requested installation scope (`user`, `system`, or `project`).
-- `ZOI.PATH.user`: Path to Zoi's user directory (`~/.zoi`).
+- `ZOI.PATH.user`: Path to Zoi's user data directory (`$XDG_DATA_HOME/zoi`, with a platform-native fallback).
 - `ZOI.PATH.system`: Path to Zoi's system-wide binary directory.
 
 #### The `ZOI.PKG` Table
@@ -48,7 +48,7 @@ These variables provide absolute paths related to the current package environmen
 
 | Variable           | Type     | Description                                                     |
 | :----------------- | :------- | :-------------------------------------------------------------- |
-| `ZOI.PKG.store`    | `string` | Absolute path of the package store (`~/.zoi/pkgs/store`).       |
+| `ZOI.PKG.store`    | `string` | Absolute path of the package store in Zoi's user data directory. |
 | `ZOI.PKG.template` | `string` | Absolute path to the current directory (project template root). |
 | `ZOI.PKG.root`     | `string` | Absolute path to the system root (`/` or `C:\`).                |
 | `ZOI.PKG.home`     | `string` | Absolute path to the user's home directory.                     |
@@ -115,7 +115,7 @@ The destination path is determined by the installation scope:
 
 ### `zshell(source, shell)`
 
-Stages a shell completion file for a specific shell. The file is copied to `${pkgstore}/shell/{shell}/{filename}` and symlinked into the global completions directory (`~/.zoi/pkgs/shell/{shell}/{package}/`). Zoi automatically manages the symlinks during install and uninstall.
+Stages a shell completion file for a specific shell. The file is copied to `${pkgstore}/shell/{shell}/{filename}` and symlinked into the global completions directory in the user data directory. Zoi automatically manages the symlinks during install and uninstall.
 
 - **source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}`.
 - **shell**: The shell name. Supported values: `"bash"`, `"zsh"`, `"fish"`, `"elvish"`.

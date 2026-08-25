@@ -165,10 +165,10 @@ enum ListSub {
 /// Available git repository sub-commands.
 #[derive(Subcommand)]
 enum GitCommand {
-    /// Show only cloned git repositories (~/.zoi/pkgs/git)
+    /// Show only cloned git repositories in the user data directory
     #[command(alias = "ls")]
     List,
-    /// Remove a cloned git repository directory (~/.zoi/pkgs/git/<repo-name>)
+    /// Remove a cloned git repository directory from the user data directory
     Rm {
         /// The name of the repository to remove
         repo_name: String
@@ -183,9 +183,12 @@ fn run_list_git_only() -> Result<()> {
         return Ok(());
     }
 
+    let git_dir =
+        crate::pkg::utils::get_git_base_dir(crate::pkg::types::Scope::User)?;
     println!(
-        "{} Cloned git repositories (~/.zoi/pkgs/git):",
-        "::".bold().blue()
+        "{} Cloned git repositories ({}):",
+        "::".bold().blue(),
+        git_dir.display()
     );
     let mut table = Table::new();
     table.load_style(UTF8_FULL).set_header(vec!["Repository"]);

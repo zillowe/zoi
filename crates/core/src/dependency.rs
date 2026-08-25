@@ -39,6 +39,20 @@ static VER_RE: LazyLock<Regex> = LazyLock::new(|| {
         .expect("Static VER_RE regex is valid")
 });
 
+/// External package-manager command templates interpolate these components as
+/// shell words, so reject shell-control syntax before executing a template.
+static EXTERNAL_PACKAGE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"^@?[A-Za-z0-9][^\s'"`$\\;|&(){}\[\]<>*?!~]*$"#)
+        .expect("Static external package regex is valid")
+});
+
+/// Versions may begin with the `SemVer` `=`, `^`, or `~` operators while still
+/// being safe to interpolate in an external package-manager command.
+static EXTERNAL_VERSION_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"^[=^~]?[A-Za-z0-9][^\s'"`$\\;|&(){}\[\]<>*?!~]*$"#)
+        .expect("Static external version regex is valid")
+});
+
 /// Parses a dependency string into its constituent parts.
 ///
 /// The expected format is `manager:package[@version][:description]`.
@@ -124,6 +138,18 @@ pub fn parse_dependency_string(
     } else {
         None
     };
+
+    if manager != "zoi"
+        && (!EXTERNAL_PACKAGE_RE.is_match(package)
+            || version_str
+                .as_ref()
+                .is_some_and(|version| !EXTERNAL_VERSION_RE.is_match(version)))
+    {
+        return Err(anyhow!(
+            "External dependency package names and versions may not contain \
+             shell-control syntax: {dep_str}"
+        ));
+    }
 
     Ok(Dependency {
         manager,

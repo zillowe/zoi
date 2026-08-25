@@ -9,7 +9,7 @@ Plugins are global Lua scripts that allow you to transform Zoi from a tool into 
 
 Plugins are distributed via **Extensions**. When an extension containing a `plugin` change-type is added, the script is saved to the Zoi home directory.
 
-- **Storage Location**: `~/.zoi/plugins/`
+- **Storage Location**: Zoi's user data directory under `zoi/plugins/`
 - **Loading**: Every time you run `zoi`, Zoi initializes a Lua VM and executes every `.lua` file in the plugins folder in alphabetical order before processing your command.
 
 ---
@@ -135,7 +135,7 @@ If you are inside a project with a `zoi.yaml` file, this table is available:
 
 ## Persistent State
 
-Plugins can save and retrieve data that persists between different Zoi commands. The data is stored in `~/.zoi/plugins/state.json`.
+Plugins can save and retrieve data that persists between different Zoi commands. The data is stored in the user data directory under `zoi/plugins/state.json`.
 
 - **`zoi.set_data(key, value)`**: Store a value. Supports strings, numbers, and booleans.
 - **`zoi.get_data(key)`**: Retrieve a value. Returns `nil` if the key doesn't exist.

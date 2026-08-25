@@ -928,15 +928,15 @@ end
 After installation, completions are symlinked to:
 
 ```
-~/.zoi/pkgs/shell/zsh/my-tool/_my-tool
-~/.zoi/pkgs/shell/bash/my-tool/my-tool.bash
-~/.zoi/pkgs/shell/fish/my-tool/my-tool.fish
+~/.local/share/zoi/pkgs/shell/zsh/my-tool/_my-tool
+~/.local/share/zoi/pkgs/shell/bash/my-tool/my-tool.bash
+~/.local/share/zoi/pkgs/shell/fish/my-tool/my-tool.fish
 ```
 
 For **zsh**, add the parent directory to your `fpath` in `.zshrc`:
 
 ```bash
-fpath=(~/.zoi/pkgs/shell/zsh $fpath)
+fpath=(~/.local/share/zoi/pkgs/shell/zsh $fpath)
 autoload -Uz compinit && compinit
 ```
 

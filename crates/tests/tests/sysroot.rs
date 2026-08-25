@@ -37,3 +37,14 @@ fn test_sysroot_can_be_replaced() {
         PathBuf::from("/mnt/second/etc/hosts")
     );
 }
+
+#[test]
+fn test_sysroot_should_contain_parent_traversal() {
+    let _ctx = common::TestContextGuard::acquire();
+    common::TestContextGuard::set_sysroot(PathBuf::from("/mnt/root"));
+
+    assert_eq!(
+        sysroot::apply_sysroot(PathBuf::from("../../etc/passwd")),
+        PathBuf::from("/mnt/root/etc/passwd")
+    );
+}

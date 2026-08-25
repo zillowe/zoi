@@ -151,7 +151,7 @@ sudo zoi install @parlex/neovim @parlex/git --root /mnt
 ```
 
 <Callout title="Isolated State">
-  When using `--root`, Zoi is fully isolated. Transaction logs, audit history, and local configuration files are stored within the target's `/var/lib/zoi` and `~/.zoi` directories. By default, metadata is synced to the system-wide store (`/var/lib/zoi/pkgs/db`), ensuring the new OS is ready for use even without a pre-configured user home.
+  When using `--root`, Zoi is fully isolated. System package data is stored within the target's `/var/lib/zoi`; user state follows the target user's XDG or platform-native directories. By default, metadata is synced to the system-wide store (`/var/lib/zoi/pkgs/db`), ensuring the new OS is ready for use even without a pre-configured user home.
 </Callout>
 
 <Callout title="Pro Tip">

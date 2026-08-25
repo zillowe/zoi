@@ -346,6 +346,14 @@ pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
     input.trim().eq_ignore_ascii_case("y")
 }
 
+/// Escapes a string for use inside an Elvish double-quoted string literal.
+///
+/// Backslashes are escaped first so that escaping the double quotes
+/// afterwards cannot produce double-escaped sequences.
+fn elvish_quote(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
 /// Sets up the PATH environment variable for the given scope.
 ///
 /// # Errors
@@ -363,13 +371,7 @@ pub fn setup_path(scope: Scope) -> anyhow::Result<()> {
     }
 
     let zoi_bin_dir = match scope {
-        Scope::User => {
-            let home = crate::pkg::utils::get_user_home()
-                .ok_or_else(|| anyhow!("Could not find home directory."))?;
-            crate::pkg::sysroot::apply_sysroot(
-                home.join(".zoi").join("pkgs").join("bin")
-            )
-        }
+        Scope::User => crate::pkg::utils::get_user_bin_dir()?,
         Scope::System => {
             if cfg!(target_os = "windows") {
                 crate::pkg::sysroot::apply_sysroot(PathBuf::from(
@@ -403,7 +405,7 @@ pub fn setup_path(scope: Scope) -> anyhow::Result<()> {
         use std::fs::{File, OpenOptions};
         let home = crate::pkg::utils::get_user_home()
             .ok_or_else(|| anyhow!("Could not find home directory."))?;
-        let zoi_bin_str = "$HOME/.zoi/pkgs/bin";
+        let zoi_bin_str = zoi_bin_dir.to_string_lossy();
 
         let shell_name = std::env::var("SHELL").unwrap_or_default();
         let (profile_file_path, cmd_to_write) = if shell_name.contains("bash") {
@@ -431,11 +433,12 @@ pub fn setup_path(scope: Scope) -> anyhow::Result<()> {
             (path, cmd)
         } else if shell_name.contains("elvish") {
             let path = home.join(".config/elvish/rc.elv");
-            let cmd = "
-# Added by Zoi
-set paths = [ ~/.zoi/pkgs/bin $paths... ]
-"
-            .to_string();
+            // Escape the path so it parses as one literal string value even
+            // when it contains whitespace, quotes, or backslashes.
+            let cmd = format!(
+                "\n# Added by Zoi\nset paths = [ \"{}\" $paths... ]\n",
+                elvish_quote(&zoi_bin_str)
+            );
             (path, cmd)
         } else if shell_name.contains("csh") || shell_name.contains("tcsh") {
             let path = home.join(".cshrc");
@@ -461,7 +464,7 @@ set paths = [ ~/.zoi/pkgs/bin $paths... ]
         }
 
         let content = fs::read_to_string(&profile_file_path)?;
-        if content.contains(zoi_bin_str) {
+        if content.contains(zoi_bin_str.as_ref()) {
             println!("Zoi bin directory is already in your shell's config.");
             return Ok(());
         }
@@ -545,13 +548,10 @@ set paths = [ ~/.zoi/pkgs/bin $paths... ]
 /// Checks if the Zoi bin directory is in the current PATH and prints a warning
 /// if not.
 pub fn check_path() {
-    if let Some(home) = crate::pkg::utils::get_user_home() {
-        let zoi_bin_dir =
-            crate::pkg::sysroot::apply_sysroot(home.join(".zoi/pkgs/bin"));
-        if !zoi_bin_dir.exists() {
-            return;
-        }
-    } else {
+    let Ok(zoi_bin_dir) = crate::pkg::utils::get_user_bin_dir() else {
+        return;
+    };
+    if !zoi_bin_dir.exists() {
         return;
     }
 
@@ -568,7 +568,8 @@ pub fn check_path() {
         Ok(output) => {
             if output.status.success() {
                 let path_var = String::from_utf8_lossy(&output.stdout);
-                path_var.contains(".zoi/pkgs/bin")
+                std::env::split_paths(path_var.as_ref())
+                    .any(|path| path == zoi_bin_dir)
             } else {
                 false
             }

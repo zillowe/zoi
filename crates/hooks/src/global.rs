@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use colored::Colorize;
 use glob::Pattern;
 use serde::{Deserialize, Serialize};
@@ -84,9 +84,7 @@ pub enum HookWhen {
 /// Returns an error if the user home directory cannot be found or if creating
 /// the hooks directory fails.
 pub fn get_user_hooks_dir() -> Result<PathBuf> {
-    let home = utils::get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory"))?;
-    let dir = home.join(".zoi").join("hooks");
+    let dir = utils::get_user_data_dir()?.join("hooks");
     if !dir.exists() {
         fs::create_dir_all(&dir)?;
     }
@@ -100,13 +98,7 @@ pub fn get_user_hooks_dir() -> Result<PathBuf> {
 /// This function is currently infallible but returns a `Result` for
 /// consistency.
 pub fn get_system_hooks_dir() -> Result<PathBuf> {
-    if cfg!(windows) {
-        Ok(sysroot::apply_sysroot(PathBuf::from(
-            "C:\\ProgramData\\zoi\\hooks"
-        )))
-    } else {
-        Ok(sysroot::apply_sysroot(PathBuf::from("/etc/zoi/hooks")))
-    }
+    Ok(utils::get_system_config_dir().join("hooks"))
 }
 
 /// Loads all available global hooks from builtin, system, user, and package

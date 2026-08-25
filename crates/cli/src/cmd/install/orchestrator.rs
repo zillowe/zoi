@@ -287,69 +287,112 @@ impl<'a> Orchestrator<'a> {
         if !options.force {
             let mut to_remove = Vec::new();
             for (pkg_id, node) in &graph.nodes {
-                // Check if any version of this package is already installed
-                let pkg_spec = if node.pkg.repo.is_empty() {
-                    node.pkg.name.clone()
-                } else {
-                    format!("@{}/{}", node.pkg.repo, node.pkg.name)
+                // The request is built directly from the node instead of
+                // round-tripping through a source string because parsing
+                // lowercases identifiers and drops sub-package information,
+                // which made already-installed detection unreliable.
+                let request_base = zoi_resolver::resolve::PackageRequest {
+                    handle: None,
+                    repo: (!node.pkg.repo.is_empty())
+                        .then(|| node.pkg.repo.to_lowercase()),
+                    name: node.pkg.name.to_lowercase(),
+                    sub_package: node.sub_package.clone(),
+                    version_spec: None
                 };
 
-                let request_base =
-                    zoi_resolver::resolve::parse_source_string(&pkg_spec)?;
+                let target_scope = scope_override.unwrap_or(node.pkg.scope);
                 let installed = local::find_installed_manifests_matching(
                     &request_base,
-                    scope_override.unwrap_or(node.pkg.scope)
+                    target_scope
                 )?;
 
-                if !installed.is_empty() {
-                    let already_at_target = installed.iter().any(|m| {
-                        m.version == node.version && m.revision == node.revision
-                    });
-
-                    let display_name = ux::format_display_name(
-                        &node.registry_handle,
-                        &node.pkg.repo,
-                        &node.pkg.name,
-                        node.sub_package.as_deref(),
-                        &config
-                    );
-                    if !options.plan_json {
-                        if already_at_target {
-                            let full_spec =
-                                format!("{}@{}", display_name, node.version);
-                            println!(
-                                "{} Package '{}' is already installed. \
-                                 Skipping.",
-                                "::".bold().green(),
-                                full_spec.cyan()
+                if installed.is_empty() {
+                    // Not installed in the requested scope. If it exists in
+                    // another scope, inform the user but continue installing.
+                    let other_scopes = [
+                        types::Scope::Project,
+                        types::Scope::User,
+                        types::Scope::System
+                    ]
+                    .into_iter()
+                    .filter(|s| *s != target_scope);
+                    for other_scope in other_scopes {
+                        if !local::find_installed_manifests_matching(
+                            &request_base,
+                            other_scope
+                        )?
+                        .is_empty()
+                        {
+                            let display_name = ux::format_display_name(
+                                &node.registry_handle,
+                                &node.pkg.repo,
+                                &node.pkg.name,
+                                node.sub_package.as_deref(),
+                                &config
                             );
-                        } else {
-                            let current_version = installed
-                                .first()
-                                .map(|m| m.version.as_str())
-                                .unwrap_or_default();
-
-                            let current_spec =
-                                format!("{display_name}@{current_version}");
-                            let available_spec =
-                                format!("{}@{}", display_name, node.version);
-
-                            println!(
-                                "{} Package '{}' is already installed \
-                                 (available: {}).",
-                                "::".bold().yellow(),
-                                current_spec.cyan(),
-                                available_spec.cyan()
-                            );
-                            println!(
-                                "   {} To update to the newer version, run: {}",
-                                "Hint:".bold().blue(),
-                                format!("zoi update {pkg_spec}").italic()
-                            );
+                            if !options.plan_json {
+                                println!(
+                                    "{} Package '{}' is already installed in \
+                                     {:?} scope. Installing into {:?} scope \
+                                     anyway.",
+                                    "::".bold().blue(),
+                                    display_name.cyan(),
+                                    other_scope,
+                                    target_scope
+                                );
+                            }
+                            break;
                         }
                     }
-                    to_remove.push(pkg_id.clone());
+                    continue;
                 }
+
+                let already_at_target = installed.iter().any(|m| {
+                    m.version == node.version && m.revision == node.revision
+                });
+
+                let display_name = ux::format_display_name(
+                    &node.registry_handle,
+                    &node.pkg.repo,
+                    &node.pkg.name,
+                    node.sub_package.as_deref(),
+                    &config
+                );
+                if !options.plan_json {
+                    if already_at_target {
+                        let full_spec =
+                            format!("{}@{}", display_name, node.version);
+                        println!(
+                            "{} Package '{}' is already installed. Skipping.",
+                            "::".bold().green(),
+                            full_spec.cyan()
+                        );
+                    } else {
+                        let current_version = installed
+                            .first()
+                            .map(|m| m.version.as_str())
+                            .unwrap_or_default();
+
+                        let current_spec =
+                            format!("{display_name}@{current_version}");
+                        let available_spec =
+                            format!("{}@{}", display_name, node.version);
+
+                        println!(
+                            "{} Package '{}' is already installed (available: \
+                             {}).",
+                            "::".bold().yellow(),
+                            current_spec.cyan(),
+                            available_spec.cyan()
+                        );
+                    }
+                    println!(
+                        "   {} To update it, run: {}",
+                        "Hint:".bold().blue(),
+                        format!("zoi update {}", node.pkg.name).italic()
+                    );
+                }
+                to_remove.push(pkg_id.clone());
             }
             skipped_existing_count = to_remove.len();
 

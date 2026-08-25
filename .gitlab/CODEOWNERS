@@ -1,5 +1,6 @@
 # Code Owners
 # This file defines individuals or teams that are responsible for code in the repository.
-# For more info: https://docs.gitlab.com/ee/user/project/code_owners.html
+# For more info: https://docs.gitlab.com/user/project/codeowners/
 
-* @zillowe/teams/rust-team @zillowe/zillwen/zusty
+* @zillowe/teams/rust @zillowe/zillwen/zusty
+packages/ @zillowe/teams/packaging

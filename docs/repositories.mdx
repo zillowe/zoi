@@ -13,7 +13,7 @@ This page explains Zoi's official repositories and mirrors, and how package repo
 
 ## Managing the Package Database Registry
 
-The package database is the core git repository that Zoi clones to `~/.zoi/pkgs/db`. This repository contains all the package definitions organized into tiers. While you can manage which repositories inside the database are active using `zoi repo`, you can also change the URL of the entire database registry itself using `zoi sync`.
+The package database is the core git repository that Zoi clones to its user data directory under `zoi/pkgs/db`. This repository contains all the package definitions organized into tiers. While you can manage which repositories inside the database are active using `zoi repo`, you can also change the URL of the entire database registry itself using `zoi sync`.
 
 This is useful if you want to use a mirror or a completely different package database.
 
@@ -44,7 +44,7 @@ Zoi is intelligent about where it stores metadata:
 
 - **Running as Root?** Zoi defaults to `--scope system`.
 - **Using `--root`?** Zoi defaults to `--scope system` within the target.
-- **Normal User?** Zoi defaults to `--scope user` (`~/.zoi/pkgs/db`).
+- **Normal User?** Zoi defaults to `--scope user` in the user data directory under `zoi/pkgs/db`.
 
 ```sh
 # Show the current configured registries
@@ -89,7 +89,7 @@ The `zoi repo` command manages which repositories from the package database are 
 | `zoi repo add`                | Add an official repo by name or a git repo by URL (interactive if no args).                       |
 | `zoi repo rm <name>`          | Remove a repository from the active list.                                                         |
 | `zoi repo list` (alias: `ls`) | Show active repositories from config. Use `zoi repo list all` to show all available repositories. |
-| `zoi repo git ls`             | List cloned git repositories under `~/.zoi/pkgs/git`.                                             |
+| `zoi repo git ls`             | List cloned git repositories under the user data directory's `zoi/pkgs/git`.                     |
 | `zoi repo git rm <repo>`      | Remove a cloned git repository directory.                                                         |
 
 ### Examples
@@ -103,7 +103,7 @@ zoi repo add core
 zoi repo add main
 zoi repo add community
 
-# Add by git URL (cloned under ~/.zoi/pkgs/git/ and used via #git@<repo>/<pkg>)
+# Add by git URL (cloned under the user data directory and used via #git@<repo>/<pkg>)
 zoi repo add https://github.com/YourOrg/my-zoi-repo.git
 
 # Remove and list
@@ -120,13 +120,13 @@ In addition to adding a git repository to your local configuration with `zoi rep
 
 ```sh
 # Install from a GitHub repository
-zoi install --repo Zillowe/Hello
+zoi install --repo zillowe/hello
 
 # Install from a GitLab repository
-zoi install --repo gl:Zillowe/Hello
+zoi install --repo gl:zillowe/hello
 
 # Install from a Codeberg repository
-zoi install --repo cb:Zillowe/Hello
+zoi install --repo cb:zillowe/hello
 ```
 
 This works if the target repository has a `zoi.yaml` file in its root. The `package` field in this file can specify a package name (e.g. `hello`), a path to a `.pkg.lua` file within the repository, or a URL to a `.pkg.lua` file. This provides a quick way to install packages from git repositories without permanently adding them to your configuration.
@@ -175,7 +175,7 @@ You can specify which repository or registry to install a package from using spe
 
 - **From a custom git repository:**
 
-  Use the `#git@` prefix, followed by the repository name (the directory name in `~/.zoi/pkgs/git/`) and the package name.
+  Use the `#git@` prefix, followed by the repository name (the directory name in the user data directory's `zoi/pkgs/git/`) and the package name.
 
   ```sh
   # Install from a nested directory within the git repo

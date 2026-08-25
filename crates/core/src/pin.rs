@@ -15,10 +15,8 @@ pub struct PinnedPackage {
 
 /// Returns the path to the `pinned.json` file in the user's Zoi directory.
 fn get_pinned_json_path() -> Result<PathBuf, io::Error> {
-    let home_dir = dirs::home_dir().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::NotFound, "Could not find home directory")
-    })?;
-    let zoi_dir = home_dir.join(".zoi");
+    let zoi_dir =
+        crate::utils::get_user_state_dir().map_err(io::Error::other)?;
     if !zoi_dir.exists() {
         fs::create_dir_all(&zoi_dir)?;
     }

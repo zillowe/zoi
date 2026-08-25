@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 
 /// Returns the root directory for Zoi's cache.
 ///
@@ -9,9 +9,7 @@ use anyhow::{Result, anyhow};
 ///
 /// Returns an error if the user's home directory cannot be determined.
 pub fn get_cache_root() -> Result<PathBuf> {
-    let home_dir = crate::utils::get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("cache"))
+    crate::utils::get_user_cache_dir()
 }
 
 /// Returns the root directory for Zoi's archive cache.

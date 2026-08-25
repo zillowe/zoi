@@ -9,7 +9,7 @@ use serde_yaml::Value;
 
 use crate::sysroot::apply_sysroot;
 use crate::types::{Config, Registry, RepoConfig};
-use crate::utils::{get_db_root, get_user_home};
+use crate::utils::{get_db_root, get_user_config_dir, get_user_data_dir};
 
 /// Returns the default registry URL for Zoi.
 ///
@@ -33,20 +33,12 @@ pub fn get_builtin_authorities() -> Vec<String> {
 
 /// Returns the path to the system-wide configuration file.
 fn get_system_config_path() -> PathBuf {
-    if cfg!(target_os = "windows") {
-        apply_sysroot(PathBuf::from("C:\\ProgramData\\zoi\\config.yaml"))
-    } else {
-        apply_sysroot(PathBuf::from("/etc/zoi/config.yaml"))
-    }
+    crate::utils::get_system_config_dir().join("config.yaml")
 }
 
 /// Returns the path to the user-specific configuration file.
 fn get_user_config_path() -> Result<PathBuf> {
-    let home_dir = get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(apply_sysroot(home_dir.join(".zoi"))
-        .join("pkgs")
-        .join("config.yaml"))
+    Ok(get_user_config_dir()?.join("config.yaml"))
 }
 
 /// Returns the path to the project-local configuration file.
@@ -59,20 +51,12 @@ fn get_project_config_path() -> Result<PathBuf> {
 
 /// Returns the path to the directory where git repositories are cloned.
 fn get_git_root() -> Result<PathBuf> {
-    let home_dir = get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(apply_sysroot(home_dir.join(".zoi"))
-        .join("pkgs")
-        .join("git"))
+    Ok(get_user_data_dir()?.join("pkgs").join("git"))
 }
 
 /// Returns the path to the remote policy cache file.
 fn get_remote_policy_cache_path() -> PathBuf {
-    if cfg!(target_os = "windows") {
-        apply_sysroot(PathBuf::from("C:\\ProgramData\\zoi\\policy.cache.yaml"))
-    } else {
-        apply_sysroot(PathBuf::from("/etc/zoi/policy.cache.yaml"))
-    }
+    crate::utils::get_system_cache_dir().join("policy.cache.yaml")
 }
 
 /// Reads a YAML value from the specified path.
@@ -97,7 +81,7 @@ fn read_config_from_path(path: &Path) -> Result<Config> {
 ///
 /// Zoi uses a hierarchical configuration model with the following precedence:
 /// - System: (`/etc/zoi/config.yaml`) - Defines global machine policy.
-/// - User: (`~/.zoi/pkgs/config.yaml`) - Defines user preferences.
+/// - User: (`$XDG_CONFIG_HOME/zoi/config.yaml`) - Defines user preferences.
 /// - Project: (`./.zoi/pkgs/config.yaml`) - Local overrides for a specific
 ///   project.
 ///

@@ -437,10 +437,18 @@ pub fn run(
         eprintln!("\n{} Rolling back changes...", "::".bold().yellow());
         if let Err(e) = transaction::rollback(&transaction.id) {
             eprintln!("\nCRITICAL: Rollback failed: {e}");
+            let transaction_path =
+                crate::pkg::utils::get_user_state_dir().map(|dir| {
+                    dir.join("transactions")
+                        .join(format!("{}.json", transaction.id))
+                });
             eprintln!(
                 "The system may be in an inconsistent state. The transaction \
-                 log is at ~/.zoi/transactions/{}.json",
-                transaction.id
+                 log is at {}",
+                transaction_path.map_or_else(
+                    |_| format!("transaction {}", transaction.id),
+                    |path| path.display().to_string()
+                )
             );
         } else {
             println!("\n{} Rollback successful.", "Success:".green().bold());

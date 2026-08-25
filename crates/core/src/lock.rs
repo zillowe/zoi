@@ -14,16 +14,16 @@ thread_local! {
 
 /// Returns the path to the system-wide lock file.
 fn get_lock_path() -> Result<PathBuf> {
-    let home_dir = crate::utils::get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("lock"))
+    Ok(crate::utils::get_user_state_dir()?
+        .join("pkgs")
+        .join("lock"))
 }
 
 /// Acquires a system-wide lock to prevent concurrent modifications to the Zoi
 /// store.
 ///
 /// Locking Mechanism:
-/// - Attempts to open/create `~/.zoi/pkgs/lock`.
+/// - Attempts to open/create the user state lock file.
 /// - Uses `flock` (via `fs2`) to acquire an exclusive advisory lock on the
 ///   file.
 /// - If busy, reads the file to display the PID of the process currently
@@ -112,30 +112,25 @@ pub fn acquire_lock() -> Result<LockGuard> {
     let _ = file.flush();
 
     Ok(LockGuard {
-        path: Some(lock_path),
         file: Some(file),
         is_recursive: false
     })
 }
 
-/// Releases the system-wide lock if it exists.
+/// Returns an error because only dropping the owning [`LockGuard`] can release
+/// the advisory lock. The lock file itself is intentionally never removed
+/// because unlinking it can let a waiting process and a newly-created inode be
+/// locked concurrently.
 ///
 /// # Errors
 ///
 /// Returns an error if the lock path cannot be determined.
 pub fn release_lock() -> Result<()> {
-    let lock_path = get_lock_path()?;
-    if lock_path.exists() {
-        let _ = fs::remove_file(lock_path);
-    }
-    LOCK_COUNT.with(|c| c.set(0));
-    Ok(())
+    Err(anyhow!("drop the LockGuard to release the system lock"))
 }
 
 /// A guard that releases the system-wide lock when dropped.
 pub struct LockGuard {
-    /// The path to the lock file.
-    path: Option<PathBuf>,
     /// The file handle holding the lock.
     file: Option<fs::File>,
     /// Whether this guard is a recursive acquisition.
@@ -146,7 +141,6 @@ impl LockGuard {
     /// Creates a no-op lock guard that does not hold any lock.
     pub fn noop() -> Self {
         Self {
-            path: None,
             file: None,
             is_recursive: false
         }
@@ -155,7 +149,6 @@ impl LockGuard {
     /// Creates a recursive lock guard.
     pub fn recursive() -> Self {
         Self {
-            path: None,
             file: None,
             is_recursive: true
         }
@@ -169,14 +162,7 @@ impl Drop for LockGuard {
             return;
         }
 
-        if let Some(path) = self.path.take() {
-            self.file.take();
-
-            if path.exists()
-                && let Err(e) = fs::remove_file(&path)
-            {
-                debug_assert!(false, "Failed to remove lock file: {e}");
-            }
+        if self.file.take().is_some() {
             LOCK_COUNT.with(|c| c.set(0));
         }
     }

@@ -198,9 +198,7 @@ pub fn get_db_root() -> Result<PathBuf> {
 ///
 /// Returns an error if the home directory cannot be found.
 pub fn get_host_db_root() -> Result<PathBuf> {
-    let home_dir = zoi_core::utils::get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("db"))
+    zoi_core::utils::get_db_base_dir(zoi_core::types::Scope::User)
 }
 
 /// Parses a source string into a `PackageRequest`.
@@ -1530,13 +1528,9 @@ fn resolve_source_recursive(
             .last()
             .ok_or_else(|| anyhow!("Empty path in git source"))?;
 
-        let home_dir = zoi_core::utils::get_user_home()
-            .ok_or_else(|| anyhow!("Could not find home directory."))?;
-        let mut path = home_dir
-            .join(".zoi")
-            .join("pkgs")
-            .join("git")
-            .join(repo_name);
+        let mut path =
+            zoi_core::utils::get_git_base_dir(zoi_core::types::Scope::User)?
+                .join(repo_name);
 
         for part in nested_path_parts.iter().take(nested_path_parts.len() - 1) {
             path = path.join(part);
@@ -1559,11 +1553,9 @@ fn resolve_source_recursive(
             "#git@".yellow(),
             repo_name.yellow()
         );
-        let git_repo_root = home_dir
-            .join(".zoi")
-            .join("pkgs")
-            .join("git")
-            .join(repo_name);
+        let git_repo_root =
+            zoi_core::utils::get_git_base_dir(zoi_core::types::Scope::User)?
+                .join(repo_name);
         let git_sha = get_git_head_sha(&git_repo_root);
 
         ResolvedSource {

@@ -29,7 +29,7 @@ powershell -c "irm zillowe.pages.dev/scripts/zoi/install.ps1|iex"
 
 ## 2. Set Up Your Shell
 
-Zoi links package binaries into `~/.zoi/pkgs/bin`. If commands installed by Zoi are not found, configure your shell completions and PATH:
+Zoi links package binaries into its user data directory under `zoi/pkgs/bin`. If commands installed by Zoi are not found, configure your shell completions and PATH. See [Storage Locations](/docs/zds/zoi/storage) for the exact platform path:
 
 ```sh
 zoi shell zsh
@@ -125,7 +125,7 @@ zoi rollback --last-transaction
 
 ## 7. Create a Project Environment
 
-Zoi Spec v2 uses `zoi.lua` for tools and `zoi.yaml` for tasks.
+Zoi Spec v2 uses `zoi.lua` for tools and tasks (the previous `zoi.yaml` is only for tasks now).
 
 Create `zoi.lua` in your project root:
 
@@ -192,7 +192,7 @@ Zoi source strings let you choose where a package comes from.
 | Local package file   | `zoi install ./my-tool.pkg.lua`       |
 | Source bundle        | `zoi install ./my-tool.zsa`           |
 | Pre-built archive    | `zoi install ./my-tool-1.0.0.zpa`     |
-| Git repository       | `zoi install --repo Zillowe/Hello`    |
+| Git repository       | `zoi install --repo zillowe/hello`    |
 
 For more source formats, see [Repositories & Registries](/docs/zds/zoi/repositories).
 
@@ -275,7 +275,7 @@ Common fixes:
 
 | Problem                                     | Fix                                                                             |
 | ------------------------------------------- | ------------------------------------------------------------------------------- |
-| Installed commands are not found            | Run `zoi shell <shell>` or add `~/.zoi/pkgs/bin` to `PATH`.                     |
+| Installed commands are not found            | Run `zoi shell <shell>` or add Zoi's user `pkgs/bin` directory to `PATH`.       |
 | Package cannot be found                     | Run `zoi sync`, then check active repos with `zoi repo list`.                   |
 | You need a mirror                           | Use `zoi sync set github`, `zoi sync set codeberg`, or a custom registry URL.   |
 | You need offline installs                   | Pre-populate archives with `zoi cache add` or use `--pkg-dir` with `--offline`. |
@@ -287,4 +287,3 @@ Common fixes:
 - Read [Features & Usage](/docs/zds/zoi/features) for the full command reference.
 - Read [Project Configuration](/docs/zds/zoi/project-config) for `zoi.yaml`.
 - Read [Creating Packages](/docs/zds/zoi/creating-packages) to write packages.
-- Read [Comparisons](/docs/zds/zoi/comparisons) to understand when Zoi is the right tool.

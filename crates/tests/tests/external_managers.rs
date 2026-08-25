@@ -50,3 +50,11 @@ fn test_external_manager_without_version() {
 
     assert_eq!(install_cmd, "brew install node");
 }
+
+#[test]
+fn external_dependency_should_reject_shell_syntax() {
+    let err = parse_dependency_string("apt:curl; touch /tmp/zoi-pwned")
+        .expect_err("shell syntax must not be accepted in package metadata");
+
+    assert!(err.to_string().contains("shell-control syntax"));
+}

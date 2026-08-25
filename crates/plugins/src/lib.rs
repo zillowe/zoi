@@ -33,7 +33,7 @@ const PLUGIN_ENV_OVERRIDES_KEY: &str = "__ZOI_ENV_OVERRIDES";
 /// - Intercepting lifecycle events (`zoi.on_post_install`, etc.).
 /// - Overriding tool versions at runtime (shim resolution).
 ///
-/// Plugins are stored in `~/.zoi/plugins/` and are verified against
+/// Plugins are stored in Zoi's user data directory and are verified against
 /// a `trusted_hashes.json` database to prevent unauthorized execution.
 pub struct PluginManager {
     /// The initialized mlua Lua Virtual Machine.
@@ -1164,9 +1164,7 @@ impl PluginManager {
 /// Returns an error if the user home directory cannot be found or if the
 /// plugin directory cannot be created.
 pub fn get_plugin_dir() -> Result<PathBuf> {
-    let home_dir = utils::get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory."))?;
-    let plugin_dir = home_dir.join(".zoi").join("plugins");
+    let plugin_dir = utils::get_user_data_dir()?.join("plugins");
     if !plugin_dir.exists() {
         fs::create_dir_all(&plugin_dir)?;
     }

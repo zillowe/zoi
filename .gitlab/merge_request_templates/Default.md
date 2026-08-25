@@ -24,5 +24,5 @@ Add any other context, mockups, or screenshots here.
 For example, screenshot of the UI change.
 -->
 
-/assign @me
-/reviewer @zillowe/teams/rust-team
+/assign me
+/reviewer @zillowe/teams/rust

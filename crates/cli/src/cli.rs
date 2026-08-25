@@ -14,11 +14,11 @@ use crate::{cmd, utils};
 
 // Development, Special, Public or Production
 /// The release branch of the current build.
-const BRANCH: &str = "Production";
+const BRANCH: &str = "Development";
 /// The release status of the current build.
 const STATUS: &str = "Release";
 /// The version number of the current build.
-const NUMBER: &str = "1.25.5";
+const NUMBER: &str = "1.26.0";
 /// Help text for package source identifiers.
 const PKG_SOURCE_HELP: &str =
     "Package identifier (e.g. @repo/name, #git@repo/name, path, or URL)";
@@ -180,9 +180,9 @@ enum Commands {
     #[command(
         alias = "sy",
         long_about = "Clones the official package database from GitLab to \
-                      your local machine (~/.zoi/pkgs/db). If the database \
-                      already exists, it verifies the remote URL and pulls \
-                      the latest changes."
+                      Zoi's user data directory. If the database already \
+                      exists, it verifies the remote URL and pulls the latest \
+                      changes."
     )]
     Sync {
         /// The sync subcommand to execute.

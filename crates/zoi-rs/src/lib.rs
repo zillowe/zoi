@@ -466,7 +466,8 @@ pub fn bundle_package(
         sign,
         version_override,
         build_type
-    )
+    )?;
+    Ok(())
 }
 
 /// Builds a Zoi package from a local `.pkg.lua` file.

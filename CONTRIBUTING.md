@@ -29,7 +29,7 @@ making our project better. Every contribution, no matter how small, is valuable 
 We welcome contributions in many forms, including bug reports, feature requests,
 documentation improvements, and code contributions.
 
-You can only use our main [GitLab mirror](/README.md#-repositories-mirrors) for contributions.
+You can only use our main [GitLab mirror](/README.md#repositories-mirrors) for contributions.
 
 - [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoi): Main
 - [GitHub](https://github.com/zillowe/zoi) or

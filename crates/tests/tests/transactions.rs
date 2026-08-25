@@ -209,6 +209,44 @@ fn test_transaction_read_and_list() {
 }
 
 #[test]
+fn transaction_operations_should_reject_path_traversal_ids() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("unwrap failed");
+    ctx.set_env_var("HOME", tmp.path());
+
+    let invalid_id = "../outside";
+    assert!(transaction::read_transaction(invalid_id).is_err());
+    assert!(transaction::commit(invalid_id).is_err());
+    assert!(transaction::get_modified_files(invalid_id).is_err());
+    assert!(transaction::delete_log(invalid_id).is_err());
+}
+
+#[test]
+fn rollback_should_retain_log_when_an_operation_fails() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("unwrap failed");
+    ctx.set_env_var("HOME", tmp.path());
+
+    let mut transaction = transaction::begin().expect("unwrap failed");
+    let id = transaction.id.clone();
+    transaction::record_operation(
+        &mut transaction,
+        TransactionOperation::Install {
+            manifest: Box::new(sample_manifest("not-installed", vec![]))
+        }
+    )
+    .expect("unwrap failed");
+
+    assert!(transaction::rollback(&id).is_err());
+    assert!(
+        tmp.path()
+            .join(".zoi/transactions")
+            .join(format!("{id}.json"))
+            .exists()
+    );
+}
+
+#[test]
 fn test_transaction_rollback_install_uses_exact_subpackage_source() {
     let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("unwrap failed");

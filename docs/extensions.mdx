@@ -67,7 +67,7 @@ Clones a Git repository containing `.pkg.lua` files into Zoi's local package sou
 
 - **Purpose:** To add a custom, third-party package repository.
 - **`add` Value:** A valid Git repository URL (e.g. `https://github.com/user/my-zoi-repo.git`).
-- **Effect:** Zoi clones the repository into `~/.zoi/pkgs/git/`. Users can then install packages from it using the `#git@<repo-name>/<pkg-name>` syntax.
+- **Effect:** Zoi clones the repository into the user data directory under `zoi/pkgs/git/`. Users can then install packages from it using the `#git@<repo-name>/<pkg-name>` syntax.
 - **On Removal:** The cloned repository directory is deleted.
 
 #### `repo-add`
@@ -114,7 +114,7 @@ Adds a PGP key to Zoi's local key store.
 - **Fields:**
   - `name`: A string that will be used as the name for the key in Zoi's store.
   - `key`: A string containing either a URL to the PGP key file (`.asc`) or the key's fingerprint.
-- **Effect:** Zoi downloads or fetches the key and adds it to `~/.zoi/pgps/`.
+- **Effect:** Zoi downloads or fetches the key and adds it to the user data directory under `zoi/pgps/`.
 - **On Removal:** The PGP key file is deleted from the store.
 
 #### `plugin`
@@ -125,7 +125,7 @@ Distributes a Lua script that extends Zoi's core CLI functionality with custom s
 - **Fields:**
   - `name`: A unique name for the plugin.
   - `script`: The raw Lua script content.
-- **Effect:** Zoi saves the script to `~/.zoi/plugins/` and loads it on startup. The script can use the `zoi` API to register commands.
+- **Effect:** Zoi saves the script to the user data directory under `zoi/plugins/` and loads it on startup. The script can use the `zoi` API to register commands.
 - **On Removal:** The plugin script is deleted.
 
 #### `hook`
@@ -136,7 +136,7 @@ Distributes a global transaction hook.
 - **Fields:**
   - `name`: A unique name for the hook.
   - `content`: The raw YAML content of the hook definition.
-- **Effect:** Zoi saves the hook to `~/.zoi/hooks/<name>.hook.yaml`. It will be triggered during future transactions based on its path matching logic.
+- **Effect:** Zoi saves the hook to the user data directory under `zoi/hooks/<name>.hook.yaml`. It will be triggered during future transactions based on its path matching logic.
 - **On Removal:** The hook file is deleted.
 
 ## Examples

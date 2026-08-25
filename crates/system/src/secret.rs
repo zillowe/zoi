@@ -8,7 +8,7 @@ use argon2::password_hash::{PasswordHasher, SaltString};
 use base64::Engine as _;
 use base64::engine::general_purpose;
 use rand::{Rng, rng};
-use zoi_core::utils::get_user_home;
+use zoi_core::utils::get_user_state_dir;
 
 const SECRET_PREFIX: &str = "ZOISEC:v1:";
 
@@ -29,9 +29,7 @@ pub fn hash_password(password: &str) -> Result<String> {
 
 /// Retrieves or generates the local master key for two-way encryption.
 fn get_master_key() -> Result<[u8; 32]> {
-    let mut key_path = get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory"))?;
-    key_path.push(".zoi/master.key");
+    let key_path = get_user_state_dir()?.join("master.key");
 
     if !key_path.exists() {
         if let Some(parent) = key_path.parent() {
@@ -88,9 +86,7 @@ pub fn import_master_key(encoded_key: &str) -> Result<()> {
         return Err(anyhow!("Invalid master key length. Expected 32 bytes."));
     }
 
-    let mut key_path = get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory"))?;
-    key_path.push(".zoi/master.key");
+    let key_path = get_user_state_dir()?.join("master.key");
 
     if let Some(parent) = key_path.parent() {
         fs::create_dir_all(parent)?;

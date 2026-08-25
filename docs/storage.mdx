@@ -1,0 +1,38 @@
+---
+title: Storage Locations
+description: XDG, platform-native, system, and project paths used by Zoi.
+---
+
+Zoi separates configuration, durable package data, cache files, and mutable
+state. XDG variables always take precedence when they are set. This is a
+breaking layout change - existing `~/.zoi` data is not read automatically.
+
+## User scope
+
+| Purpose | Linux and other Unix | macOS | Windows |
+| --- | --- | --- | --- |
+| Configuration | `$XDG_CONFIG_HOME/zoi`, otherwise `~/.config/zoi` | XDG override, otherwise the native configuration directory | XDG override, otherwise the native local configuration directory |
+| Package data, registries, keys, plugins, and LSP files | `$XDG_DATA_HOME/zoi`, otherwise `~/.local/share/zoi` | XDG override, otherwise `~/Library/Application Support/zoi` | XDG override, otherwise `%LOCALAPPDATA%\zoi` |
+| Downloads and other cache files | `$XDG_CACHE_HOME/zoi`, otherwise `~/.cache/zoi` | XDG override, otherwise `~/Library/Caches/zoi` | XDG override, otherwise the native cache directory |
+| Transactions, pins, audit history, telemetry, and user lockfiles | `$XDG_STATE_HOME/zoi`, otherwise `~/.local/state/zoi` | XDG override, otherwise `~/Library/Application Support/zoi` | XDG override, otherwise `%LOCALAPPDATA%\zoi` |
+
+The user package store is under `pkgs/store` in the data directory. Command
+shims are under `pkgs/bin` in that same directory. Add that resolved directory
+to `PATH`, or use `zoi shell` to configure it.
+
+## System scope
+
+On Unix-like systems, Zoi follows the FHS:
+
+- Configuration and system hooks: `/etc/zoi`
+- Package data and registry database: `/var/lib/zoi`
+- Cache files: `/var/cache/zoi`
+- Command shims: `/usr/local/bin`
+
+On Windows, system package data is stored below `C:\ProgramData\zoi`.
+
+## Project scope
+
+Project scope is deliberately self-contained and never uses XDG variables. All
+project package data, registries, configuration, and task cache live under
+`./.zoi/` in the current project.

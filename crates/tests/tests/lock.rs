@@ -1,12 +1,15 @@
 //! Integration tests for Zoi process-wide recursive locking.
 
+use tempfile::tempdir;
 use zoi::pkg::lock;
 
 mod common;
 
 #[test]
 fn test_recursive_locking_in_same_thread() {
-    let _ctx = common::TestContextGuard::acquire();
+    let mut ctx = common::TestContextGuard::acquire();
+    let home = tempdir().expect("temporary home should be created");
+    ctx.set_env_var("HOME", home.path());
 
     // First acquisition
     let guard1 =

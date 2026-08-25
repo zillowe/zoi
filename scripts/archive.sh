@@ -126,7 +126,8 @@ for binary_path in "$COMPILED_DIR"/*; do
     fi
 
     # Delta patch generation
-    if [ -n "${PREV_TAG:-}" ] && [ -n "${CI_COMMIT_TAG:-}" ]; then
+    # Only generate patches for 'zoi', skipping 'zoi-mini' and 'zoid'
+    if [[ "$binary_base" == "zoi" ]] && [ -n "${PREV_TAG:-}" ] && [ -n "${CI_COMMIT_TAG:-}" ]; then
         # Extract status and version from tags
         # Tag format: [Branch]-[Status]-[Version]
         OLD_STATUS=$(echo "$PREV_TAG" | cut -d'-' -f2 | tr '[:upper:]' '[:lower:]')

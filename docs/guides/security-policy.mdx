@@ -12,7 +12,7 @@ Policies can **only** be defined in the system-level `config.yaml`:
 - **Linux/macOS:** `/etc/zoi/config.yaml`
 - **Windows:** `C:\ProgramData\zoi\config.yaml`
 
-Settings defined here are the "source of truth." When a policy field is marked as `unoverridable`, any attempts by a user to change that setting in their `~/.zoi/pkgs/config.yaml` or a project-local config will be ignored.
+Settings defined here are the "source of truth." When a policy field is marked as `unoverridable`, any attempts by a user to change that setting in their user configuration file or a project-local config will be ignored.
 
 ---
 
@@ -104,7 +104,7 @@ policy:
 
 ### Log Storage and Viewing
 
-Logs are stored in a structured JSON Lines format at `~/.zoi/audit.json`. Administrators and users can view the history using the `zoi history` command:
+Logs are stored in a structured JSON Lines format in the user state directory under `zoi/audit/audit.json`. Administrators and users can view the history using the `zoi history` command:
 
 ```sh
 zoi history

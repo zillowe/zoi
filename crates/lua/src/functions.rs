@@ -144,9 +144,8 @@ pub fn setup_lua_environment(
     }
 
     let path_table = lua.create_table()?;
-    if let Some(home_dir) = utils::get_user_home() {
-        path_table
-            .set("user", home_dir.join(".zoi").to_string_lossy().to_string())?;
+    if let Ok(user_data_dir) = utils::get_user_data_dir() {
+        path_table.set("user", user_data_dir.to_string_lossy().to_string())?;
     }
 
     let system_bin_path = if cfg!(target_os = "windows") {
@@ -160,15 +159,11 @@ pub fn setup_lua_environment(
 
     if let Some(home_dir) = utils::get_user_home() {
         pkg_table.set("home", home_dir.to_string_lossy().to_string())?;
-        pkg_table.set(
-            "store",
-            home_dir
-                .join(".zoi")
-                .join("pkgs")
-                .join("store")
-                .to_string_lossy()
-                .to_string()
-        )?;
+        if let Ok(store_dir) =
+            utils::get_store_base_dir(zoi_core::types::Scope::User)
+        {
+            pkg_table.set("store", store_dir.to_string_lossy().to_string())?;
+        }
     }
 
     if let Ok(current_dir) = std::env::current_dir() {
@@ -218,10 +213,10 @@ pub fn setup_lua_environment(
         if let Some(home_dir) = utils::get_user_home() {
             location_table.set(
                 "PKGSTORE",
-                home_dir
-                    .join(".zoi")
-                    .join("pkgs")
-                    .join("store")
+                utils::get_store_base_dir(zoi_core::types::Scope::User)
+                    .map_err(|error| {
+                        mlua::Error::RuntimeError(error.to_string())
+                    })?
                     .to_string_lossy()
                     .to_string()
             )?;

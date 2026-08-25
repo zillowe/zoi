@@ -78,7 +78,12 @@ pub fn display_updates(pkg: &types::Package, yes: bool) -> Result<bool> {
 
 /// Extracts the filename from a URL.
 pub fn get_filename_from_url(url: &str) -> &str {
-    url.split('/').next_back().unwrap_or_default()
+    url.split(['?', '#'])
+        .next()
+        .unwrap_or_default()
+        .rsplit('/')
+        .next()
+        .unwrap_or_default()
 }
 
 /// Fetches the text content from a list of candidate URLs.

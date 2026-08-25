@@ -21,9 +21,10 @@ Each entry follows the format `manager:package[@version][:description]`. If the 
   - Note: For `deno` dependencies, use a `-` separator instead of `:` (e.g. `deno:npm-chalk` or `deno:jsr-@std/bytes`).
 - **Virtual Packages:** You can depend on a virtual package name that is satisfied by any package that includes it in its `provides` list.
 - **Split packages:** Use the dependency group's `sub_packages` map to add dependencies that only apply to a specific sub-package. Dependency strings themselves do not have a separate sub-package field.
-- **Version:** Can be specified with `@<semver>` or a comparator string like `=1.2.3`, `>=2.0.0`, `^1.2`, `~1.2.3`. An optional `v` prefix is supported (e.g. `@v1.2.3`).
+- **Version:** Zoi dependencies support standard SemVer requirements such as `=1.2.3`, `>=2.0.0`, `^1.2`, and `~1.2.3`. External dependencies support exact versions and safe version forms beginning with `=`, `^`, or `~`; their package manager ultimately decides whether a version can be enforced. An optional `v` prefix is supported (e.g. `@v1.2.3`).
   - Examples: `npm:typescript@5.3.2`, `cargo:bat@v0.24.0`, `apt:curl=7.68.0-1ubuntu2.18`.
   - For `zoi` packages, you can use a channel name like `zoi:my-pkg@stable`.
+  - External dependency names and versions must not contain shell-control syntax. Zoi rejects these values before invoking the external package manager.
 - **Description:** An inline description can be added after the last colon. It must not contain version characters.
   - Example: `pipx:black:Python formatter CLI`.
 - **Native Packages:** Use `native:<pkg>` to have Zoi automatically select the system's package manager.

@@ -70,7 +70,12 @@ pub struct BuildCommand {
     /// The base package to install when using --pure (default:
     /// @core/base:dev).
     #[arg(long, default_value = "@core/base:dev")]
-    pub root_package: String
+    pub root_package: String,
+
+    /// Skip creating an intermediate source bundle (.zsa) and build directly
+    /// from the .pkg.lua file.
+    #[arg(long)]
+    pub no_zsa: bool
 }
 
 /// Run the package build command.
@@ -134,6 +139,37 @@ pub fn run(mut args: BuildCommand) -> Result<()> {
         println!("Running tests before building...");
         crate::pkg::package::test::run(&args)?;
         println!("Tests passed, proceeding with build...");
+    }
+
+    // Two-stage build: bundle the package into a .zsa source archive first,
+    // then build the distributable .zpa from that archive. The bundle is
+    // temporary and discarded after the build. --no-zsa opts out and keeps
+    // the legacy direct-from-source behavior.
+    let mut _temp_zsa_bundle = None;
+    if !args.no_zsa && args.package_file.to_string_lossy().ends_with(".pkg.lua")
+    {
+        let temp = tempfile::Builder::new()
+            .prefix("zoi-build-zsa-")
+            .tempdir()?;
+        println!("{} Bundling source archive...", "::".bold().blue());
+        let zsa_path = crate::pkg::package::bundle::run(
+            &args.package_file,
+            Some(temp.path()),
+            None,
+            args.version_override.as_deref(),
+            args.r#type.as_deref()
+        )?;
+
+        // Pin the output dir to the original package's directory when unset.
+        // Otherwise the build would default its output to the temp bundle
+        // directory, which gets deleted right after this function returns.
+        if args.output_dir.is_none() {
+            args.output_dir = args.package_file.parent().map(PathBuf::from);
+        }
+
+        println!("{} Building from source bundle...", "::".bold().blue());
+        args.package_file = zsa_path;
+        _temp_zsa_bundle = Some(temp);
     }
 
     crate::pkg::package::build::run(
