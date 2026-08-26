@@ -700,6 +700,20 @@ fn build_for_platform(
                 true
             )?;
 
+            // Relocate ELFs before pooling so hashes and sizes are recorded
+            // from the final relocated bytes. If we relocated after pooling,
+            // the manifest sizes/hashes would refer to pre-relocation content
+            // and installation would fail its integrity checks.
+            if platform.starts_with("linux")
+                && let Err(e) =
+                    super::relocate::relocate_elfs(v_staging.path(), quiet)
+            {
+                eprintln!(
+                    "{} Failed to relocate ELF binaries in staging: {e}",
+                    "Warning:".yellow(),
+                );
+            }
+
             let mut scope_mapping = ScopeMapping::default();
             super::pool::pool_files(
                 v_staging.path(),
@@ -732,15 +746,6 @@ fn build_for_platform(
             }
         }
         mappings.insert(sub_package, sub_mapping);
-    }
-
-    if platform.starts_with("linux")
-        && let Err(e) = super::relocate::relocate_elfs(&pool_dir, quiet)
-    {
-        eprintln!(
-            "{} Failed to relocate ELF binaries in pool: {e}",
-            "Warning:".yellow(),
-        );
     }
 
     let pooled_manifest = PooledZpaManifest {
