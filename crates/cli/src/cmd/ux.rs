@@ -168,7 +168,7 @@ fn failure_hint(message: &str, command: &str) -> Option<&'static str> {
         return Some("Run `zoi sync` and retry.");
     }
     if m.contains("not enough disk space") {
-        return Some("Free space (e.g. `zoi clean`) and retry.");
+        return Some("Free space (e.g. `zoi cache clear`) and retry.");
     }
     if m.contains("policy") || m.contains("compliance") {
         return Some("Review policy settings in config and rerun.");

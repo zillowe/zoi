@@ -8,8 +8,6 @@ pub mod audit;
 pub mod autoremove;
 /// The `cache` command.
 pub mod cache;
-/// The `clean` command.
-pub mod clean;
 /// The `clone` command.
 pub mod clone;
 /// The `complete` command.

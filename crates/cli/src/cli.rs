@@ -574,13 +574,6 @@ enum Commands {
         args: Vec<String>
     },
 
-    /// Clears the cache of downloaded package binaries
-    Clean {
-        /// Do not actually clear the cache, just show what would be done
-        #[arg(long)]
-        dry_run: bool
-    },
-
     /// Clones the git repository of a package
     Clone {
         /// The package identifier (e.g. @repo/name, path, or URL)
@@ -776,7 +769,7 @@ pub enum CacheCommands {
         #[arg(required = true)]
         files: Vec<std::path::PathBuf>
     },
-    /// Clear the local cache
+    /// Clear the entire Zoi cache
     #[command(alias = "clean")]
     Clear {
         /// Do not actually clear the cache, just show what would be done
@@ -1160,7 +1153,6 @@ pub fn run() -> anyhow::Result<()> {
                 };
                 cmd::download::run(&package, download_type, output_dir)
             }
-            Commands::Clean { dry_run } => cmd::clean::run(dry_run),
             Commands::Clone { package, location } => {
                 cmd::clone::run(&package, location, cli.yes)
             }

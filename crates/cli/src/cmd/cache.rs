@@ -52,7 +52,7 @@ pub fn add(files: &[PathBuf]) -> Result<()> {
     Ok(())
 }
 
-/// Clears the local archive cache.
+/// Clears the entire Zoi cache.
 ///
 /// # Errors
 ///
@@ -62,7 +62,16 @@ pub fn add(files: &[PathBuf]) -> Result<()> {
 ///
 /// This function does not explicitly panic.
 pub fn clear(dry_run: bool) -> Result<()> {
-    crate::cmd::clean::run(dry_run)
+    if dry_run {
+        println!("{} Cleaning cache (Dry-run)...", "::".bold().yellow());
+    } else {
+        println!("{} Cleaning cache...", "::".bold().blue());
+    }
+    crate::pkg::cache::clear(dry_run)?;
+    if !dry_run {
+        println!("{}", "Cache cleaned successfully.".green());
+    }
+    Ok(())
 }
 
 /// Lists files in the local archive cache.
