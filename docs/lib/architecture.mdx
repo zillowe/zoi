@@ -67,7 +67,7 @@ Zoi implements simple reference counting using the `dependents/` directory. When
 
 ### Binary Linking
 
-Binaries are not added to the system `PATH` individually. Instead, Zoi maintains a global `bin` directory under its user data directory (`zoi/pkgs/bin`) and creates symlinks to the binaries located inside the specific `{version}/bin/` directories in the store.
+Binaries are not added to the system `PATH` individually. Instead, Zoi maintains a global shim directory per scope (`~/.local/bin` for user scope, `/usr/bin` for system scope on Linux) and creates symlinks to the binaries located inside the specific `{version}/bin/` directories in the store.
 
 ---
 

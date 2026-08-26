@@ -35,7 +35,7 @@ jobs:
       - name: Install Zoi
         run: |
           curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
-          echo "${XDG_DATA_HOME:-$HOME/.local/share}/zoi/pkgs/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Sync Zoi
         run: zoi sync
@@ -59,7 +59,7 @@ publish-pkg:
     - name: Install Zoi
       run: |
  curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
- echo "${XDG_DATA_HOME:-$HOME/.local/share}/zoi/pkgs/bin" >> $GITHUB_PATH
+ echo "$HOME/.local/bin" >> $GITHUB_PATH
 
     - name: Build Package
       run: zoi package build my-tool.pkg.lua --type source --platform linux-amd64

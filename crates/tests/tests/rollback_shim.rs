@@ -67,11 +67,7 @@ fn test_rollback_restores_shims() {
 
     local::write_manifest(&manifest).expect("unwrap failed");
 
-    let bin_root = if cfg!(windows) {
-        root.join("ProgramData/zoi/pkgs/bin")
-    } else {
-        root.join("home/.zoi/pkgs/bin")
-    };
+    let bin_root = zoi::pkg::utils::get_user_bin_dir().expect("unwrap failed");
     fs::create_dir_all(&bin_root).expect("unwrap failed");
     let shim_path = bin_root.join("test-cmd");
     shim::create_shim(&shim_path).expect("unwrap failed");

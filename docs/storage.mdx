@@ -16,18 +16,48 @@ breaking layout change - existing `~/.zoi` data is not read automatically.
 | Downloads and other cache files | `$XDG_CACHE_HOME/zoi`, otherwise `~/.cache/zoi` | XDG override, otherwise `~/Library/Caches/zoi` | XDG override, otherwise the native cache directory |
 | Transactions, pins, audit history, telemetry, and user lockfiles | `$XDG_STATE_HOME/zoi`, otherwise `~/.local/state/zoi` | XDG override, otherwise `~/Library/Application Support/zoi` | XDG override, otherwise `%LOCALAPPDATA%\zoi` |
 
-The user package store is under `pkgs/store` in the data directory. Command
-shims are under `pkgs/bin` in that same directory. Add that resolved directory
-to `PATH`, or use `zoi shell` to configure it.
+### Package store
+
+The user package store lives under `pkgs/store` in the data directory. Every
+installed package gets its own directory named after its package ID, and each
+version is isolated in `{version}/` subdirectories. A `latest` symlink points
+to the currently active version so upgrades can be swapped atomically.
+
+### Command shims
+
+Package binaries are exposed through shims rather than by modifying global
+paths individually:
+
+- User scope: `~/.local/bin` on Linux and other Unix systems
+- System scope: `/usr/bin` on Linux, `/usr/local/bin` on macOS
+- Project scope: `.zoi/pkgs/bin` inside the project
+- Windows: `%LOCALAPPDATA%\zoi\pkgs\bin` (user) or
+  `C:\ProgramData\zoi\pkgs\bin` (system)
+
+On most distributions `~/.local/bin` is already on `PATH`. If it is not, run
+`zoi shell <shell>` to add it automatically, or export it manually:
+
+```sh
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### Cache layout
+
+The cache directory contains downloaded archives under `archives/` and cached
+package definitions under `pkgdefs/`. Run `zoi cache ls` to inspect it and
+`zoi cache clear` to wipe it entirely when you need to reclaim disk space.
 
 ## System scope
 
-On Unix-like systems, Zoi follows the FHS:
+On Linux, Zoi follows the Filesystem Hierarchy Standard:
 
 - Configuration and system hooks: `/etc/zoi`
 - Package data and registry database: `/var/lib/zoi`
 - Cache files: `/var/cache/zoi`
-- Command shims: `/usr/local/bin`
+- Command shims: `/usr/bin`
+
+On macOS, system command shims are placed in `/usr/local/bin` because
+`/usr/bin` is protected by System Integrity Protection (SIP).
 
 On Windows, system package data is stored below `C:\ProgramData\zoi`.
 
@@ -35,4 +65,18 @@ On Windows, system package data is stored below `C:\ProgramData\zoi`.
 
 Project scope is deliberately self-contained and never uses XDG variables. All
 project package data, registries, configuration, and task cache live under
-`./.zoi/` in the current project.
+`./.zoi/` in the current project:
+
+- `.zoi/pkgs/store`: project-local package store
+- `.zoi/pkgs/bin`: project-local command shims
+
+This makes projects reproducible and keeps their dependencies fully isolated
+from your user or system installations.
+
+## Sysroot redirection
+
+When operating with an explicit root (for example the `--root` flag used for
+bootstrapping or cross-installation), every absolute path above - including
+shim directories such as `/usr/bin` - is transparently remapped beneath the
+configured sysroot. This lets you install an entire filesystem tree into a
+directory, partition, or container image without touching the host system.

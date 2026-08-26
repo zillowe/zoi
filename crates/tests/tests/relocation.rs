@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::io::Read;
+use std::path::Path;
 
 use sha2::{Digest, Sha256};
 use tar::Archive;
@@ -157,24 +158,24 @@ end
     let mut checked = 0usize;
     for entry in archive.entries().expect("unwrap failed") {
         let mut entry = entry.expect("unwrap failed");
-        let file_name = entry
-            .path()
-            .expect("unwrap failed")
+        let entry_path = entry.path().expect("unwrap failed").to_path_buf();
+        // Archive entry paths may or may not carry a leading "./"
+        if !entry_path.to_string_lossy().contains("/pool/")
+            && entry_path.parent().is_none_or(|p| p != Path::new("pool"))
+        {
+            continue;
+        }
+        let file_name = entry_path
             .file_name()
             .expect("unwrap failed")
             .to_string_lossy()
             .to_string();
-        if !entry
-            .path()
-            .expect("unwrap failed")
-            .to_string_lossy()
-            .contains("/pool/")
-        {
-            continue;
-        }
 
-        let key = format!("sha256-{file_name}");
-        let Some(pool_entry) = manifest.pool.get(&key) else {
+        // Pool files are named after their manifest key ("sha256-<hex>")
+        let Some(expected_hash) = file_name.strip_prefix("sha256-") else {
+            continue;
+        };
+        let Some(pool_entry) = manifest.pool.get(&file_name) else {
             continue;
         };
 
@@ -186,19 +187,20 @@ end
             if n == 0 {
                 break;
             }
-            hasher.update(&buf[..n]);
+            if let Some(chunk) = buf.get(..n) {
+                hasher.update(chunk);
+            }
             len += n as u64;
         }
 
         assert_eq!(
-            len,
-            pool_entry.size,
-            "pool size must match manifest for {key}"
+            len, pool_entry.size,
+            "pool size must match manifest for {file_name}"
         );
         assert_eq!(
-            format!("{:x}", hasher.finalize()),
-            file_name,
-            "pool content must match manifest hash for {key}"
+            hex::encode(hasher.finalize()),
+            expected_hash,
+            "pool content must match manifest hash for {file_name}"
         );
         checked += 1;
     }

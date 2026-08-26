@@ -3,7 +3,7 @@
 use std::fmt::Display;
 use std::fs;
 use std::io::{Write, stdin, stdout};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use anyhow::anyhow;
@@ -372,17 +372,7 @@ pub fn setup_path(scope: Scope) -> anyhow::Result<()> {
 
     let zoi_bin_dir = match scope {
         Scope::User => crate::pkg::utils::get_user_bin_dir()?,
-        Scope::System => {
-            if cfg!(target_os = "windows") {
-                crate::pkg::sysroot::apply_sysroot(PathBuf::from(
-                    "C:\\ProgramData\\zoi\\pkgs\\bin"
-                ))
-            } else {
-                crate::pkg::sysroot::apply_sysroot(PathBuf::from(
-                    "/usr/local/bin"
-                ))
-            }
-        }
+        Scope::System => crate::pkg::utils::get_system_bin_dir(),
         Scope::Project => return Ok(())
     };
 

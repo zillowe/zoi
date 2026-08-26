@@ -180,11 +180,7 @@ pub fn elevate_uninstall(
     }
 
     if let Some(bins) = &manifest.bins {
-        let bin_root = if cfg!(target_os = "windows") {
-            Path::new("C:\\ProgramData\\zoi\\pkgs\\bin").to_path_buf()
-        } else {
-            Path::new("/usr/local/bin").to_path_buf()
-        };
+        let bin_root = crate::pkg::utils::get_system_bin_dir();
 
         for bin in bins {
             let symlink_path = bin_root.join(bin);

@@ -148,11 +148,8 @@ pub fn setup_lua_environment(
         path_table.set("user", user_data_dir.to_string_lossy().to_string())?;
     }
 
-    let system_bin_path = if cfg!(target_os = "windows") {
-        "C:\\ProgramData\\zoi\\pkgs\\bin".to_string()
-    } else {
-        "/usr/local/bin".to_string()
-    };
+    let system_bin_path =
+        utils::get_system_bin_dir().to_string_lossy().to_string();
     path_table.set("system", system_bin_path)?;
 
     zoi_table.set("PATH", path_table)?;

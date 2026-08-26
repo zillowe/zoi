@@ -270,7 +270,7 @@ package:archive:
 #   before_script:
 #     - apt-get update -y && apt-get install -y curl git tar zstd grep sed gnupg coreutils
 #     - curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
-#     - export PATH="$HOME/.zoi/pkgs/bin:$PATH"
+#     - export PATH="$HOME/.local/share/zoi/pkgs/bin:$PATH"
 #     - zoi sync
 #     - zoi install @zillowe/gct --yes
 #   script:

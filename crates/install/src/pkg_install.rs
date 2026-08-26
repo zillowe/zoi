@@ -19,19 +19,7 @@ use zstd::stream::read::Decoder as ZstdDecoder;
 fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
     match scope {
         types::Scope::User => zoi_core::utils::get_user_bin_dir(),
-        types::Scope::System => {
-            if cfg!(target_os = "windows") {
-                Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(
-                    "C:\\ProgramData\\zoi\\pkgs\\bin"
-                )))
-            } else if zoi_core::utils::is_zoios() {
-                Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from("/usr/bin")))
-            } else {
-                Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(
-                    "/usr/local/bin"
-                )))
-            }
-        }
+        types::Scope::System => Ok(zoi_core::utils::get_system_bin_dir()),
         types::Scope::Project => {
             let current_dir = std::env::current_dir()?;
             Ok(current_dir.join(".zoi").join("pkgs").join("bin"))

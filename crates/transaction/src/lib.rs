@@ -15,7 +15,7 @@ use chrono::Utc;
 use colored::Colorize;
 use uuid::{Timestamp, Uuid};
 use zoi_audit as audit;
-use zoi_core::{sysroot, types};
+use zoi_core::types;
 use zoi_install as install;
 use zoi_resolver::local;
 use zoi_uninstall as uninstall;
@@ -362,15 +362,7 @@ fn restore_shims(manifest: &types::InstallManifest) -> Result<()> {
     if let Some(bins) = &manifest.bins {
         let bin_root = match manifest.scope {
             types::Scope::User => zoi_core::utils::get_user_bin_dir()?,
-            types::Scope::System => {
-                if cfg!(target_os = "windows") {
-                    sysroot::apply_sysroot(PathBuf::from(
-                        "C:\\ProgramData\\zoi\\pkgs\\bin"
-                    ))
-                } else {
-                    sysroot::apply_sysroot(PathBuf::from("/usr/local/bin"))
-                }
-            }
+            types::Scope::System => zoi_core::utils::get_system_bin_dir(),
             types::Scope::Project => {
                 let current_dir = std::env::current_dir()?;
                 current_dir.join(".zoi").join("pkgs").join("bin")

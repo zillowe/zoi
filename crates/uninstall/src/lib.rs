@@ -24,15 +24,7 @@ use zoi_telemetry as telemetry;
 fn get_bin_root(scope: types::Scope) -> anyhow::Result<PathBuf> {
     match scope {
         types::Scope::User => core_utils::get_user_bin_dir(),
-        types::Scope::System => {
-            if cfg!(target_os = "windows") {
-                Ok(sysroot::apply_sysroot(PathBuf::from(
-                    "C:\\ProgramData\\zoi\\pkgs\\bin"
-                )))
-            } else {
-                Ok(sysroot::apply_sysroot(PathBuf::from("/usr/local/bin")))
-            }
-        }
+        types::Scope::System => Ok(core_utils::get_system_bin_dir()),
         types::Scope::Project => {
             let current_dir = std::env::current_dir()?;
             Ok(current_dir.join(".zoi").join("pkgs").join("bin"))

@@ -52,7 +52,7 @@ metadata({{
     let archive_path = root.join("dummy.zpa");
     fs::write(&archive_path, "").expect("unwrap failed");
 
-    let bin_root = root.join(".zoi/pkgs/bin");
+    let bin_root = root.join(".local/bin");
     fs::create_dir_all(&bin_root).expect("unwrap failed");
 
     let shim2_path = bin_root.join("bin2");

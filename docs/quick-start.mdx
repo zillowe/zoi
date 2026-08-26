@@ -29,7 +29,7 @@ powershell -c "irm zillowe.pages.dev/scripts/zoi/install.ps1|iex"
 
 ## 2. Set Up Your Shell
 
-Zoi links package binaries into its user data directory under `zoi/pkgs/bin`. If commands installed by Zoi are not found, configure your shell completions and PATH. See [Storage Locations](/docs/zds/zoi/storage) for the exact platform path:
+Zoi links package binaries into `~/.local/bin` on Linux and other Unix systems. If commands installed by Zoi are not found, configure your shell completions and PATH. See [Storage Locations](/docs/zds/zoi/storage) for the exact platform path:
 
 ```sh
 zoi shell zsh
@@ -275,7 +275,7 @@ Common fixes:
 
 | Problem                                     | Fix                                                                             |
 | ------------------------------------------- | ------------------------------------------------------------------------------- |
-| Installed commands are not found            | Run `zoi shell <shell>` or add Zoi's user `pkgs/bin` directory to `PATH`.       |
+| Installed commands are not found            | Run `zoi shell <shell>` or add Zoi's user bin directory to `PATH`.              |
 | Package cannot be found                     | Run `zoi sync`, then check active repos with `zoi repo list`.                   |
 | You need a mirror                           | Use `zoi sync set github`, `zoi sync set codeberg`, or a custom registry URL.   |
 | You need offline installs                   | Pre-populate archives with `zoi cache add` or use `--pkg-dir` with `--offline`. |

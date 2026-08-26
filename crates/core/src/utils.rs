@@ -250,11 +250,44 @@ fn xdg_or_platform_dir(
 
 /// Returns the directory used for user-installed command shims.
 ///
+/// On Unix this is the conventional user bin directory (`~/.local/bin`) so
+/// shims are immediately available on most distributions without extra PATH
+/// configuration. Other platforms keep a dedicated directory inside Zoi's
+/// data location.
+///
 /// # Errors
 ///
-/// Returns an error if the user data directory cannot be determined.
+/// Returns an error if the home directory cannot be determined.
 pub fn get_user_bin_dir() -> Result<PathBuf> {
-    Ok(get_user_data_dir()?.join("pkgs").join("bin"))
+    #[cfg(unix)]
+    {
+        let home = get_user_home()
+            .ok_or_else(|| anyhow!("Could not find home directory."))?;
+        Ok(crate::sysroot::apply_sysroot(
+            home.join(".local").join("bin")
+        ))
+    }
+    #[cfg(not(unix))]
+    {
+        Ok(get_user_data_dir()?.join("pkgs").join("bin"))
+    }
+}
+
+/// Returns the directory used for system-wide command shims.
+///
+/// On Linux this follows the distro convention of `/usr/bin`. On macOS the
+/// SIP-protected `/usr/bin` cannot be written to, so `/usr/local/bin` is used
+/// instead. Windows keeps a dedicated directory below `ProgramData`.
+#[must_use]
+pub fn get_system_bin_dir() -> PathBuf {
+    let path = if cfg!(target_os = "windows") {
+        PathBuf::from("C:\\ProgramData\\zoi\\pkgs\\bin")
+    } else if cfg!(target_os = "macos") {
+        PathBuf::from("/usr/local/bin")
+    } else {
+        PathBuf::from("/usr/bin")
+    };
+    crate::sysroot::apply_sysroot(path)
 }
 
 /// Returns the directory used for user shell-completion files.

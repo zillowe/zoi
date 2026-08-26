@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 
 $GitLabProjectPath = "zillowe/zillwen/zusty/zoi"
 $GitLabProjectId = "71087662"
-$InstallDir = Join-Path $env:USERPROFILE ".zoi\bin"
+$InstallDir = Join-Path $env:LOCALAPPDATA "zoi\bin"
 $BinName = "zoi.exe"
 $PublicKeyUrl = "https://zillowe.pages.dev/keys/zillowe-main.asc"
 

@@ -22,15 +22,7 @@ use zoi_resolver::{local, resolve};
 fn get_bin_root(scope: Scope) -> Result<PathBuf> {
     match scope {
         Scope::User => utils::get_user_bin_dir(),
-        Scope::System => {
-            if cfg!(target_os = "windows") {
-                Ok(sysroot::apply_sysroot(PathBuf::from(
-                    "C:\\ProgramData\\zoi\\pkgs\\bin"
-                )))
-            } else {
-                Ok(sysroot::apply_sysroot(PathBuf::from("/usr/local/bin")))
-            }
-        }
+        Scope::System => Ok(utils::get_system_bin_dir()),
         Scope::Project => {
             let current_dir = std::env::current_dir()?;
             Ok(current_dir.join(".zoi").join("pkgs").join("bin"))
