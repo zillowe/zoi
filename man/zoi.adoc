@@ -72,7 +72,7 @@ Zoi also manages declarative user environments and the underlying ZoiOS system.
   Install an older version of a package from the local store or cache.
 
 *env*::
-  Manage and set up project environments defined in zoi.yaml.
+  Manage and set up project environments defined in zoi.lua.
 
 *exec*::
   Execute a package binary directly with its dependencies resolved.
@@ -136,7 +136,7 @@ Zoi also manages declarative user environments and the underlying ZoiOS system.
   Roll a package back to the previously installed version.
 
 *run*::
-  Execute a command defined in a local zoi.yaml file.
+  Execute a command defined in a local zoi.lua file.
 
 *search*::
   Search for packages by name or description.
@@ -200,6 +200,9 @@ Zoi also manages declarative user environments and the underlying ZoiOS system.
   *~/.local/share/zoi/* on most systems.
 
 *./zoi.yaml*::
+  Legacy per-project task runner.
+
+*./zoi.lua*::
   Per-project configuration and dependencies.
 
 *./.zoi/*::
