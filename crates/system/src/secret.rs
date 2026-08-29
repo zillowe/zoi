@@ -4,7 +4,7 @@ use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
 use anyhow::{Result, anyhow};
 use argon2::Argon2;
-use argon2::password_hash::{PasswordHasher, SaltString};
+use argon2::password_hash::PasswordHasher;
 use base64::Engine as _;
 use base64::engine::general_purpose;
 use rand::{Rng, rng};
@@ -14,14 +14,9 @@ const SECRET_PREFIX: &str = "ZOISEC:v1:";
 
 /// Generates a one-way password hash using Argon2 (modern standard).
 pub fn hash_password(password: &str) -> Result<String> {
-    let mut salt_bytes = [0u8; 16];
-    rng().fill_bytes(&mut salt_bytes);
-    let salt = SaltString::encode_b64(&salt_bytes)
-        .map_err(|e| anyhow!("Failed to encode salt: {}", e))?;
-
     let argon2 = Argon2::default();
     let password_hash = argon2
-        .hash_password(password.as_bytes(), &salt)
+        .hash_password(password.as_bytes())
         .map_err(|e| anyhow!("Failed to hash password: {}", e))?
         .to_string();
     Ok(password_hash)

@@ -184,7 +184,7 @@ ignore = "0.4.33"
 aes-gcm = "0.11.1"
 rand = { version = "0.10.2", features = ["std", "thread_rng", "sys_rng"] }
 getrandom = "0.4.3"
-argon2 = "0.5.3"
+argon2 = "0.6.0"
 base64 = "0.23.1"
 
 zoi-common = { path = "crates/common", version = "1.26.1" }
