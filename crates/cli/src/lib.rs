@@ -71,6 +71,8 @@ pub fn install_sources(
         false,
         false,
         options.save,
+        false,
+        false,
         options.build_type.as_deref(),
         options.dry_run,
         pm_ptr,

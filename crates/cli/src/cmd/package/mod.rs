@@ -10,6 +10,8 @@ use clap::{Parser, Subcommand};
 pub mod build;
 /// Bundle command module.
 pub mod bundle;
+/// Delta generation command module.
+pub mod delta;
 /// Doctor command module.
 pub mod doctor;
 /// Init-LSP command module.
@@ -20,6 +22,8 @@ pub mod inspect;
 pub mod install;
 /// Test command module.
 pub mod test;
+/// Verify command module.
+pub mod verify;
 
 /// Arguments for the `package` command.
 #[derive(Parser, Debug)]
@@ -40,6 +44,10 @@ enum Commands {
     Test(build::BuildCommand),
     /// Install a package from a local archive
     Install(install::InstallCommand),
+    /// Generate a delta patch between two package archives
+    Delta(delta::DeltaCommand),
+    /// Verify the integrity of installed packages or an archive
+    Verify(verify::VerifyCommand),
     /// Lint and validate a package definition for maintainers
     Doctor(doctor::DoctorCommand),
     /// Initialize LSP support for .pkg.lua files
@@ -59,6 +67,8 @@ pub fn run(args: PackageCommand) -> Result<()> {
         Commands::Bundle(cmd) => bundle::run(cmd),
         Commands::Test(cmd) => test::run(&cmd),
         Commands::Install(cmd) => install::run(cmd),
+        Commands::Delta(cmd) => delta::run(&cmd),
+        Commands::Verify(cmd) => verify::run(&cmd),
         Commands::Doctor(cmd) => doctor::run(&cmd),
         Commands::InitLsp(cmd) => init_lsp::run(&cmd),
         Commands::Inspect(cmd) => inspect::run(cmd)

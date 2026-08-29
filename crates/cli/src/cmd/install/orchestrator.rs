@@ -32,6 +32,9 @@ pub struct InstallOptions<'a> {
     pub yes: bool,
     /// Whether to save the installation to the project file.
     pub save: bool,
+    /// Whether to install only the dependency nodes, skipping direct
+    /// packages.
+    pub deps_only: bool,
     /// The build type to use.
     pub build_type: Option<&'a str>,
     /// Whether to perform a dry run.
@@ -741,6 +744,7 @@ impl<'a> Orchestrator<'a> {
                         )
                     )
                     .row("Frozen lockfile", options.frozen.to_string())
+                    .row("Deps only", options.deps_only.to_string())
                     .row("Retry attempts", options.retry.to_string())
                     .row("Direct packages", direct_packages.len().to_string())
                     .row(
@@ -756,6 +760,74 @@ impl<'a> Orchestrator<'a> {
                         zoi_core::utils::format_bytes(total_installed_size)
                     );
             crate::cmd::ux::print_preflight(&preflight);
+        }
+
+        if options.explain {
+            let mut report = ux::ExplainReport::new("Install explanation");
+            let mut sorted_nodes: Vec<_> = graph.nodes.iter().collect();
+            sorted_nodes.sort_by(|a, b| a.1.pkg.name.cmp(&b.1.pkg.name));
+            for (id, node) in sorted_nodes {
+                let action = match install_plan.get(id) {
+                    Some(plan::InstallAction::DownloadAndInstall(_)) => {
+                        "download"
+                    }
+                    Some(plan::InstallAction::InstallFromArchive(_)) => {
+                        "archive"
+                    }
+                    Some(plan::InstallAction::BuildAndInstall) => {
+                        "build from source"
+                    }
+                    None => "unknown"
+                };
+                let display_name = ux::format_display_name(
+                    &node.registry_handle,
+                    &node.pkg.repo,
+                    &node.pkg.name,
+                    node.sub_package.as_deref(),
+                    &config
+                );
+                match &node.reason {
+                    types::InstallReason::Direct => {
+                        report = report.item(
+                            format!("{display_name}@{}", node.version),
+                            "explicitly requested",
+                            vec![
+                                format!("action: {action}"),
+                                format!("source: {}", node.source),
+                            ]
+                        );
+                    }
+                    types::InstallReason::Dependency { parent } => {
+                        report = report.item(
+                            format!("{display_name}@{}", node.version),
+                            format!("required by {parent}"),
+                            Vec::new()
+                        );
+                    }
+                }
+            }
+            if skipped_existing_count > 0 {
+                report = report.item(
+                    format!("{skipped_existing_count} already installed"),
+                    "skipped (identical version and revision already present)",
+                    Vec::new()
+                );
+            }
+            for dep in &non_zoi_deps {
+                report = report.item(
+                    dep.clone(),
+                    "handled by an external package manager",
+                    Vec::new()
+                );
+            }
+            if options.deps_only {
+                report = report.item(
+                    "--deps-only",
+                    "direct packages will not be installed",
+                    Vec::new()
+                );
+            }
+            ux::print_explain(&report);
         }
 
         let yes = options.yes;
@@ -890,108 +962,119 @@ impl<'a> Orchestrator<'a> {
             }
         }
 
-        println!("\n{} Installing packages...", "::".bold().blue());
-        let m_pkg = MultiProgress::new();
+        if options.deps_only {
+            println!(
+                "\n{} Skipping direct packages (--deps-only).",
+                "::".bold().yellow()
+            );
+        } else {
+            println!("\n{} Installing packages...", "::".bold().blue());
+            let m_pkg = MultiProgress::new();
 
-        for stage in &stages {
-            let mut stage_direct_ids = Vec::new();
-            for pkg_id in stage {
-                if let Some(node) = graph.nodes.get(pkg_id)
-                    && matches!(node.reason, types::InstallReason::Direct)
-                {
-                    let name = if let Some(sub) = &node.sub_package {
-                        format!("{}:{}", node.pkg.name, sub)
-                    } else {
-                        node.pkg.name.clone()
-                    };
-                    let version_display = if node.revision == "1" {
-                        node.version.clone()
-                    } else {
-                        format!("{}-{}", node.version, node.revision)
-                    };
-                    println!("@{name}:{version_display}");
-                    stage_direct_ids.push(pkg_id.clone());
-                }
-            }
-
-            if stage_direct_ids.is_empty() {
-                continue;
-            }
-
-            let res = stage_direct_ids.par_iter().try_for_each(
-                |pkg_id| -> Result<()> {
-                    let node = graph.nodes.get(pkg_id).ok_or_else(|| {
-                        anyhow!(
-                            "Package node '{pkg_id}' missing from graph \
-                             during final installation"
-                        )
-                    })?;
-
-                    let prepared = {
-                        let lock = prepared_nodes.lock().map_err(|e| {
-                            anyhow!(
-                                "Prepared nodes mutex poisoned during package \
-                                 install: {e}"
-                            )
-                        })?;
-                        lock.get(pkg_id).cloned().ok_or_else(|| {
-                            anyhow!("Prepared node missing for: {pkg_id}")
-                        })?
-                    };
-
-                    match installer::install_prepared_node(
-                        node,
-                        &prepared,
-                        Some(&m_pkg),
-                        yes,
-                        true,
-                        true,
-                        verbose
-                    ) {
-                        Ok(manifest) => {
-                            installed_manifests
-                                .lock()
-                                .expect("Installed manifests mutex poisoned")
-                                .push(manifest.clone());
-                            let mut tx_lock =
-                                transaction.lock().map_err(|e| {
-                                    anyhow!(
-                                        "Transaction mutex poisoned during \
-                                         direct package installation: {e}"
-                                    )
-                                })?;
-                            transaction::record_operation(
-                                &mut tx_lock,
-                                types::TransactionOperation::Install {
-                                    manifest: Box::new(manifest)
-                                }
-                            )?;
-                            successfully_installed_sources
-                                .lock()
-                                .expect(
-                                    "Successfully installed sources mutex \
-                                     poisoned"
-                                )
-                                .push(node.source.clone());
-                            Ok(())
-                        }
-                        Err(e) => {
-                            failed_packages
-                                .lock()
-                                .expect("Failed packages mutex poisoned")
-                                .push(node.pkg.name.clone());
-                            eprintln!(
-                                "Error installing {}: {}",
-                                node.pkg.name, e
-                            );
-                            Err(e)
-                        }
+            for stage in &stages {
+                let mut stage_direct_ids = Vec::new();
+                for pkg_id in stage {
+                    if let Some(node) = graph.nodes.get(pkg_id)
+                        && matches!(node.reason, types::InstallReason::Direct)
+                    {
+                        let name = if let Some(sub) = &node.sub_package {
+                            format!("{}:{}", node.pkg.name, sub)
+                        } else {
+                            node.pkg.name.clone()
+                        };
+                        let version_display = if node.revision == "1" {
+                            node.version.clone()
+                        } else {
+                            format!("{}-{}", node.version, node.revision)
+                        };
+                        println!("@{name}:{version_display}");
+                        stage_direct_ids.push(pkg_id.clone());
                     }
                 }
-            );
 
-            if res.is_err() {
-                break;
+                if stage_direct_ids.is_empty() {
+                    continue;
+                }
+
+                let res = stage_direct_ids.par_iter().try_for_each(
+                    |pkg_id| -> Result<()> {
+                        let node =
+                            graph.nodes.get(pkg_id).ok_or_else(|| {
+                                anyhow!(
+                                    "Package node '{pkg_id}' missing from \
+                                     graph during final installation"
+                                )
+                            })?;
+
+                        let prepared = {
+                            let lock = prepared_nodes.lock().map_err(|e| {
+                                anyhow!(
+                                    "Prepared nodes mutex poisoned during \
+                                     package install: {e}"
+                                )
+                            })?;
+                            lock.get(pkg_id).cloned().ok_or_else(|| {
+                                anyhow!("Prepared node missing for: {pkg_id}")
+                            })?
+                        };
+
+                        match installer::install_prepared_node(
+                            node,
+                            &prepared,
+                            Some(&m_pkg),
+                            yes,
+                            true,
+                            true,
+                            verbose
+                        ) {
+                            Ok(manifest) => {
+                                installed_manifests
+                                    .lock()
+                                    .expect(
+                                        "Installed manifests mutex poisoned"
+                                    )
+                                    .push(manifest.clone());
+                                let mut tx_lock =
+                                    transaction.lock().map_err(|e| {
+                                        anyhow!(
+                                            "Transaction mutex poisoned \
+                                             during direct package \
+                                             installation: {e}"
+                                        )
+                                    })?;
+                                transaction::record_operation(
+                                    &mut tx_lock,
+                                    types::TransactionOperation::Install {
+                                        manifest: Box::new(manifest)
+                                    }
+                                )?;
+                                successfully_installed_sources
+                                    .lock()
+                                    .expect(
+                                        "Successfully installed sources mutex \
+                                         poisoned"
+                                    )
+                                    .push(node.source.clone());
+                                Ok(())
+                            }
+                            Err(e) => {
+                                failed_packages
+                                    .lock()
+                                    .expect("Failed packages mutex poisoned")
+                                    .push(node.pkg.name.clone());
+                                eprintln!(
+                                    "Error installing {}: {}",
+                                    node.pkg.name, e
+                                );
+                                Err(e)
+                            }
+                        }
+                    }
+                );
+
+                if res.is_err() {
+                    break;
+                }
             }
         }
 

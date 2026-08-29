@@ -118,3 +118,35 @@ pub fn show(transaction_id: &str) -> Result<()> {
 
     Ok(())
 }
+
+/// Undoes a transaction by reverting all of its recorded operations in
+/// reverse order. Falls back to the most recent transaction when no ID is
+/// given.
+///
+/// # Errors
+///
+/// Returns an error if the transaction cannot be read or the revert fails.
+pub fn undo(id: Option<&str>, yes: bool, global_yes: bool) -> Result<()> {
+    use crate::utils;
+
+    let skip_confirm = yes || global_yes;
+    if !utils::ask_for_confirmation(
+        "This will revert all operations recorded in the transaction. Are you \
+         sure?",
+        skip_confirm
+    ) {
+        println!("Operation aborted.");
+        return Ok(());
+    }
+
+    let transaction_id = match id {
+        Some(id) => id.to_string(),
+        None => transaction::get_last_transaction_id()?
+            .ok_or_else(|| anyhow::anyhow!("No transactions found to undo."))?
+    };
+
+    println!("Undoing transaction {transaction_id}...");
+    transaction::rollback(&transaction_id)?;
+    println!("{}", "Transaction undone successfully.".green());
+    Ok(())
+}

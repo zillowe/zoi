@@ -656,12 +656,8 @@ enum Commands {
     /// Rollback a package to the previously installed version
     Rollback {
         /// The package identifier.
-        #[arg(value_name = "INST_PACKAGES", required_unless_present = "last_transaction", help = PKG_SOURCE_HELP)]
-        package: Option<String>,
-
-        /// Rollback the last transaction
-        #[arg(long, conflicts_with = "package")]
-        last_transaction: bool
+        #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
+        package: String
     },
 
     /// Shows a package's manual
@@ -820,6 +816,17 @@ pub enum TransactionCommands {
     Files {
         /// Transaction ID
         id: String
+    },
+    /// Undo a transaction by reverting all of its recorded operations.
+    /// Defaults to the most recent transaction when no ID is given.
+    #[command(alias = "rollback")]
+    Undo {
+        /// Transaction ID (defaults to the last transaction)
+        id: Option<String>,
+
+        /// Do not prompt for confirmation
+        #[arg(long)]
+        yes: bool
     }
 }
 
@@ -1176,6 +1183,9 @@ pub fn run() -> anyhow::Result<()> {
                 TransactionCommands::Files { id } => {
                     cmd::transaction::files(&id)
                 }
+                TransactionCommands::Undo { id, yes } => {
+                    cmd::transaction::undo(id.as_deref(), yes, cli.yes)
+                }
             },
             Commands::Repo(args) => cmd::repo::run(args),
             Commands::Registry(args) => cmd::registry::run(args),
@@ -1201,20 +1211,8 @@ pub fn run() -> anyhow::Result<()> {
             Commands::Extension(args) => {
                 cmd::extension::run(args, cli.yes, Some(&plugin_manager))
             }
-            Commands::Rollback {
-                package,
-                last_transaction
-            } => {
-                if last_transaction {
-                    cmd::rollback::run_transaction_rollback(
-                        cli.yes,
-                        Some(&plugin_manager)
-                    )
-                } else if let Some(pkg) = package {
-                    cmd::rollback::run(&pkg, cli.yes, Some(&plugin_manager))
-                } else {
-                    Ok(())
-                }
+            Commands::Rollback { package } => {
+                cmd::rollback::run(&package, cli.yes, Some(&plugin_manager))
             }
             Commands::Man {
                 package_name,

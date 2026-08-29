@@ -54,6 +54,32 @@ pub fn download_and_cache_archive(
     let sig_filename = format!("{archive_filename}.sig");
     let cached_sig_path = archive_cache_root.join(&sig_filename);
 
+    let authorities = config
+        .default_registry
+        .as_ref()
+        .filter(|r| r.handle == node.registry_handle)
+        .and_then(|r| r.authorities.as_ref())
+        .or_else(|| {
+            config
+                .added_registries
+                .iter()
+                .find(|r| r.handle == node.registry_handle)
+                .and_then(|r| r.authorities.as_ref())
+        });
+    let has_authorities = authorities.is_some_and(|a| !a.is_empty());
+    let pgp_identifiers: Option<Vec<String>> = signature_policy
+        .as_ref()
+        .map(|p| p.trusted_keys.clone())
+        .or_else(|| authorities.cloned());
+    let has_pgp_identifiers = pgp_identifiers
+        .as_ref()
+        .is_some_and(|keys| !keys.is_empty());
+
+    // Track whether the archive was rebuilt from a delta so we can skip
+    // the whole-archive checksum (per-pool-entry integrity was already
+    // verified during delta application).
+    let mut delta_applied = false;
+
     let archive_path = if let Some(path) =
         pkgdir::find_in_pkg_dirs(archive_filename)
     {
@@ -73,45 +99,75 @@ pub fn download_and_cache_archive(
                  offline mode. Missing: {archive_filename}"
             ));
         }
-        let part_path =
-            archive_cache_root.join(format!("{archive_filename}.part"));
 
-        if part_path.exists() && pb.is_none() {
-            println!("Resuming partial download: {}", part_path.display());
-        }
+        // Delta fast-path: if a previous version of this archive is cached,
+        // try to fetch and apply a `.zdelta` instead of downloading the full
+        // archive. Any failure here silently falls back to the full
+        // download below. The rebuilt archive is written to
+        // `cached_archive_path` so the normal signature checks still run
+        // against it. Note: the whole-archive checksum is skipped for
+        // delta-rebuilt archives because the tar+zstd byte stream differs
+        // from the original while per-pool-entry integrity is already
+        // verified by `apply_zpa_delta`.
+        delta_applied = try_delta_upgrade(
+            node,
+            &archive_cache_root,
+            &cached_archive_path,
+            pb,
+            verbose,
+            pgp_identifiers.as_deref()
+        )
+        .unwrap_or(false);
 
-        let mut last_error = None;
-        let candidate_urls =
-            cache::mirror_candidate_urls(&details.info.final_url);
-        let mut downloaded = false;
-        for candidate_url in candidate_urls {
-            match util::download_file_with_progress(
-                &candidate_url,
-                &part_path,
-                pb,
-                Some(details.download_size)
-            ) {
-                Ok(()) => {
-                    downloaded = true;
-                    break;
-                }
-                Err(e) => last_error = Some((candidate_url, e))
+        // If the delta succeeded, `cached_archive_path` now exists and
+        // the normal flow will pick it up. Otherwise continue to download.
+        if delta_applied {
+            cached_archive_path.clone()
+        } else {
+            let part_path =
+                archive_cache_root.join(format!("{archive_filename}.part"));
+
+            if part_path.exists() && pb.is_none() {
+                println!("Resuming partial download: {}", part_path.display());
             }
-        }
-        if !downloaded {
-            let (url, error) = last_error.ok_or_else(|| {
-                anyhow!("archive download failed but no error recorded")
-            })?;
-            return Err(anyhow!(
-                "Failed to download package archive from {url}: {error}"
-            ));
-        }
 
-        fs::rename(&part_path, &cached_archive_path)?;
-        cached_archive_path.clone()
+            let mut last_error = None;
+            let candidate_urls =
+                cache::mirror_candidate_urls(&details.info.final_url);
+            let mut downloaded = false;
+            for candidate_url in candidate_urls {
+                match util::download_file_with_progress(
+                    &candidate_url,
+                    &part_path,
+                    pb,
+                    Some(details.download_size)
+                ) {
+                    Ok(()) => {
+                        downloaded = true;
+                        break;
+                    }
+                    Err(e) => last_error = Some((candidate_url, e))
+                }
+            }
+            if !downloaded {
+                let (url, error) = last_error.ok_or_else(|| {
+                    anyhow!("archive download failed but no error recorded")
+                })?;
+                return Err(anyhow!(
+                    "Failed to download package archive from {url}: {error}"
+                ));
+            }
+
+            fs::rename(&part_path, &cached_archive_path)?;
+            cached_archive_path.clone()
+        }
     };
 
-    if let Some(hash_url) = &details.info.hash_url {
+    // Delta-rebuilt archives already passed per-pool-entry structural
+    // verification inside `apply_zpa_delta`, and their tar+zstd byte
+    // stream will differ from the original, so skip the whole-archive
+    // checksum for them.
+    if !delta_applied && let Some(hash_url) = &details.info.hash_url {
         let hash = db::get_package_hash_from_db(
             &node.registry_handle,
             &node.pkg.name,
@@ -137,94 +193,101 @@ pub fn download_and_cache_archive(
         }
     }
 
-    let authorities = config
-        .default_registry
-        .as_ref()
-        .filter(|r| r.handle == node.registry_handle)
-        .and_then(|r| r.authorities.as_ref())
-        .or_else(|| {
-            config
-                .added_registries
-                .iter()
-                .find(|r| r.handle == node.registry_handle)
-                .and_then(|r| r.authorities.as_ref())
-        });
-    let has_authorities = authorities.is_some_and(|a| !a.is_empty());
-    let pgp_identifiers: Option<Vec<String>> = signature_policy
-        .as_ref()
-        .map(|p| p.trusted_keys.clone())
-        .or_else(|| authorities.cloned());
-    let has_pgp_identifiers = pgp_identifiers
-        .as_ref()
-        .is_some_and(|keys| !keys.is_empty());
-
     validate_signature_requirements(
         signature_policy.is_some(),
         details.info.pgp_url.is_some(),
         has_pgp_identifiers
     )?;
 
-    if let Some(pgp_url) = &details.info.pgp_url {
-        if let Some(ref identifiers) = pgp_identifiers
-            && !identifiers.is_empty()
-        {
-            let sig_path = if cached_sig_path.exists() {
-                cached_sig_path.clone()
-            } else {
-                if zoi_core::offline::is_offline() {
-                    return Err(anyhow!(
-                        "Signature not found in cache and cannot download: \
-                         Zoi is in offline mode."
-                    ));
+    // An embedded `manifest.sig` entry travels inside the archive itself, so
+    // it is preferred over a detached sidecar: it works even when the archive
+    // is distributed out-of-band without its `.sig`.
+    let mut embedded_verified = false;
+    if let Some(ref identifiers) = pgp_identifiers
+        && !identifiers.is_empty()
+        && !matches!(archive_filename.rsplit('.').next(), Some("zsa"))
+    {
+        let trusted_certs = pgp::get_certs_by_name_or_fingerprint(identifiers)?;
+        match try_verify_embedded_signature(&archive_path, trusted_certs) {
+            Ok(true) => {
+                if verbose {
+                    println!(
+                        "{}",
+                        "Embedded signature verified successfully.".green()
+                    );
                 }
-                let temp_dir =
-                    tempfile::Builder::new().prefix("zoi-sig-dl-").tempdir()?;
-                let temp_sig_path = temp_dir.path().join(&sig_filename);
-                let mut last_error = None;
-                let mut downloaded = false;
-                for candidate_url in cache::mirror_candidate_urls(pgp_url) {
-                    match util::download_file_with_progress(
-                        &candidate_url,
-                        &temp_sig_path,
-                        pb,
-                        None
-                    ) {
-                        Ok(()) => {
-                            downloaded = true;
-                            break;
-                        }
-                        Err(e) => last_error = Some((candidate_url, e))
-                    }
-                }
-                if !downloaded {
-                    let (url, error) = last_error.ok_or_else(|| {
-                        anyhow!(
-                            "signature download failed but no error recorded"
-                        )
-                    })?;
-                    return Err(anyhow!(
-                        "Failed to download signature from {url}: {error}"
-                    ));
-                }
-                fs::copy(&temp_sig_path, &cached_sig_path)?;
-                cached_sig_path.clone()
-            };
-
-            if verbose {
-                println!("Verifying signature...");
+                embedded_verified = true;
             }
-            let trusted_certs =
-                pgp::get_certs_by_name_or_fingerprint(identifiers)?;
-            pgp::verify_detached_signature_multi_key(
-                &archive_path,
-                &sig_path,
-                trusted_certs
-            )?;
-            if verbose {
-                println!("{}", "Signature verified successfully.".green());
+            Ok(false) => {}
+            Err(e) => {
+                return Err(anyhow!(
+                    "Embedded signature verification failed: {e}"
+                ));
             }
         }
-    } else if has_authorities {
+    }
+
+    if !embedded_verified
+        && let Some(pgp_url) = &details.info.pgp_url
+        && let Some(ref identifiers) = pgp_identifiers
+        && !identifiers.is_empty()
+    {
+        let sig_path = if cached_sig_path.exists() {
+            cached_sig_path.clone()
+        } else {
+            if zoi_core::offline::is_offline() {
+                return Err(anyhow!(
+                    "Signature not found in cache and cannot download: Zoi is \
+                     in offline mode."
+                ));
+            }
+            let temp_dir =
+                tempfile::Builder::new().prefix("zoi-sig-dl-").tempdir()?;
+            let temp_sig_path = temp_dir.path().join(&sig_filename);
+            let mut last_error = None;
+            let mut downloaded = false;
+            for candidate_url in cache::mirror_candidate_urls(pgp_url) {
+                match util::download_file_with_progress(
+                    &candidate_url,
+                    &temp_sig_path,
+                    pb,
+                    None
+                ) {
+                    Ok(()) => {
+                        downloaded = true;
+                        break;
+                    }
+                    Err(e) => last_error = Some((candidate_url, e))
+                }
+            }
+            if !downloaded {
+                let (url, error) = last_error.ok_or_else(|| {
+                    anyhow!("signature download failed but no error recorded")
+                })?;
+                return Err(anyhow!(
+                    "Failed to download signature from {url}: {error}"
+                ));
+            }
+            fs::copy(&temp_sig_path, &cached_sig_path)?;
+            cached_sig_path.clone()
+        };
+
+        if verbose {
+            println!("Verifying signature...");
+        }
+        let trusted_certs = pgp::get_certs_by_name_or_fingerprint(identifiers)?;
+        pgp::verify_detached_signature_multi_key(
+            &archive_path,
+            &sig_path,
+            trusted_certs
+        )?;
+        if verbose {
+            println!("{}", "Signature verified successfully.".green());
+        }
+    } else if !embedded_verified
+        && details.info.pgp_url.is_none()
+        && has_authorities
+    {
         let msg = format!(
             "Warning: Installing unsigned package '{}' from a registry that \
              claims to be secure.",
@@ -244,6 +307,259 @@ pub fn download_and_cache_archive(
     }
 
     Ok(archive_path)
+}
+
+/// Attempts to upgrade a package archive via a `.zdelta` against a cached
+/// previous version.
+///
+/// Uses explicit delta URLs from repo.yaml (delta section). Verifies the
+/// delta patch file's hash and signature, then applies it. Returns
+/// `Ok(false)` whenever a delta is unavailable or cannot be applied so the
+/// caller can fall back to a full download.
+fn try_delta_upgrade(
+    node: &InstallNode,
+    archive_cache_root: &Path,
+    target_path: &Path,
+    pb: Option<&ProgressBar>,
+    verbose: bool,
+    pgp_identifiers: Option<&[String]>
+) -> Result<bool> {
+    let Ok(target_version) = semver::Version::parse(&node.version) else {
+        return Ok(false);
+    };
+
+    // Find the newest cached archive of the same package on the same
+    // platform that is older than the target version. Archive names follow
+    // `{name}-{version}-{platform}.zpa`.
+    let platform = zoi_core::utils::get_platform().unwrap_or_default();
+    let prefix = format!("{}-", node.pkg.name);
+    let suffix = format!("-{platform}.zpa");
+    let mut best: Option<(semver::Version, PathBuf)> = None;
+    let entries = std::fs::read_dir(archive_cache_root).ok();
+    let Some(entries) = entries else {
+        return Ok(false);
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !name.starts_with(&prefix) || !name.ends_with(&suffix) {
+            continue;
+        }
+        let middle = &name[prefix.len()..name.len() - suffix.len()];
+        let version_str = middle.trim_start_matches('v');
+        let Ok(version) = semver::Version::parse(version_str) else {
+            continue;
+        };
+        if version >= target_version {
+            continue;
+        }
+        if best.as_ref().is_none_or(|(v, _)| version > *v) {
+            best = Some((version, entry.path()));
+        }
+    }
+    let Some((base_version, base_path)) = best else {
+        return Ok(false);
+    };
+
+    // Look up explicit delta info from repo.yaml
+    let Some(delta_info) =
+        crate::util::find_delta_info_for_node(node, &base_version.to_string())?
+    else {
+        if verbose {
+            println!(
+                "No delta configuration found; falling back to full download."
+            );
+        }
+        return Ok(false);
+    };
+
+    if verbose {
+        println!("Attempting delta upgrade from v{base_version}...");
+    }
+
+    let temp_dir = tempfile::Builder::new().prefix("zoi-delta-").tempdir()?;
+    let delta_path = temp_dir.path().join("upgrade.zdelta");
+    let mut downloaded = false;
+    for candidate_url in cache::mirror_candidate_urls(&delta_info.final_url) {
+        if util::download_file_with_progress(
+            &candidate_url,
+            &delta_path,
+            pb,
+            None
+        )
+        .is_ok()
+        {
+            downloaded = true;
+            break;
+        }
+    }
+    if !downloaded {
+        if verbose {
+            println!("No delta available; falling back to full download.");
+        }
+        return Ok(false);
+    }
+
+    // Verify delta patch hash - this is mandatory for integrity.
+    let expected_delta_hash =
+        delta_info.hash_url.as_ref().ok_or_else(|| {
+            anyhow!(
+                "Delta configuration missing required hash URL for package \
+                 '{}'",
+                node.pkg.name
+            )
+        })?;
+    let expected = util::get_expected_hash(expected_delta_hash, None)?;
+    if !util::verify_file_hash(&delta_path, &expected, pb)? {
+        if verbose {
+            println!(
+                "{} Delta hash verification failed; falling back to full \
+                 download.",
+                "Warning:".yellow()
+            );
+        }
+        return Ok(false);
+    }
+
+    // Verify delta patch signature if PGP URL and trusted keys available.
+    if let Some(pgp_url) = &delta_info.pgp_url
+        && let Some(identifiers) = pgp_identifiers
+        && !identifiers.is_empty()
+    {
+        let temp_dir = tempfile::Builder::new()
+            .prefix("zoi-delta-sig-")
+            .tempdir()?;
+        let temp_sig_path = temp_dir.path().join("delta.sig");
+        let mut downloaded = false;
+        for candidate_url in cache::mirror_candidate_urls(pgp_url) {
+            if util::download_file_with_progress(
+                &candidate_url,
+                &temp_sig_path,
+                pb,
+                None
+            )
+            .is_ok()
+            {
+                downloaded = true;
+                break;
+            }
+        }
+        if downloaded {
+            let trusted_certs =
+                pgp::get_certs_by_name_or_fingerprint(identifiers)?;
+            pgp::verify_detached_signature_multi_key(
+                &delta_path,
+                &temp_sig_path,
+                trusted_certs
+            )?;
+            if verbose {
+                println!(
+                    "{}",
+                    "Delta signature verified successfully.".green()
+                );
+            }
+        } else if verbose {
+            println!(
+                "{} Delta signature file not found; skipping signature \
+                 verification.",
+                "Warning:".yellow()
+            );
+        }
+    } else if verbose {
+        println!(
+            "{} No trusted PGP keys for delta signature verification.",
+            "Warning:".yellow()
+        );
+    }
+
+    let rebuilt_path = temp_dir.path().join("rebuilt.zpa");
+    if let Err(e) = zoi_package::delta::apply_zpa_delta(
+        &base_path,
+        &delta_path,
+        &rebuilt_path
+    ) {
+        if verbose {
+            println!(
+                "{} Delta application failed ({e}); falling back to full \
+                 download.",
+                "Warning:".yellow()
+            );
+        }
+        return Ok(false);
+    }
+
+    // Delta patch verified and applied successfully. The rebuilt archive
+    // is trusted because:
+    // - The base archive was already verified (full hash + sig on install)
+    // - The delta patch was verified (hash + optionally sig)
+    // - The delta application does per-pool-entry structural verification
+    // We skip the whole-archive hash check since the tar+zstd stream differs
+    // from the original but the content is verified.
+    fs::rename(&rebuilt_path, target_path)?;
+    if verbose {
+        println!("{}", "Delta applied successfully.".green());
+    }
+    Ok(true)
+}
+
+/// Attempts to verify an embedded `manifest.sig` entry inside a downloaded
+/// archive against the pooled `manifest.json` it signs.
+///
+/// Returns `Ok(false)` when the archive carries no embedded signature pair,
+/// letting the caller fall back to the detached sidecar flow.
+///
+/// # Errors
+///
+/// Returns an error if the archive cannot be read or the signature does not
+/// verify.
+fn try_verify_embedded_signature(
+    archive_path: &Path,
+    trusted_certs: Vec<pgp::sequoia_openpgp::Cert>
+) -> Result<bool> {
+    use std::io::Read;
+
+    let file = fs::File::open(archive_path)?;
+    let decoder = zstd::stream::read::Decoder::new(file)?;
+    let mut archive = tar::Archive::new(decoder);
+
+    let mut manifest_bytes: Option<Vec<u8>> = None;
+    let mut sig_bytes: Option<Vec<u8>> = None;
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let name = entry.path()?.to_string_lossy().to_string();
+        match Path::new(&name).file_name().and_then(|f| f.to_str()) {
+            Some("manifest.json") if manifest_bytes.is_none() => {
+                let mut buf = Vec::new();
+                entry.read_to_end(&mut buf)?;
+                manifest_bytes = Some(buf);
+            }
+            Some("manifest.sig") => {
+                let mut buf = Vec::new();
+                entry.read_to_end(&mut buf)?;
+                sig_bytes = Some(buf);
+            }
+            _ => {}
+        }
+    }
+
+    let (Some(manifest), Some(sig)) = (manifest_bytes, sig_bytes) else {
+        return Ok(false);
+    };
+
+    // Reuse the existing path-based multi-key verifier on temporary files so
+    // we sign-verify the exact bytes that ship inside the archive.
+    let temp_dir = tempfile::Builder::new()
+        .prefix("zoi-embed-sig-")
+        .tempdir()?;
+    let manifest_path = temp_dir.path().join("manifest.json");
+    let sig_path = temp_dir.path().join("manifest.sig");
+    fs::write(&manifest_path, &manifest)?;
+    fs::write(&sig_path, &sig)?;
+    pgp::verify_detached_signature_multi_key(
+        &manifest_path,
+        &sig_path,
+        trusted_certs
+    )?;
+    Ok(true)
 }
 
 /// Ensures that an enforced signature policy has everything needed to verify
@@ -582,7 +898,7 @@ pub fn install_prepared_node(
             pb.set_message(format!("Installing {}...", pkg.name.cyan()));
         }
 
-        let installed_files = crate::pkg_install::run(
+        let (installed_files, file_digests) = crate::pkg_install::run(
             archive_path,
             Some(pkg.scope),
             &node.registry_handle,
@@ -610,7 +926,8 @@ pub fn install_prepared_node(
             node.repo_type.clone(),
             &node.chosen_options,
             &node.chosen_optionals,
-            sub_package_to_install.clone()
+            sub_package_to_install.clone(),
+            file_digests
         )?;
 
         if record {

@@ -41,7 +41,8 @@ Zoi is an advanced package manager and environment orchestrator, designed to sim
   - `zoi clone`: Clone a package's git repository.
   - `zoi download`: Download a package archive (.zpa) or source bundle (.zsa).
   - `zoi why`: Understand why a package is installed.
-  - `zoi rollback`: Revert a package to its previous version or roll back the newest remaining transaction log.
+  - `zoi rollback`: Revert a package to its previous version.
+  - `zoi transaction undo`: Revert all operations recorded in a transaction.
   - `zoi pin`: Pin a package to a specific version.
   - `zoi exec`: Run a package's binary without installing it.
   - `zoi dev`: Enter a project-specific development shell with all dependencies.
@@ -109,7 +110,7 @@ zoi why openssl                   # See what requires it
 ```sh
 zoi update --all --dry-run        # See what will change
 zoi update --all                  # Apply changes
-zoi rollback --last-transaction   # Undo if broken
+zoi transaction undo              # Undo if broken
 ```
 
 ### Forcing a source build

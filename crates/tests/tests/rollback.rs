@@ -57,6 +57,7 @@ fn test_transaction_rollback_uninstall() {
         platform: zoi_core::utils::get_platform().unwrap_or_default(),
         service: None,
         installed_files: vec![],
+        file_digests: None,
         installed_size: None,
         sandbox: None,
         completions: None
@@ -123,6 +124,7 @@ fn test_package_rollback_requires_explicit_source_for_ambiguous_name_matches() {
         platform: zoi_core::utils::get_platform().unwrap_or_default(),
         service: None,
         installed_files: vec![],
+        file_digests: None,
         installed_size: None,
         sandbox: None,
         completions: None

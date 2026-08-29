@@ -578,6 +578,104 @@ pub fn find_source_bundle_info_for_package(
     find_registry_info_for_package(pkg, registry_handle, version, true)
 }
 
+/// Finds delta patch info for upgrading from one version to another.
+///
+/// # Errors
+///
+/// Returns an error if the registry information cannot be retrieved.
+pub fn find_delta_info(
+    pkg: &types::Package,
+    registry_handle: &str,
+    _from_version: &str,
+    to_version: &str
+) -> Result<Option<types::DeltaInfo>> {
+    let platform = zoi_core::utils::get_platform()?;
+
+    let repo_config =
+        if zoi_core::utils::is_mini_mode() && registry_handle == "zoidberg" {
+            zoi_resolver::mini_resolve::fetch_registry_config().ok()
+        } else {
+            let db_path = zoi_resolver::resolve::get_db_root()?;
+            let repo_db_path = db_path.join(registry_handle);
+            zoi_core::config::read_repo_config(&repo_db_path).ok()
+        };
+
+    if let Some(repo_config) = repo_config {
+        let mut delta_links_to_try = Vec::new();
+        // Try "main" type first, then "mirror"
+        if let Some(main_delta) =
+            repo_config.delta.iter().find(|d| d.link_type == "main")
+        {
+            delta_links_to_try.push(main_delta.clone());
+        }
+        delta_links_to_try.extend(
+            repo_config
+                .delta
+                .iter()
+                .filter(|d| d.link_type == "mirror")
+                .cloned()
+        );
+
+        if let Some(delta_link) = delta_links_to_try.into_iter().next() {
+            // Delta URLs are expected to contain {name}, {version} placeholders
+            // The version in the URL refers to the "to" version (target
+            // version)
+            let final_url = resolve_url_placeholders(
+                &delta_link.url,
+                &pkg.name,
+                &pkg.repo,
+                to_version,
+                &platform
+            );
+
+            let pgp_url = Some(delta_link.pgp.as_ref().map_or_else(
+                || format!("{final_url}.sig"),
+                |url| {
+                    resolve_url_placeholders(
+                        url, &pkg.name, &pkg.repo, to_version, &platform
+                    )
+                }
+            ));
+            let hash_url = delta_link.hash.as_ref().map(|url| {
+                resolve_url_placeholders(
+                    url, &pkg.name, &pkg.repo, to_version, &platform
+                )
+            });
+            let size_url = delta_link.size.as_ref().map(|url| {
+                resolve_url_placeholders(
+                    url, &pkg.name, &pkg.repo, to_version, &platform
+                )
+            });
+
+            return Ok(Some(types::DeltaInfo {
+                final_url,
+                pgp_url,
+                hash_url,
+                size_url
+            }));
+        }
+    }
+
+    Ok(None)
+}
+
+/// Finds delta patch info for an install node, given the base version.
+///
+/// # Errors
+///
+/// Returns an error if the registry information cannot be retrieved.
+pub fn find_delta_info_for_node(
+    node: &InstallNode,
+    base_version: &str
+) -> Result<Option<types::DeltaInfo>> {
+    find_delta_info(
+        &node.pkg,
+        &node.registry_handle,
+        base_version,
+        &node.version
+    )
+}
+
 /// Finds prebuilt info for an install node.
 ///
 /// # Errors

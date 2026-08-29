@@ -34,6 +34,10 @@ pub mod service {
 pub mod registry {
     pub use zoi_package::registry::*;
 }
+/// Package archive delta generation and application.
+pub mod delta {
+    pub use zoi_package::delta::*;
+}
 /// System doctor utilities.
 pub mod doctor {
     pub use zoi_package::doctor_system::*;

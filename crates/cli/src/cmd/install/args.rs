@@ -41,8 +41,17 @@ pub struct InstallArgs {
     pub global: bool,
 
     /// Save the package to the project's zoi.yaml
-    #[arg(long)]
+    #[arg(long, conflicts_with = "deps_only")]
     pub save: bool,
+
+    /// Install only the dependencies of the given packages, not the packages
+    /// themselves
+    #[arg(long, conflicts_with_all = &["save", "build_deps_only"])]
+    pub deps_only: bool,
+
+    /// Install only the build dependencies of the given packages
+    #[arg(long, conflicts_with_all = &["save", "deps_only"])]
+    pub build_deps_only: bool,
 
     /// The type of package to build if building from source (e.g. 'source',
     /// 'pre-compiled').
@@ -97,6 +106,8 @@ impl Runnable for InstallArgs {
             self.local,
             self.global,
             self.save,
+            self.deps_only,
+            self.build_deps_only,
             self.r#type.as_deref(),
             self.dry_run,
             Some(&plugin_manager),

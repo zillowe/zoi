@@ -144,12 +144,44 @@ man:
 clean:
     @echo "Cleaning project artifacts..."
     @cargo clean
-    @rm -f config.mk config.just
+    @rm -f config.just
     @echo "Cleaned."
 
 # Configure the Justfile
 configure *args:
     ./configure {{ args }}
+
+# Check for unused dependencies
+deps:
+    @cargo machete --with-metadata
+
+# Format Rust code
+fmt:
+    @cargo +nightly fmt --all
+
+# Check for formating issues in Rust code
+fmt-check:
+    @cargo +nightly fmt --all --check
+
+# Check Rust code for error
+check:
+    @cargo check --workspace --all-targets --tests
+
+# Run lints on Rust code
+lint:
+    @cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+# Run lints on Rust code and apply fixes where possible
+lint-fix:
+    @cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged -- -D warnings
+
+# Run Zoi test suite
+test:
+    @cargo test --all-features -- --test-threads=1
+
+# Bump Zoi version
+bump *args:
+    @./scripts/bump.sh {{ args }}
 
 # Print this help message
 help:

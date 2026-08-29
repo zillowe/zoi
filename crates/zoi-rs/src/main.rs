@@ -74,6 +74,8 @@ fn main() {
                 false,
                 false,
                 false,
+                false,
+                false,
                 None,
                 false,
                 Some(&plugin_manager),

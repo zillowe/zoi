@@ -6,6 +6,7 @@ use std::time::SystemTime;
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
 use colored::Colorize;
+pub use sequoia_openpgp;
 use sequoia_openpgp::Cert;
 use sequoia_openpgp::parse::Parse;
 use sequoia_openpgp::policy::StandardPolicy;

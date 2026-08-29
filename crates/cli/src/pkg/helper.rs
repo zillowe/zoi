@@ -29,16 +29,17 @@ pub fn elevate_install_node(
     let handle = &node.registry_handle;
     let sub_packages_vec = node.sub_package.clone().map(|s| vec![s]);
 
-    let installed_files = crate::pkg::install::pkg_install::run(
-        &cmd.archive,
-        Some(pkg.scope),
-        handle,
-        Some(&node.version),
-        cmd.yes,
-        sub_packages_vec,
-        cmd.link_bins,
-        None
-    )?;
+    let (installed_files, file_digests) =
+        crate::pkg::install::pkg_install::run(
+            &cmd.archive,
+            Some(pkg.scope),
+            handle,
+            Some(&node.version),
+            cmd.yes,
+            sub_packages_vec,
+            cmd.link_bins,
+            None
+        )?;
 
     if let types::InstallReason::Dependency { ref parent } = node.reason {
         let package_dir =
@@ -56,7 +57,8 @@ pub fn elevate_install_node(
         node.repo_type.clone(),
         &node.chosen_options,
         &node.chosen_optionals,
-        node.sub_package.clone()
+        node.sub_package.clone(),
+        file_digests
     )?;
 
     local::write_manifest(&manifest)?;

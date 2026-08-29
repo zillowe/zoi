@@ -31,3 +31,5 @@ pub mod service;
 pub mod shim;
 /// Utility functions.
 pub mod util;
+/// Module for integrity verification of packages and archives.
+pub mod verify;

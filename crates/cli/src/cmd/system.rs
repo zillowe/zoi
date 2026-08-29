@@ -288,6 +288,8 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                         false,
                         false,
                         false,
+                        false,
+                        false,
                         None,
                         false,
                         None,

@@ -51,6 +51,7 @@ end
         Some("source"),
         std::slice::from_ref(&platform),
         None,
+        zoi_core::types::SignMode::Embed,
         Some(&output_dir),
         Some(version),
         None,

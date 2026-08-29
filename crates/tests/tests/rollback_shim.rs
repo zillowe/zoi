@@ -60,6 +60,7 @@ fn test_rollback_restores_shims() {
         platform: zoi_core::utils::get_platform().unwrap_or_default(),
         service: None,
         installed_files: vec![bin_path.to_string_lossy().to_string()],
+        file_digests: None,
         installed_size: None,
         sandbox: None,
         completions: None

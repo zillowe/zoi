@@ -74,6 +74,7 @@ fn test_linux_service_lifecycle() {
         platform: zoi_core::utils::get_platform().unwrap_or_default(),
         service: Some(service_config.clone()),
         installed_files: vec![],
+        file_digests: None,
         installed_size: None,
         sandbox: None,
         completions: None

@@ -32,6 +32,7 @@ pub fn run(
     package_file: &Path,
     output_dir: Option<&Path>,
     sign: Option<String>,
+    sign_mode: zoi_core::types::SignMode,
     version_override: Option<&str>,
     build_type: Option<&str>
 ) -> Result<PathBuf> {
@@ -392,6 +393,28 @@ pub fn run(
     header.set_cksum();
     tar_builder.append(&header, &[][..])?;
 
+    // Embedded signatures are added to the archive itself so they travel
+    // with the bundle. The anchor is the `.pkg.lua` definition, which
+    // identifies the bundle contents.
+    if let Some(key_id) = &sign
+        && sign_mode == zoi_core::types::SignMode::Embed
+    {
+        let pkg_filename_str = pkg_filename.to_string_lossy();
+        let sig_name = format!("{pkg_filename_str}.sig");
+        let temp_sig = tempfile::Builder::new()
+            .prefix("zoi-embed-sig-")
+            .tempfile()?;
+        zoi_core::pgp::sign_detached(package_file, temp_sig.path(), key_id)?;
+        let mut header = tar::Header::new_gnu();
+        let metadata = std::fs::metadata(temp_sig.path())?;
+        header.set_metadata(&metadata);
+        header.set_path(&sig_name)?;
+        header.set_cksum();
+        let mut sig_file = File::open(temp_sig.path())?;
+        tar_builder.append_data(&mut header, &sig_name, &mut sig_file)?;
+        println!("  Embedded signature for {sig_name}");
+    }
+
     tar_builder.finish()?;
     println!(
         "{} Successfully created bundle: {}",
@@ -399,7 +422,9 @@ pub fn run(
         output_path.display()
     );
 
-    if let Some(key_id) = sign {
+    if let Some(key_id) = sign
+        && sign_mode == zoi_core::types::SignMode::File
+    {
         println!(
             "{} Signing bundle with key '{}'...",
             "::".bold().blue(),

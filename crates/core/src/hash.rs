@@ -80,6 +80,52 @@ pub fn calculate_file_hash(path: &Path, algo: HashAlgorithm) -> Result<String> {
     }
 }
 
+/// Calculates the cryptographic hash of any reader, along with the total
+/// number of bytes consumed. Useful for hashing entries while streaming an
+/// archive without touching the filesystem.
+///
+/// # Errors
+///
+/// Returns an error if reading from the reader fails.
+pub fn calculate_reader_hash(
+    reader: &mut impl Read,
+    algo: HashAlgorithm
+) -> Result<(u64, String)> {
+    let mut buffer = [0u8; 8192];
+    let mut len: u64 = 0;
+
+    macro_rules! stream {
+        ($hasher:expr) => {{
+            loop {
+                let bytes_read = reader.read(&mut buffer)?;
+                if bytes_read == 0 {
+                    break;
+                }
+                len += bytes_read as u64;
+                $hasher.update(
+                    buffer
+                        .get(..bytes_read)
+                        .ok_or_else(|| anyhow!("Buffer overflow"))?
+                );
+            }
+            hex::encode($hasher.finalize())
+        }};
+    }
+
+    match algo {
+        HashAlgorithm::Sha512 => {
+            let mut hasher = Sha512::new();
+            let result = stream!(hasher);
+            Ok((len, result))
+        }
+        HashAlgorithm::Sha256 => {
+            let mut hasher = Sha256::new();
+            let result = stream!(hasher);
+            Ok((len, result))
+        }
+    }
+}
+
 /// Calculates the cryptographic hash of a string.
 pub fn calculate_string_hash(input: &str, algo: HashAlgorithm) -> String {
     match algo {

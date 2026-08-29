@@ -80,6 +80,9 @@ pub struct BuildOptions<'a> {
     pub platforms: Vec<String>,
     /// Optional PGP key name or fingerprint used to sign the output archive.
     pub sign_key: Option<String>,
+    /// How to attach the signature when `sign_key` is set. Defaults to
+    /// embedding the signature inside the archive.
+    pub sign_mode: zoi_core::types::SignMode,
     /// Optional directory to output the built package to.
     pub output_dir: Option<PathBuf>,
     /// Optional sub-packages to build.
@@ -107,6 +110,7 @@ impl Default for BuildOptions<'_> {
                     .unwrap_or_else(|_| "linux-amd64".to_string()),
             ],
             sign_key: None,
+            sign_mode: zoi_core::types::SignMode::default(),
             output_dir: None,
             sub_packages: None,
             install_deps: true,
@@ -284,6 +288,7 @@ pub fn build_with_options(
         options.build_type,
         &options.platforms,
         options.sign_key.clone(),
+        options.sign_mode,
         options.output_dir.as_deref(),
         options.version_override,
         options.sub_packages.clone(),
@@ -306,7 +311,7 @@ pub fn install_package_with_options(
     options: &PackageInstallOptions
 ) -> Result<Vec<String>> {
     let _lock = zoi_core::lock::acquire_lock()?;
-    zoi_install::pkg_install::run(
+    let (installed_files, _file_digests) = zoi_install::pkg_install::run(
         package_file,
         options.scope_override,
         &options.registry_handle,
@@ -315,7 +320,8 @@ pub fn install_package_with_options(
         options.sub_packages.clone(),
         options.link_bins,
         None
-    )
+    )?;
+    Ok(installed_files)
 }
 
 /// Installs one or more package sources using the provided options.
@@ -351,6 +357,8 @@ pub fn install_sources(
         false,
         false,
         options.save,
+        false,
+        false,
         options.build_type.as_deref(),
         options.dry_run,
         pm_ptr,
@@ -464,6 +472,7 @@ pub fn bundle_package(
         package_file,
         output_dir,
         sign,
+        zoi_core::types::SignMode::Embed,
         version_override,
         build_type
     )?;
@@ -528,6 +537,7 @@ pub fn build(
         build_type,
         platforms: platforms.to_vec(),
         sign_key,
+        sign_mode: zoi_core::types::SignMode::Embed,
         output_dir: None,
         sub_packages: None,
         install_deps,

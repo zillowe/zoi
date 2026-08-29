@@ -1,55 +1,84 @@
 ---
-title: Advanced Rollback Guide
-description: Understanding Zoi's transaction system and rollback limitations.
+title: Rollback & Transaction Undo
+description: Understanding Zoi's transaction system and how to revert changes.
 ---
 
-Zoi includes a robust rollback system designed to recover from failed installations or problematic updates. This guide explains the underlying transaction mechanism and provides details on what can and cannot be rolled back.
+Zoi includes a robust rollback and transaction undo system designed to recover from failed installations or problematic updates. This guide explains the two levels of reversion and the underlying transaction mechanism.
 
-## How Transactions Work
+## Transaction Undo
 
 Every operation that modifies your Zoi installation (install, uninstall, upgrade) is wrapped in a **transaction**.
 
 - **Transaction Begin**: Zoi generates a UUID v7 transaction ID and creates a temporary JSON log in the user state directory under `zoi/transactions/`.
 - **Recording Operations**: Package install, uninstall, and upgrade operations are recorded with their manifests, including the files listed in those manifests.
 - **Atomic Commits**: If all steps in the operation succeed, Zoi moves the transaction log to its history directory.
-- **Rollback on Failure**: If an install, uninstall, or update fails after a transaction starts, Zoi attempts to revert the operations recorded in the current transaction.
+- **Failure Rollback**: If an install, uninstall, or update fails after a transaction starts, Zoi attempts to revert the operations recorded in the current transaction.
 - **Incomplete Rollback**: If any rollback step fails, Zoi retains the active transaction log and returns an error. After correcting the underlying problem, you can retry the rollback instead of losing the recovery record.
 
-### The Last Transaction
+### Reverting a Transaction
 
-You can manually revert the newest remaining transaction log using the `--last-transaction` flag:
+Use `zoi transaction undo` to revert all operations recorded in a transaction. It defaults to the most recent transaction.
 
 ```sh
-zoi rollback --last-transaction
+# Undo the most recent transaction
+zoi transaction undo
+
+# Undo a specific transaction by ID
+zoi transaction undo abc123-def456
+
+# Skip confirmation prompt
+zoi transaction undo --yes
 ```
+
+When undoing, Zoi reads the transaction log and reverses every operation in order: installs are uninstalled, uninstalls are restored, and upgrades are downgraded to their previous version.
+
+### Inspecting Transactions
+
+Before undoing, you can inspect what a transaction contains:
+
+```sh
+# List recent transactions
+zoi transaction list
+
+# Show operations in a specific transaction
+zoi transaction show <id>
+
+# List files modified by a transaction
+zoi transaction files <id>
+```
+
+---
+
+## Per-Package Rollback
+
+While `zoi transaction undo` reverts an entire transaction, `zoi rollback` reverts a single package to its previous version.
+
+```sh
+# Roll back a package to its previously installed version
+zoi rollback @core/curl
+
+# Roll back a specific sub-package
+zoi rollback @core/linux:headers
+```
+
+This is useful when you want to undo a single package upgrade without affecting other packages installed in the same transaction.
+
+Zoi keeps the previous version's directory in the store (if `rollback_enabled` is true in `config.yaml`). Rolling back swaps the `latest` symlink and re-links the binaries.
 
 ---
 
 ## Downgrading to Specific Versions
 
-While `rollback` is useful for quickly undoing the very last action, you may sometimes need to return to a much older version of a package. For this, Zoi provides the `zoi downgrade` command.
+For jumping back multiple versions, use `zoi downgrade`:
 
-### `zoi downgrade <package>`
+```sh
+# Interactive version selection
+zoi downgrade @core/curl
+```
 
-This command initiates an interactive process:
-
-1. **Version Discovery**: Zoi scans your local installation store, your archive cache, and the registry metadata to find every version of the package that has ever been on your system.
-2. **Interactive Selection**: You are presented with a list of discovered versions (newest first).
-3. **Clean Installation**: Once you select a version, Zoi performs a fresh, dependency-aware installation of that specific version.
-
-Use `downgrade` when a simple `rollback` isn't enough, or if you need to jump back multiple versions at once.
+This command scans your local installation store, archive cache, and registry metadata to find every version of the package that has ever been on your system. You can then select which version to install.
 
 ---
-
-## Rollback Types
-
-### 1. Zoi-Native Packages
-
-For packages installed directly by Zoi, rollbacks are highly reliable. Zoi keeps the previous version's directory in the store (if `rollback_enabled` is true in `config.yaml`). Rolling back simply swaps the `latest` symlink and re-links the binaries.
-
-### 2. Multi-Registry Rollbacks
-
-If an update involves moving a package between different registries or tiers, Zoi tracks the origin handle to ensure it can point back to the correct source during a rollback.
 
 ## Limitations and Caveats
 
@@ -65,7 +94,7 @@ Zoi can install dependencies via over 40 external package managers (APT, Homebre
 
 ### Manual Cleanup
 
-In rare cases where a transaction log is corrupted (e.g. a power loss during the rollback itself), you may need to use `zoi doctor` to identify broken symlinks or inconsistent records.
+In rare cases where a transaction log is corrupted (e.g. a power loss during the undo itself), you may need to use `zoi doctor` to identify broken symlinks or inconsistent records.
 
 ## Configuration
 

@@ -2,8 +2,7 @@
 
 use anyhow::{Result, anyhow};
 
-use crate::pkg::{self, transaction};
-use crate::utils;
+use crate::pkg::{self};
 
 /// Rolls back a specific package to its previous state.
 ///
@@ -44,35 +43,4 @@ pub fn run(
         pm.trigger_hook("on_rollback", None)?;
     }
     pkg::rollback::run(&pkg::local::installed_manifest_source(&chosen), yes)
-}
-
-/// Rolls back the most recent transaction.
-///
-/// This reverts all changes made in the last recorded transaction.
-///
-/// # Errors
-///
-/// Returns an error if the transaction rollback fails.
-pub fn run_transaction_rollback(
-    yes: bool,
-    plugin_manager: Option<&crate::pkg::plugin::PluginManager>
-) -> Result<()> {
-    if !utils::ask_for_confirmation(
-        "This will roll back the last recorded transaction. Are you sure?",
-        yes
-    ) {
-        println!("Operation aborted.");
-        return Ok(());
-    }
-
-    if let Some(id) = transaction::get_last_transaction_id()? {
-        println!("Rolling back transaction {id}...");
-        if let Some(pm) = plugin_manager {
-            pm.trigger_hook("on_rollback", None)?;
-        }
-        transaction::rollback(&id)
-    } else {
-        println!("No transactions found to roll back.");
-        Ok(())
-    }
 }

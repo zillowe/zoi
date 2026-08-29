@@ -10,7 +10,7 @@ use std::process::Command;
 
 use anyhow::{Result, anyhow};
 use colored::Colorize;
-use zoi_core::utils;
+use zoi_core::{types, utils};
 
 /// Runs the package build process inside a Docker container.
 /// # Errors
@@ -22,6 +22,7 @@ pub fn run(
     build_type: Option<&str>,
     platforms: &[String],
     sign_key: Option<String>,
+    sign_mode: types::SignMode,
     output_dir: Option<&Path>,
     version_override: Option<&str>,
     sub_packages: Option<Vec<String>>,
@@ -118,6 +119,7 @@ pub fn run(
         build_type,
         platforms,
         sign_key,
+        sign_mode,
         container_output_dir,
         version_override,
         sub_packages,
@@ -169,6 +171,7 @@ fn build_command_args(
     build_type: Option<&str>,
     platforms: &[String],
     sign_key: Option<String>,
+    sign_mode: types::SignMode,
     output_dir: &str,
     version_override: Option<&str>,
     sub_packages: Option<Vec<String>>,
@@ -190,6 +193,10 @@ fn build_command_args(
     }
     if let Some(sign_key) = sign_key {
         args.extend(["--sign".to_string(), sign_key]);
+        if sign_mode == types::SignMode::Embed {
+            args.push("--sign-mode".to_string());
+            args.push("embed".to_string());
+        }
     }
     if let Some(version_override) = version_override {
         args.extend([
@@ -226,6 +233,7 @@ mod tests {
             Some("source; id"),
             &["linux-amd64; id".to_string()],
             Some("key; id".to_string()),
+            zoi_core::types::SignMode::Embed,
             "/output",
             Some("1.0.0; id"),
             Some(vec!["sub; id".to_string()]),

@@ -13,6 +13,8 @@ pub mod builtin;
 pub mod cache;
 /// Configuration management and policy enforcement.
 pub mod config;
+/// `.zdelta` delta patch generation and application.
+pub mod delta;
 /// Dependency resolution and management.
 pub mod dependency;
 /// Management of frozen/locked package states.

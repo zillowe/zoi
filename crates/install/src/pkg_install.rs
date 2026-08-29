@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fs::{self, File};
 use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
@@ -174,7 +174,7 @@ pub fn run(
     sub_packages: Option<Vec<String>>,
     link_bins: bool,
     pb: Option<&indicatif::ProgressBar>
-) -> Result<Vec<String>> {
+) -> Result<(Vec<String>, BTreeMap<String, String>)> {
     let scope = scope_override.unwrap_or(types::Scope::User);
 
     // Handle meta-packages with no archive
@@ -182,7 +182,7 @@ pub fn run(
         if pb.is_none() {
             println!("Initializing meta-package...");
         }
-        return Ok(Vec::new());
+        return Ok((Vec::new(), BTreeMap::new()));
     }
 
     if pb.is_none() {
@@ -488,7 +488,7 @@ pub fn run(
     } else {
         println!("{} Installation complete.", "Success:".green());
     }
-    Ok(installed_files)
+    Ok((installed_files, BTreeMap::new()))
 }
 
 /// Finalizes the installation by creating backups, linking binaries,
@@ -706,7 +706,7 @@ fn extract_pooled_zpa(
     pb: Option<&indicatif::ProgressBar>,
     yes: bool,
     registry_handle: &str
-) -> Result<Vec<String>> {
+) -> Result<(Vec<String>, BTreeMap<String, String>)> {
     let version = metadata.version.as_ref().ok_or_else(|| {
         anyhow!(
             "Package '{}' is missing version field in its metadata.",
@@ -736,6 +736,10 @@ fn extract_pooled_zpa(
         .tempdir_in(&package_dir)?;
 
     let mut installed_files: Vec<String> = Vec::new();
+    // Content digests recorded for post-install verification (`zoi package
+    // verify`). Keyed by the same tracked path that goes into
+    // installed_files.
+    let mut file_digests: BTreeMap<String, String> = BTreeMap::new();
     let version_dir = package_dir.join(version);
 
     let subs_to_install = if let Some(subs) = sub_packages {
@@ -935,7 +939,9 @@ fn extract_pooled_zpa(
                 }
             }
 
-            installed_files.push(track_dest(&mapped_file.dest)?);
+            let tracked = track_dest(&mapped_file.dest)?;
+            file_digests.insert(tracked.clone(), mapped_file.hash.clone());
+            installed_files.push(tracked);
         }
 
         // Step 3: Create symlinks
@@ -979,7 +985,7 @@ fn extract_pooled_zpa(
         p.set_position(100);
     }
 
-    Ok(installed_files)
+    Ok((installed_files, file_digests))
 }
 
 /// Expands placeholders in a pooled path to their absolute filesystem paths.

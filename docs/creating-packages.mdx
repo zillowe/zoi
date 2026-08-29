@@ -627,6 +627,12 @@ zoi package bundle /path/to/your-package.pkg.lua
 
 Zoi intelligently parses your script to include only the necessary local files.
 
+You can sign a source bundle for distribution:
+
+```sh
+zoi package bundle --sign <KEY> /path/to/your-package.pkg.lua
+```
+
 #### Excluding files with `.zoiignore`
 
 You can create a `.zoiignore` file in the same directory as your `.pkg.lua` to exclude specific files or directories from being bundled into the `.zsa` archive. It follows the same pattern syntax as `.gitignore`.
@@ -666,6 +672,7 @@ zoi package build --type <build-type> --test /path/to/your-package.pkg.lua
 - `--no-zsa`: Skip creating the intermediate source bundle and build directly from the `.pkg.lua` file.
 - `--sub <SUB_PACKAGE...>`: For a split package, build only the specified sub-packages.
 - `--sign <KEY>`: Sign the resulting archive with a PGP key from your Zoi keyring.
+- `--sign-mode <embed|file>`: How to attach the signature when `--sign` is used. Default: `embed`. The `embed` mode stores a `manifest.sig` entry inside the archive so the signature travels with it. The `file` mode writes a detached `<archive>.sig` sidecar file (legacy behavior).
 - `--test`: Run the `test()` function before building the archive.
 - `--install-deps`: Automatically install build-time dependencies from other package managers (e.g. Pacman, APT, Cargo) before building.
 - `--version-override <VERSION>`: Override the package version defined in the `.pkg.lua` file.
@@ -677,7 +684,15 @@ zoi package build --type <build-type> --test /path/to/your-package.pkg.lua
 
 ### Step 7: Verify the Final Archive
 
-Install the built archive to ensure it's correct and installs properly for end-users.
+After building, you can verify the archive's integrity against its pooled manifest:
+
+```sh
+zoi package verify archive --file /path/to/your-package-1.0.0-linux-amd64.zpa
+```
+
+This checks that every pool entry hashes correctly and the manifest is internally consistent.
+
+Then install the built archive to ensure it works for end-users.
 
 ```sh
 zoi package install /path/to/your-package-1.0.0-linux-amd64.zpa

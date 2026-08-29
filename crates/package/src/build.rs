@@ -448,6 +448,7 @@ fn build_for_platform(
     build_type: Option<&str>,
     platform: &str,
     sign_key: Option<&String>,
+    sign_mode: types::SignMode,
     output_dir: Option<&Path>,
     version_override: Option<&str>,
     sub_packages: Option<&Vec<String>>,
@@ -757,6 +758,25 @@ fn build_for_platform(
     let manifest_json = serde_json::to_string_pretty(&pooled_manifest)?;
     fs::write(staging_dir.join("manifest.json"), manifest_json)?;
 
+    // Embedded signatures must be created BEFORE the archive is built so the
+    // signature file becomes part of the tar payload. It covers the manifest
+    // bytes verbatim, which in turn cover every pool hash.
+    if let Some(key_id) = sign_key
+        && sign_mode == types::SignMode::Embed
+        && !quiet
+    {
+        println!("Signing embedded manifest with key '{}'...", key_id.cyan());
+    }
+    if let Some(key_id) = sign_key
+        && sign_mode == types::SignMode::Embed
+    {
+        zoi_core::pgp::sign_detached(
+            &staging_dir.join("manifest.json"),
+            &staging_dir.join("manifest.sig"),
+            key_id
+        )?;
+    }
+
     fs::copy(
         package_file,
         staging_dir.join(
@@ -907,24 +927,37 @@ fn build_for_platform(
     }
 
     if let Some(key_id) = sign_key {
-        if !quiet {
-            println!("Signing package with key '{}'...", key_id.cyan());
-        }
-        let signature_path =
-            PathBuf::from(format!("{}.sig", output_path.display()));
-        if signature_path.exists() {
-            fs::remove_file(&signature_path)?;
-        }
-        zoi_core::pgp::sign_detached(&output_path, &signature_path, key_id)?;
-        if !quiet {
-            println!(
-                "{}",
-                format!(
-                    "Successfully created signature: {}",
-                    signature_path.display()
-                )
-                .green()
-            );
+        match sign_mode {
+            types::SignMode::Embed => {
+                if !quiet {
+                    println!("{}", "Embedded signature created.".green());
+                }
+            }
+            types::SignMode::File => {
+                if !quiet {
+                    println!("Signing package with key '{}'...", key_id.cyan());
+                }
+                let signature_path =
+                    PathBuf::from(format!("{}.sig", output_path.display()));
+                if signature_path.exists() {
+                    fs::remove_file(&signature_path)?;
+                }
+                zoi_core::pgp::sign_detached(
+                    &output_path,
+                    &signature_path,
+                    key_id
+                )?;
+                if !quiet {
+                    println!(
+                        "{}",
+                        format!(
+                            "Successfully created signature: {}",
+                            signature_path.display()
+                        )
+                        .green()
+                    );
+                }
+            }
         }
     }
 
@@ -945,6 +978,7 @@ pub fn run(
     build_type: Option<&str>,
     platforms: &[String],
     sign_key: Option<String>,
+    sign_mode: types::SignMode,
     output_dir: Option<&Path>,
     version_override: Option<&str>,
     sub_packages: Option<Vec<String>>,
@@ -1011,6 +1045,7 @@ pub fn run(
             build_type,
             platforms,
             sign_key,
+            sign_mode,
             output_dir,
             version_override,
             sub_packages,
@@ -1027,6 +1062,7 @@ pub fn run(
             build_type,
             platforms,
             sign_key,
+            sign_mode,
             output_dir,
             version_override,
             sub_packages,
@@ -1072,6 +1108,7 @@ pub fn run(
             build_type,
             platform,
             sign_key.as_ref(),
+            sign_mode,
             output_dir,
             version_override,
             sub_packages.as_ref(),

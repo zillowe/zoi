@@ -20,6 +20,11 @@ pub struct BundleCommand {
     #[arg(long)]
     pub sign: Option<String>,
 
+    /// How to attach the signature when --sign is used. `embed` stores the
+    /// signature inside the bundle; `file` writes a legacy `.sig` sidecar.
+    #[arg(long, value_enum, default_value_t = super::build::SignModeArg::Embed)]
+    pub sign_mode: super::build::SignModeArg,
+
     /// Override the package version
     #[arg(long)]
     pub version_override: Option<String>,
@@ -40,6 +45,7 @@ pub fn run(args: BundleCommand) -> Result<()> {
         &args.package_file,
         args.output_dir.as_deref(),
         args.sign,
+        args.sign_mode.into(),
         args.version_override.as_deref(),
         args.build_type.as_deref()
     )?;

@@ -52,6 +52,10 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Transaction Inspection:** Inspect recorded package operations and touched files with `zoi transaction list`, `zoi transaction show`, and `zoi transaction files`.
 
+- **Delta Upgrades:** When a previous version of an archive is cached, upgrades automatically try to fetch and apply a `.zdelta` (bsdiff-based) instead of re-downloading the full archive. Delta patches are explicitly configured in the registry's `repo.yaml` (delta section) with their own URLs, hash files, and PGP signatures. The delta patch is verified for integrity and authenticity before application, falling back silently to a full download whenever a delta is unavailable or fails verification.
+
+- **Embedded Signatures:** Packages can be signed so the signature travels inside the archive itself (`manifest.sig`), in addition to the legacy detached `.sig` sidecar which remains fully supported. Delta patches can also be signed and verified.
+
 - **Development Shells (`zoi dev`):** Enter a subshell where all project dependencies are locally installed and environment variables like `LD_LIBRARY_PATH`, `CPATH`, and `PKG_CONFIG_PATH` are automatically configured for seamless development.
 
 - **Service Management (`zoi service`):** Define background processes in `.pkg.lua` and manage them via Zoi using your system's native manager (`systemd`, `launchd`, or `sc.exe`).
@@ -122,6 +126,8 @@ Zoi is packed with features designed to make package management and environment 
   - `zoi package install`: Install a package from a local archive for testing.
   - `zoi package doctor`: Lint and validate `.pkg.lua` definitions before testing/building.
   - `zoi package inspect`: Parse a package definition and output resolved metadata (supports JSON).
+  - `zoi package verify`: Verify integrity. With no arguments it checks every installed package's files against the digests recorded at install time; with `verify archive --file <PATH>` it checks a `.zpa` against its internal pooled manifest.
+  - `zoi package delta`: Generate a `.zdelta` patch between an older and a newer `.zpa`, transferring only changed content as bsdiff patches.
   - `zoi package init-lsp`: Initialize LSP support with EmmyLua type definitions and `.luarc.json`.
 
 - **Powerful CLI Tools:** Zoi offers a rich set of commands for package management and inspection:
@@ -144,7 +150,8 @@ Zoi is packed with features designed to make package management and environment 
   - `zoi owner`: Find which package owns a specific file on the system.
   - `zoi pin`: Lock a package to a specific version to prevent updates.
   - `zoi provides`: Find which package provides a specific command or file.
-  - `zoi rollback`: Revert a package to its previously installed version or roll back the newest remaining transaction log.
+  - `zoi rollback`: Revert a package to its previously installed version.
+  - `zoi transaction undo`: Revert every operation recorded in a transaction (defaults to the most recent).
   - `zoi search`: Searches for packages by name or description.
   - `zoi service`: Manage background services for installed packages.
   - `zoi tree`: Visualize the dependency tree of a package.
@@ -370,7 +377,7 @@ Installs one or more packages. For split packages, you can specify a sub-package
 Zoi resolves dependencies, checks for conflicts, and then sequentially downloads and installs each package, showing progress bars for both download and installation phases.
 
 If a requested package is already installed in the target scope at the same version and revision, Zoi skips it with an "already installed" message instead of reinstalling.
-If an older version is installed, Zoi skips it and prints a hint pointing to zoi update <package>.
+If an older version is installed, Zoi skips it and prints a hint pointing to `zoi update <package>`.
 If the package is installed in a different scope than requested, Zoi notes that but proceeds installing into the requested scope. `--force` bypasses these checks entirely and reinstalls.
 
 **Arguments:**
@@ -387,12 +394,14 @@ If the package is installed in a different scope than requested, Zoi notes that 
 - `--local`: Install packages to the current project (alias for `--scope=project`).
 - `--global`: Install packages globally for the current user (alias for `--scope=user`).
 - `--save`: Save the package to the project's `zoi.yaml`.
+- `--deps-only`: Install only the dependencies of the given packages, not the packages themselves.
+- `--build-deps-only`: Install only the build dependencies declared by the given packages. Works for any source type (local `.pkg.lua`, registry package, URL, or git).
 - `--type <TYPE>`: The type of package to build if building from source. Specifying a type other than `pre-compiled` or `pre-built` will force a local build.
 - `--build` (alias: `-b`): Force building from source even if a pre-compiled archive is available in the registry.
 - `--frozen`: Install exactly what is pinned in `zoi.lock` (project scope only, lockfile must already exist, no lockfile updates are allowed, and recorded sub-package/dependency selections are preserved).
 - `--retry <N>`: Retry failed downloads up to `N` attempts (minimum `1`, default `3`).
 - `-v`, `--verbose`: Show additional install details, including package origins and preflight information.
-- `--explain`: Print dependency-selection and install-decision explanation.
+- `--explain`: Print a dependency-selection and install-decision explanation, including why each package was chosen and which action will be taken.
 - `--plan-json`: Emit machine-readable install plan JSON.
 - `--dry-run`: Do not actually install, just show what would be done.
 
@@ -491,6 +500,7 @@ Build, create, and manage Zoi packages.
   - `-o`, `--output-dir <DIR>`: Directory to output the built package to.
   - `--no-zsa`: Skip creating the intermediate source bundle and build directly from the `.pkg.lua` file.
   - `--sign <KEY>`: Sign the package with the given PGP key.
+  - `--sign-mode <embed|file>`: How to attach the signature when `--sign` is used (default: `embed`). `embed` stores a `manifest.sig` entry inside the archive so authenticity travels with it; `file` writes a legacy `<archive>.sig` sidecar.
   - `--sub <SUB_PACKAGES...>`: For a split package, build only the specified sub-packages.
   - `--test`: Run package tests before building.
   - `--install-deps`: Automatically install build-time dependencies defined in the package before building.
@@ -516,6 +526,13 @@ Build, create, and manage Zoi packages.
   - `--platform <PLATFORM>`: Resolve metadata for a specific platform.
   - `--version-override <VERSION>`: Override package version while inspecting.
 - `init-lsp`: Initialize LSP support with EmmyLua type definitions and `.luarc.json`.
+- `verify [installed|archive]`: Verify package integrity. Without arguments, checks every installed package's files against digests recorded at install time. With `archive --file <PATH>`, checks a `.zpa` archive against its internal pooled manifest.
+  - `--scope <user|system>`: Scope to verify (installed mode).
+  - `--archive <PATH>`: Path to the `.zpa` archive to verify (archive mode).
+  - `--json`: Output results as JSON.
+- `delta <old_archive> <new_archive>`: Generate a `.zdelta` patch between an older and a newer `.zpa` archive. The delta contains only the changed content as bsdiff patches, transferred through a zstd-compressed tar container. Also generates `.zdelta.hash`, `.zdelta.size`, and optionally `.zdelta.sig` sidecar files.
+  - `-o, --output <PATH>`: Output path for the `.zdelta` file (defaults to `<new_archive>.zdelta`).
+  - `--sign <KEY>`: Sign the delta patch with a PGP key from your Zoi keyring. Generates a `.zdelta.sig` file.
 
 ---
 
@@ -581,19 +598,17 @@ Find which package provides a specific command or file. This command searches th
 
 ---
 
-### `zoi rollback [PACKAGE]`
+### `zoi rollback <PACKAGE>`
 
 Rollback a package to the previously installed version.
 
 **Arguments:**
 
-- `[PACKAGE]`: The name of the package to rollback.
+- `<PACKAGE>`: The name of the package to rollback.
 
 If multiple installed packages match the same name, Zoi will prompt you to choose the exact installed package. For non-interactive use, pass an explicit source such as `#handle@repo/name[:sub]@version`.
 
-**Options:**
-
-- `--last-transaction`: Roll back the newest remaining transaction log.
+To revert an entire transaction, use `zoi transaction undo` instead.
 
 ---
 
@@ -837,6 +852,7 @@ Inspect recorded transactions.
 - `list` (alias: `ls`): List available transaction logs with their start time and operation count.
 - `show <id>`: Show the ordered operations recorded in a transaction.
 - `files <id>`: List the unique files modified by a transaction.
+- `undo [id]`: Revert all operations recorded in a transaction (installs are uninstalled, uninstalls are restored, upgrades are downgraded). Defaults to the most recent transaction when no ID is given (aliases: `rollback`).
 
 ---
 

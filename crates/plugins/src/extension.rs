@@ -253,6 +253,7 @@ pub fn add(
         platform: zoi_core::utils::get_platform().unwrap_or_default(),
         service: None,
         installed_files: vec![],
+        file_digests: None,
         installed_size: pkg.installed_size,
         sandbox: None,
         completions: None

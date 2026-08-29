@@ -207,11 +207,13 @@ Here are the fields available in `repo.yaml`:
 
 | Field             | Type                | Description                                                                                                                                                          |
 | ----------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`            | `string`            | The name of the repository. This is used as the handle for the registry.                                                                                             |
+| `name`            | `string`            | The display name of the repository.                                                                                                                                  |
+| `handle`          | `string`            | Short identifier used as the registry handle (e.g. `zoidberg`). This is what users see in `@handle/repo/package` install syntax.                                    |
 | `description`     | `string`            | A short description of the repository.                                                                                                                               |
 | `advisory_prefix` | `string`            | (Optional) Prefix used for advisory identifiers imported from this registry.                                                                                         |
 | `git`             | `list` of `GitLink` | A list of git repository URLs. The `type` can be `main` for the primary repository or `mirror` for fallbacks.                                                        |
 | `pkg`             | `list` of `PkgLink` | (Optional) A list of URLs for pre-built package registries. Zoi will try to download pre-built packages from here before building from source.                       |
+| `delta`           | `list` of `DeltaLink` | (Optional) A list of URLs for delta patch registries. Zoi will use these for bandwidth-efficient upgrades when a previous version is cached.                         |
 | `db`              | `string`            | (Optional) URL for registry database metadata.                                                                                                                       |
 | `pgp`             | `list` of `PgpKey`  | (Optional) A list of PGP keys to import for package signature verification. The `key` can be a URL to the key file or a PGP fingerprint.                             |
 | `repos`           | `list` of `Repo`    | A list of the sub-repositories (or tiers) contained within the registry. `type` can be `official`, `community`, etc. `active` determines if it's enabled by default. |
@@ -253,6 +255,18 @@ The `url`, `pgp`, `hash`, `size`, and `files` fields within a `PkgLink` object c
 - `{platform}`: The full platform string (e.g. `linux-amd64`).
 - `{repo}`: The name of the sub-repository (e.g. `core`, `main`).
 
+### `DeltaLink` Placeholders
+
+The `url`, `pgp`, `hash`, and `size` fields within a `DeltaLink` object can contain the following placeholders, which Zoi will replace at runtime:
+
+- `{name}`: The name of the package.
+- `{version}`: The target version of the package (the version being upgraded to).
+- `{id}`: A flattened unique identifier (repo path + name with slashes replaced by dots, e.g. `core.editors.vim`).
+- `{os}`: The operating system (e.g. `linux`, `macos`, `windows`).
+- `{arch}`: The CPU architecture (e.g. `amd64`, `arm64`).
+- `{platform}`: The full platform string (e.g. `linux-amd64`).
+- `{repo}`: The name of the sub-repository (e.g. `core`, `main`).
+
 Zoi uses a smart URL construction strategy:
 
 - If your `url` template ends with `.zpa`, Zoi uses it exactly as generated. This gives you full control over the file path.
@@ -263,6 +277,8 @@ Zoi uses a smart URL construction strategy:
 ```yaml
 name: Zoidberg
 description: Official Zoi packages repository
+handle: zoidberg
+advisory_prefix: ZSA
 git:
   - type: main
     url: https://gitlab.com/zillowe/zillwen/zusty/zoidberg.git
@@ -271,24 +287,93 @@ git:
   - type: mirror
     url: https://codeberg.org/zillowe/zoidberg.git
 pkg:
-  # Example 1: Standard directory-based structure (Zoi appends filename)
+  # Pre-built packages (GitLab Generic Package Registry)
   - type: main
-    url: https://zillowe.pages.dev/pkgs/{repo}/{os}/{arch}/{version}
-    pgp: https://zillowe.pages.dev/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.zpa.sig
-    hash: https://zillowe.pages.dev/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.zpa.hash
-    size: https://zillowe.pages.dev/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.zpa.size
-    files: https://zillowe.pages.dev/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.zpa.files
-  # Example 2: Source bundle mirror (Zoi appends .zsa filename)
+    url: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zpa
+    pgp: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zpa.sig
+    hash: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zpa.hash
+    size: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zpa.size
+    files: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zpa.files
+  # Source bundles
   - type: source-main
-    url: https://zillowe.pages.dev/source-pkgs/{repo}/{version}
-    hash: https://zillowe.pages.dev/source-pkgs/{repo}/{version}/{name}-{version}.zsa.hash
-  - type: source-mirror
-    url: https://mirror.example.com/source-pkgs/{repo}/{version}
-
-  # Example 3: Direct file link (Full control)
-  - type: mirror
-    url: https://mirror.example.com/{repo}/{name}-{version}-{platform}.zpa
+    url: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}.zsa
+    hash: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}.zsa.hash
+    pgp: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}.zsa.sig
+    size: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}.zsa.size
+    files: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}.zsa.files
+delta:
+  # Delta patches for bandwidth-efficient upgrades
+  - type: main
+    url: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zdelta
+    pgp: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zdelta.sig
+    hash: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zdelta.hash
+    size: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zdelta.size
+pgp:
+  - name: zillowe-main
+    key: https://zillowe.pages.dev/keys/zillowe-main.asc
+repos:
+  - name: core
+    type: official
+    active: true
+  - name: main
+    type: official
+    active: true
+  - name: extra
+    type: official
+    active: false
+  - name: community
+    type: community
+    active: false
+  - name: archive
+    type: archive
+    active: false
+  - name: test
+    type: test
+    active: false
 ```
+
+### Delta Patches
+
+Zoi supports bandwidth-efficient upgrades using `.zdelta` patches (bsdiff-based deltas applied to the content-addressed pool). When a previous version of a package is cached and a delta is available from the registry, Zoi will download the delta patch, verify its hash and signature, apply it to the cached archive, and install the rebuilt package.
+
+Delta patches are configured explicitly in the `delta` section of `repo.yaml`. Each `DeltaLink` supports the same mirror types as `PkgLink` (`main`, `mirror`).
+
+**Required fields for secure delta upgrades:**
+
+- `url`: The delta patch URL template (must contain `{version}` placeholder for the target version).
+- `hash`: URL to the delta patch's SHA-256 hash file (mandatory for integrity).
+- `pgp`: URL to the delta patch's detached PGP signature (recommended for authenticity).
+- `size`: URL to the delta patch's size file (for progress reporting).
+
+**Example delta configuration:**
+
+```yaml
+delta:
+  - type: main
+    url: https://example.com/deltas/{id}/{version}/{name}-{version}-{platform}.zdelta
+    pgp: https://example.com/deltas/{id}/{version}/{name}-{version}-{platform}.zdelta.sig
+    hash: https://example.com/deltas/{id}/{version}/{name}-{version}-{platform}.zdelta.hash
+    size: https://example.com/deltas/{id}/{version}/{name}-{version}-{platform}.zdelta.size
+  - type: mirror
+    url: https://mirror.example.com/deltas/{id}/{version}/{name}-{version}-{platform}.zdelta
+    hash: https://mirror.example.com/deltas/{id}/{version}/{name}-{version}-{platform}.zdelta.hash
+```
+
+When upgrading, Zoi looks up the delta URL using the **target version** (the version being upgraded to). The delta patch is verified against its hash and signature before application. If no delta is configured, unavailable, or fails verification, Zoi silently falls back to downloading the full archive.
+
+**Creating delta patches:**
+
+Use `zoi package delta` to generate a `.zdelta` between two `.zpa` archives:
+
+```sh
+# Generate delta with automatic naming
+zoi package delta old-package-1.0.0-linux-amd64.zpa new-package-1.1.0-linux-amd64.zpa
+
+# Generate signed delta for distribution
+zoi package delta --sign <KEY> old-package-1.0.0-linux-amd64.zpa new-package-1.1.0-linux-amd64.zpa
+```
+
+This creates the `.zdelta` file plus sidecar files: `.zdelta.hash`, `.zdelta.size`, and `.zdelta.sig` (if `--sign` is used). Distribute these alongside your package archives in the registry.
 
 ## Registry Metadata Files
 

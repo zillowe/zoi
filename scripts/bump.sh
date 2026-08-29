@@ -3,6 +3,7 @@ set -e
 
 # Usage: ./scripts/bump.sh [Branch]-[Status]-[Number]
 # Example: ./scripts/bump.sh Prod-Release-1.25.0
+# Uses ZFVM (https://zillowe.qzz.io/docs/methods/zfvm)
 
 VERSION_INPUT=$1
 

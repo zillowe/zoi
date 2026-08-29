@@ -54,15 +54,23 @@ The `repo.yaml` file defines the configuration for a specific package repository
 version: "2"
 name: "Zoidberg"
 description: "Main repository configuration"
+handle: "zoidberg"
 advisory_prefix: "ZSA"
 git:
-  - url: "https://github.com/zillowe/zoidberg.git"
-    branch: "main"
+  - type: "main"
+    url: "https://gitlab.com/zillowe/zillwen/zusty/zoidberg.git"
+  - type: "mirror"
+    url: "https://github.com/zillowe/zoidberg.git"
 pkg:
-  - url: "https://zillowe.pages.dev/pkgs/{repo}/{os}/{arch}/{version}"
+  - type: "main"
+    url: "https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zpa"
+    hash: "https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zpa.hash"
+    pgp: "https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zpa.sig"
+    size: "https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zpa.size"
+    files: "https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zpa.files"
 pgp:
-  - id: "842293159C4B03357C8328D3A75793A3E674252E"
-    url: "https://zillowe.pages.dev/keys/zillowe-main.asc"
+  - name: "zillowe-main"
+    key: "https://zillowe.pages.dev/keys/zillowe-main.asc"
 repos:
   - name: "core"
     type: "official"
@@ -75,16 +83,47 @@ repos:
 ### Fields
 
 - **`version`** (String): Spec version. Defaults to `"2"`.
-- **`name`** (String): Repository/Registry name.
+- **`name`** (String): Repository/Registry display name.
 - **`description`** (String): Description of the repository collection.
+- **`handle`** (String): Short identifier used as the registry handle. This is what users see in `@handle/repo/package` install syntax.
 - **`advisory_prefix`** (String, Optional): Prefix used for security advisories (e.g. `ZSA`).
 - **`git`** (List of Objects): Git mirrors for the repository content.
-- **`pkg`** (List of Objects): Package download mirrors. Supports placeholders like `{repo}`, `{os}`, `{arch}`, `{version}`.
+- **`pkg`** (List of Objects): Package download mirrors. Supports placeholders like `{repo}`, `{os}`, `{arch}`, `{version}`, `{id}`.
+- **`delta`** (List of Objects): Delta patch mirrors for bandwidth-efficient upgrades. Supports placeholders like `{repo}`, `{os}`, `{arch}`, `{version}`, `{id}`.
 - **`pgp`** (List of Objects): Trusted PGP keys for signature verification.
 - **`repos`** (List of Objects): Sub-repositories contained within this registry.
   - **`name`** (String): Name of the sub-repo (e.g. `main`).
   - **`type`** (String): Type of the repository (`official`, `community`, `unofficial`, `testing`, `archive`).
   - **`active`** (Boolean): Whether the sub-repo is active and should be read.
+
+### Delta Patches
+
+Zoi supports bandwidth-efficient upgrades using `.zdelta` patches (bsdiff-based deltas applied to the content-addressed pool). When a previous version of a package is cached and a delta is available from the registry, Zoi will download the delta patch, verify its hash and signature, apply it to the cached archive, and install the rebuilt package.
+
+Delta patches are configured explicitly in the `delta` section of `repo.yaml` (not auto-derived from `pkg` URLs). Each `DeltaLink` supports the same mirror types as `PkgLink` (`main`, `mirror`).
+
+**Required fields for secure delta upgrades:**
+
+- `url`: The delta patch URL template (must contain `{version}` placeholder for the target version).
+- `hash`: URL to the delta patch's SHA-256 hash file (mandatory for integrity).
+- `pgp`: URL to the delta patch's detached PGP signature (recommended for authenticity).
+- `size`: URL to the delta patch's size file (for progress reporting).
+
+**Example delta configuration:**
+
+```yaml
+delta:
+  - type: main
+    url: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zdelta
+    pgp: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zdelta.sig
+    hash: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zdelta.hash
+    size: https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zdelta.size
+  - type: mirror
+    url: https://mirror.example.com/deltas/{id}/{version}/{name}-{version}-{platform}.zdelta
+    hash: https://mirror.example.com/deltas/{id}/{version}/{name}-{version}-{platform}.zdelta.hash
+```
+
+When upgrading, Zoi looks up the delta URL using the **target version** (the version being upgraded to). The delta patch is verified against its hash and signature before application. If no delta is configured, unavailable, or fails verification, Zoi silently falls back to downloading the full archive.
 
 ---
 

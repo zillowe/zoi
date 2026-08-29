@@ -1,5 +1,7 @@
 //! Installation manifest creation logic.
 
+use std::collections::BTreeMap;
+
 use anyhow::{Result, anyhow};
 use zoi_core::types;
 
@@ -18,7 +20,8 @@ pub fn create_manifest(
     repo_type: String,
     chosen_options: &[String],
     chosen_optionals: &[String],
-    sub_package: Option<String>
+    sub_package: Option<String>,
+    file_digests: BTreeMap<String, String>
 ) -> Result<types::InstallManifest> {
     let platform = zoi_core::utils::get_platform().unwrap_or_default();
 
@@ -108,6 +111,11 @@ pub fn create_manifest(
         platform,
         service: pkg.service.clone(),
         installed_files,
+        file_digests: if file_digests.is_empty() {
+            None
+        } else {
+            Some(file_digests)
+        },
         installed_size: pkg.installed_size,
         sandbox: pkg.sandbox.clone(),
         completions

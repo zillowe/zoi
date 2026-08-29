@@ -10,6 +10,8 @@ pub mod build;
 pub mod bundle;
 /// Linux isolation using Bubblewrap.
 pub mod bwrap;
+/// Delta generation and application for package archives.
+pub mod delta;
 /// Containerized builds using Docker.
 pub mod docker;
 /// Package health and metadata validation.

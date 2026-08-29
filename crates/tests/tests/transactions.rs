@@ -37,6 +37,7 @@ fn sample_manifest(name: &str, files: Vec<&str>) -> InstallManifest {
         platform: zoi_core::utils::get_platform().unwrap_or_default(),
         service: None,
         installed_files: files.into_iter().map(str::to_string).collect(),
+        file_digests: None,
         installed_size: None,
         sandbox: None,
         completions: None

@@ -6,8 +6,26 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use colored::Colorize;
+
+/// How to attach a signature to a built artifact.
+#[derive(ValueEnum, Clone, Copy, Debug)]
+pub enum SignModeArg {
+    /// Store the signature inside the archive.
+    Embed,
+    /// Write a legacy `.sig` sidecar next to the archive.
+    File
+}
+
+impl From<SignModeArg> for zoi_core::types::SignMode {
+    fn from(mode: SignModeArg) -> Self {
+        match mode {
+            SignModeArg::Embed => Self::Embed,
+            SignModeArg::File => Self::File
+        }
+    }
+}
 
 /// Arguments for the `package build` command.
 #[derive(Parser, Debug)]
@@ -32,6 +50,11 @@ pub struct BuildCommand {
     /// Sign the package with the given PGP key (name or fingerprint)
     #[arg(long)]
     pub sign: Option<String>,
+
+    /// How to attach the signature when --sign is used. `embed` stores the
+    /// signature inside the archive; `file` writes a legacy `.sig` sidecar.
+    #[arg(long, value_enum, default_value_t = SignModeArg::Embed)]
+    pub sign_mode: SignModeArg,
 
     /// Run tests before building
     #[arg(long)]
@@ -156,6 +179,7 @@ pub fn run(mut args: BuildCommand) -> Result<()> {
             &args.package_file,
             Some(temp.path()),
             None,
+            args.sign_mode.into(),
             args.version_override.as_deref(),
             args.r#type.as_deref()
         )?;
@@ -177,6 +201,7 @@ pub fn run(mut args: BuildCommand) -> Result<()> {
         args.r#type.as_deref(),
         &args.platform,
         args.sign,
+        args.sign_mode.into(),
         args.output_dir.as_deref(),
         args.version_override.as_deref(),
         args.sub,

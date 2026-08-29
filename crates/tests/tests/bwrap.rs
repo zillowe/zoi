@@ -29,6 +29,7 @@ fn test_bwrap_build_checks_command_existence() {
             None,
             &["linux-amd64".to_string()],
             None,
+            zoi_core::types::SignMode::Embed,
             None,
             None,
             None,

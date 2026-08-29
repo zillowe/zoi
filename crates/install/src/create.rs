@@ -190,6 +190,7 @@ pub fn run(
         Some("source"),
         &[utils::get_platform()?],
         None,
+        zoi_core::types::SignMode::Embed,
         Some(build_dir.path()),
         pkg.version.as_deref(),
         None,

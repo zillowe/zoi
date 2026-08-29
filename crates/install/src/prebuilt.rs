@@ -131,6 +131,7 @@ pub fn build_archive(
             Some(&build_type_clone),
             std::slice::from_ref(&current_platform_clone),
             None,
+            zoi_core::types::SignMode::Embed,
             None,
             Some(&version_clone),
             sub_packages,

@@ -119,6 +119,21 @@ pub enum Scope {
     Project
 }
 
+/// How a built artifact should be signed.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize,
+)]
+pub enum SignMode {
+    /// Embed the signature inside the archive as a `manifest.sig` entry
+    /// covering the pooled manifest (or the `.pkg.lua` for source bundles),
+    /// so authenticity travels with the archive alone.
+    #[default]
+    Embed,
+    /// Write a detached `<archive>.sig` sidecar next to the archive.
+    /// This is the legacy behavior.
+    File
+}
+
 /// A manifest for a pooled ZPA package.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PooledZpaManifest {
@@ -995,6 +1010,13 @@ pub struct InstallManifest {
     /// List of all files installed by this package.
     #[serde(default)]
     pub installed_files: Vec<String>,
+    /// Per-file SHA-256 digests recorded at install time, mapping the
+    /// manifest placeholder path (or absolute path for `${createpkgdir}`)
+    /// to its `sha256-<hex>` digest. Used by `zoi package verify` to detect
+    /// post-install drift. Older manifests without this field are reported
+    /// as "unverified" instead of failing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_digests: Option<BTreeMap<String, String>>,
     /// The total size of all installed files in bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub installed_size: Option<u64>,
@@ -1478,6 +1500,22 @@ pub struct PkgLink {
     pub files: Option<String>
 }
 
+/// A link to a delta patch in a repository configuration.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DeltaLink {
+    /// The type of link (e.g. "official").
+    #[serde(rename = "type")]
+    pub link_type: String,
+    /// The URL of the delta patch.
+    pub url: String,
+    /// Optional URL for PGP signature.
+    pub pgp: Option<String>,
+    /// Optional URL for checksum.
+    pub hash: Option<String>,
+    /// Optional URL for size information.
+    pub size: Option<String>
+}
+
 /// A PGP public key in a repository configuration.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PgpKey {
@@ -1517,6 +1555,9 @@ pub struct RepoConfig {
     /// The list of package indices or archives.
     #[serde(default)]
     pub pkg: Vec<PkgLink>,
+    /// The list of delta patches.
+    #[serde(default)]
+    pub delta: Vec<DeltaLink>,
     /// Optional URL to a pre-compiled database.
     #[serde(default)]
     pub db: Option<String>,
@@ -1540,6 +1581,19 @@ pub struct PrebuiltInfo {
     pub size_url: Option<String>,
     /// Optional URL for the file list.
     pub files_url: Option<String>
+}
+
+/// Information about a delta patch.
+#[derive(Debug, Clone)]
+pub struct DeltaInfo {
+    /// The final download URL for the delta patch.
+    pub final_url: String,
+    /// Optional URL for the PGP signature.
+    pub pgp_url: Option<String>,
+    /// Optional URL for the checksum.
+    pub hash_url: Option<String>,
+    /// Optional URL for the size information.
+    pub size_url: Option<String>
 }
 
 /// The type of source from which a package is installed.

@@ -78,6 +78,7 @@ fn test_package_outdated_on_revision_bump() {
         platform: zoi_core::utils::get_platform().unwrap_or_default(),
         service: None,
         installed_files: vec![],
+        file_digests: None,
         installed_size: None,
         sandbox: None,
         completions: None

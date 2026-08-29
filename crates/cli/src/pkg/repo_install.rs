@@ -146,6 +146,8 @@ pub fn run(
         false,
         false,
         false,
+        false,
+        false,
         None,
         false,
         plugin_manager,

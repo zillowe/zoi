@@ -72,20 +72,6 @@ just build
 sudo just install
 ```
 
-### Using Build Scripts
-
-The `scripts/` directory contains scripts for creating release builds for
-different platforms. These are used in our CI/CD pipeline.
-
-- `scripts/build-linux.sh`: Builds for Linux (amd64, arm64) and cross-compiles
-for Windows (amd64).
-- `scripts/build-macos.sh`: Builds for macOS (amd64, arm64).
-- `scripts/build-release.sh` & `build-release.ps1`: Helper scripts for creating
-a single release build on the current platform.
-
-These scripts embed the current git commit hash into the binary via the
-`ZOI_COMMIT_HASH` environment variable.
-
 ### Building .deb and .rpm Packages
 
 Zoi supports generating `.deb` and `.rpm` packages for Linux distributions
