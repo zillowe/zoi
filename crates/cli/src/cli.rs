@@ -14,11 +14,11 @@ use crate::{cmd, utils};
 
 // Development, Special, Public or Production
 /// The release branch of the current build.
-const BRANCH: &str = "Production";
+const BRANCH: &str = "Development";
 /// The release status of the current build.
 const STATUS: &str = "Release";
 /// The version number of the current build.
-const NUMBER: &str = "1.26.1";
+const NUMBER: &str = "1.27.0";
 /// Help text for package source identifiers.
 const PKG_SOURCE_HELP: &str =
     "Package identifier (e.g. @repo/name, #git@repo/name, path, or URL)";
