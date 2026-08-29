@@ -1241,6 +1241,14 @@ pub fn check_license(license: &str) {
     {
         return;
     }
+    if is_external_license_link(license) {
+        println!(
+            "{} The license is available at: {}",
+            "Warning:".yellow(),
+            license.cyan().bold()
+        );
+        return;
+    }
     match spdx::Expression::parse(license) {
         Ok(expr) => {
             if !expr.evaluate(|req| match req.license {
@@ -1263,6 +1271,13 @@ pub fn check_license(license: &str) {
             );
         }
     }
+}
+
+/// Returns `true` if the license value is an external link (a URL) pointing to
+/// the license text hosted elsewhere instead of an SPDX identifier.
+fn is_external_license_link(license: &str) -> bool {
+    let trimmed = license.trim();
+    trimmed.starts_with("http://") || trimmed.starts_with("https://")
 }
 
 /// Prompts the user to confirm installation from an untrusted (non-official)
@@ -1394,5 +1409,34 @@ pub fn get_current_shell() -> Option<Shell> {
         }
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detects_http_and_https_external_license_links() {
+        assert!(is_external_license_link("https://example.com/LICENSE"));
+        assert!(is_external_license_link("http://example.com/license"));
+        assert!(is_external_license_link("  https://example.com/MIT.txt  "));
+    }
+
+    #[test]
+    fn does_not_treat_spdx_or_special_values_as_links() {
+        assert!(!is_external_license_link("MIT"));
+        assert!(!is_external_license_link("Apache-2.0"));
+        assert!(!is_external_license_link("None"));
+        assert!(!is_external_license_link("Proprietary"));
+        assert!(!is_external_license_link("Unknown"));
+    }
+
+    #[test]
+    fn url_license_is_flagged_before_spdx_parsing() {
+        assert!(is_external_license_link("https://example.com/LICENSE"));
+        assert!(
+            spdx::Expression::parse("https://example.com/LICENSE").is_err()
+        );
     }
 }

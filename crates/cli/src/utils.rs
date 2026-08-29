@@ -302,6 +302,15 @@ pub fn check_license(license: &str) {
         return;
     }
 
+    if is_external_license_link(license) {
+        println!(
+            "{} The license is available at: {}",
+            "Warning:".yellow(),
+            license.cyan().bold()
+        );
+        return;
+    }
+
     match spdx::Expression::parse(license) {
         Ok(expr) => {
             if !expr.evaluate(|req| match req.license {
@@ -325,6 +334,13 @@ pub fn check_license(license: &str) {
             );
         }
     }
+}
+
+/// Returns `true` if the license value is an external link (a URL) pointing to
+/// the license text hosted elsewhere instead of an SPDX identifier.
+fn is_external_license_link(license: &str) -> bool {
+    let trimmed = license.trim();
+    trimmed.starts_with("http://") || trimmed.starts_with("https://")
 }
 
 /// Asks the user for confirmation with a prompt.
