@@ -13,12 +13,6 @@ ignore = [
     # team considers it complete
     "RUSTSEC-2024-0320", # yaml-rust: unmaintained, transitive via syntect
     # see yaml-rust2 fork
-    "RUSTSEC-2026-0194", # quick-xml: transitive via self_update
-    # awaiting upstream update
-    "RUSTSEC-2026-0195", # quick-xml: transitive via self_update
-    # awaiting upstream update
-    "RUSTSEC-2026-0245", # sevenz-rust: path traversal vulnerability
-    "RUSTSEC-2026-0246", # sevenz-rust: unmaintained
     "RUSTSEC-2026-0249", # smartstring: unmaintained
 ]
 
@@ -35,6 +29,7 @@ allow = [
     "MPL-2.0",
     "Unicode-3.0",
     "Zlib",
+    "CC0-1.0",
 ]
 
 confidence-threshold = 0.8

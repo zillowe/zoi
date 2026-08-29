@@ -31,7 +31,7 @@ default-members = ["crates/zoi-rs"]
 [workspace.package]
 version = "1.26.1"
 edition = "2024"
-rust-version = "1.92.0"
+rust-version = "1.93.0"
 description = "Advanced Package Manager & Environment Orchestrator"
 license = "Apache-2.0"
 repository = "https://gitlab.com/zillowe/zillwen/zusty/zoi"
@@ -140,7 +140,7 @@ reqwest = { version = "0.13.4", default-features = false, features = [
     "json",
     "rustls",
 ] }
-self_update = "0.44.0"
+self-replace = "1.5.0"
 semver = "1.0.28"
 sequoia-openpgp = { version = "2.4.1", default-features = false, features = [
     "crypto-openssl",
@@ -166,7 +166,7 @@ xz2 = "0.1.7"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 zstd = "0.13.3"
 ar = "0.9.0"
-sevenz-rust = "0.6.1"
+sevenz-rust2 = "0.22.2"
 phf = "0.14.0"
 rusqlite = { version = "0.40.2", default-features = false, features = [
     "bundled",

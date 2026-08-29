@@ -12,7 +12,7 @@ and for full functionality at runtime.
 
 These are required to compile Zoi from source.
 
-- **Rust**: Current minimum version is `1.92.0` 2024 edition from the stable
+- **Rust**: Current minimum version is `1.93.0` 2024 edition from the stable
 channel (see [`rust-toolchain.toml`](./rust-toolchain.toml) for the channel and
 [`Cargo.toml`](./Cargo.toml) for the Rust version and edition).
 - **C Compiler**: A C compiler like `gcc` is required. Packages like

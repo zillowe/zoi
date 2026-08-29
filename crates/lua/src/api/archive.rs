@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use ar::Archive as ArArchive;
 use flate2::read::GzDecoder;
 use mlua::{self, Lua, Table};
-use sevenz_rust;
+use sevenz_rust2;
 use xz2::read::XzDecoder;
 use zip::ZipArchive;
 use zstd::stream::read::Decoder as ZstdDecoder;
@@ -132,7 +132,7 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 .extension()
                 .is_some_and(|ext| ext.eq_ignore_ascii_case("7z"))
             {
-                sevenz_rust::decompress_file(&archive_file, &out_dir)
+                sevenz_rust2::decompress_file(&archive_file, &out_dir)
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
             } else if archive_path
                 .extension()
@@ -485,14 +485,9 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
         {
             let file = fs::File::open(&path)
                 .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            let len = file
-                .metadata()
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?
-                .len();
-            let reader = sevenz_rust::SevenZReader::new(
+            let reader = sevenz_rust2::ArchiveReader::new(
                 file,
-                len,
-                sevenz_rust::Password::empty()
+                sevenz_rust2::Password::empty()
             )
             .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
             for entry in &reader.archive().files {

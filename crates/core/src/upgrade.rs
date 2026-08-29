@@ -8,7 +8,8 @@ use colored::Colorize;
 use dirs;
 use hex;
 use indicatif::{ProgressBar, ProgressStyle};
-use self_update::self_replace;
+use self_replace;
+use semver::Version;
 use serde::Deserialize;
 use sha2::{Digest, Sha512};
 use tar::Archive;
@@ -390,10 +391,8 @@ pub fn run(
     };
 
     if !force
-        && !self_update::version::bump_is_greater(
-            &current_version,
-            &latest_version_str
-        )?
+        && (Version::parse(&latest_version_str)?
+            <= Version::parse(&current_version)?)
     {
         println!(
             "
@@ -442,6 +441,5 @@ pub fn run(
 
     println!("Replacing current executable...");
     self_replace::self_replace(&new_binary_path)?;
-
     Ok(())
 }
