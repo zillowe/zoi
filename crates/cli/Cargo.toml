@@ -28,7 +28,6 @@ anyhow.workspace = true
 chrono.workspace = true
 clap.workspace = true
 clap_complete.workspace = true
-clap_mangen.workspace = true
 colored.workspace = true
 comfy-table.workspace = true
 crossterm.workspace = true

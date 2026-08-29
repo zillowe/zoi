@@ -1,0 +1,108 @@
+= zoi-rs(3)
+:doctype: manpage
+:manmanual: Zoi Library Manual
+:mansource: zoi-rs
+
+== Name
+
+zoi-rs - Rust library for the Zoi package manager and environment orchestrator
+
+== Synopsis
+
+[source,rust]
+----
+use anyhow::Result;
+use zoi::{Scope, SourceInstallOptions, install_sources};
+
+fn main() -> Result<()> {
+    let options = SourceInstallOptions {
+        scope_override: Some(Scope::User),
+        yes: true,
+        ..Default::default()
+    };
+    install_sources(&["@core/ripgrep".to_string()], &options)?;
+    Ok(())
+}
+----
+
+== Description
+
+The *zoi-rs* crate exposes Zoi's package management, dependency resolution,
+and archive building capabilities as a Rust library. Its API is designed
+around "Pragmatic Transactionality": a two-phase installation process,
+SAT-based dependency resolution, and cryptographically verified registry
+state. The same code powers the *zoi*(1) command-line interface.
+
+== Key functions
+
+*build_with_options*::
+  Build a distributable .zpa archive from a `.pkg.lua` definition. Use
+  *BuildOptions* to select build type, target platforms, signing, and output.
+
+*install_package_with_options*::
+  Install a local .zpa archive. Returns the list of installed files.
+
+*install_sources*::
+  Install one or more package sources (registry names, local .pkg.lua files,
+  URLs, or local manifests).
+
+*update_packages*::
+  Update installed packages to their latest versions.
+
+*resolve_dependency_graph*::
+  Calculate the required packages and their dependencies without modifying
+  disk.
+
+*resolve_package*::
+  Resolve a single package source into *ResolvedPackage* metadata.
+
+*bundle_package*::
+  Bundle a package and its local assets into a .zsa source archive.
+
+*build*::
+  Build a package archive from source using a `.pkg.lua` definition.
+
+*install_package*::
+  Install a package archive.
+
+*uninstall_package*::
+  Uninstall an installed package.
+
+== Options structs
+
+*BuildOptions*::
+  Configure archive building.
+
+*PackageInstallOptions*::
+  Configure local archive installation.
+
+*SourceInstallOptions*::
+  Configure installation of package sources.
+
+*DependencyResolutionOptions*::
+  Configure dependency graph resolution.
+
+== Types
+
+*Scope*::
+  Selects the *User*, *System*, or *Project* installation scope.
+
+*types*::
+  Package metadata types, including *types::Package* and *types::SignMode*.
+
+*utils*::
+  Shared helpers such as platform detection and hash utilities.
+
+== Errors
+
+Library functions return `anyhow::Result`. Failures report build, resolution,
+install, and verification errors. All examples are `no_run`; inspect the
+crate's documentation on docs.rs for full examples.
+
+== See also
+
+*zoi*(1), *zoi-lua*(5)
+
+== Copying
+
+Copyright (C) Zillowe Foundation. Licensed under Apache-2.0.

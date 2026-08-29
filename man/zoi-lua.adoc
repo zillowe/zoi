@@ -1,0 +1,180 @@
+= zoi-lua(5)
+:doctype: manpage
+:manmanual: Zoi Lua Manual
+:mansource: zoi-lua
+
+== Name
+
+zoi-lua - Lua scripting environment for defining Zoi packages
+
+== Synopsis
+
+[source,lua]
+----
+metadata { name = "hello", version = "1.0.0" }
+
+function build()
+    cmd("make CFLAGS='-O2'")
+end
+
+function package()
+    zcp("hello", "${pkgstore}/bin/hello")
+    zman("hello.1", "1")
+end
+----
+
+== Description
+
+A Zoi package is defined by a `.pkg.lua` script. Zoi runs the script in a
+sandboxed Lua environment that provides host system information, staging
+paths, build helpers, and download utilities. The script declares package
+metadata and lifecycle functions; the contents of the staging directory
+become the package archive.
+
+== Global variables
+
+*SYSTEM*::
+  Host system information: OS, architecture, distribution, kernel, display
+  server, init system, and native package manager.
+
+*ZOI*::
+  Zoi environment information, including the resolved package version.
+  *ZOI.scope* holds the requested installation scope (`user`, `system`, or
+  `project`).
+
+*ZOI.PKG*::
+  Paths for the current package: the store, the template root, the system
+  root, the home directory, and the script itself.
+
+*LOCATION*::
+  Absolute staging paths that match the `${...}` placeholders such as
+  `${pkgstore}` and `${usrroot}`.
+
+*PKG*::
+  The resolved metadata table.
+
+*BUILD_DIR* and *STAGING_DIR*::
+  The temporary build directory and the staging directory whose contents
+  become the package archive.
+
+*BUILD_TYPE*::
+  The requested build method, e.g. `source` or `pre-compiled`.
+
+*SUBPKG*::
+  The sub-package name while processing split packages.
+
+== Staging functions
+
+*zcp*(_source_, _destination_)::
+  Stage a file or directory into the package. Use `${pkgluadir}` for files
+  next to the script.
+
+*zlicense*(_source_)::
+  Stage a license file for the package.
+
+*zdoc*(_source_)::
+  Stage a documentation file for the package.
+
+*zman*(_source_, [_section_])::
+  Stage a manual page. If a directory is given, all manual files inside are
+  staged recursively. The section is inferred from the file extension when
+  omitted.
+
+*zshell*(_source_, _shell_)::
+  Stage a shell completion file for bash, zsh, fish, or elvish.
+
+*zln*(_target_, _link_)::
+  Create a symbolic link in the package.
+
+*zchmod*(_path_, _mode_)::
+  Set file permissions, e.g. `0755`.
+
+*zchown*(_path_, _owner_, _group_)::
+  Set file ownership.
+
+*zmkdir*(_path_)::
+  Create a directory in the package.
+
+*zrm*(_path_)::
+  Remove files outside the package store while running `uninstall()`.
+
+*zsed*(_pattern_, _replacement_, _file_)::
+  Apply a regular expression replacement to a file in the build directory.
+
+*zpatch*(_patch_file_, [_strip_])::
+  Apply a patch file using the `patch` command.
+
+== Package definitions
+
+*metadata*(_table_)::
+  Define package properties such as name, version, and description.
+
+*dependencies*(_table_)::
+  Define build-time and runtime requirements.
+
+*updates*(_list_)::
+  Define update messages shown to the user.
+
+*hooks*(_table_)::
+  Define commands to run at lifecycle points such as `post_install`.
+
+*service*(_table_)::
+  Define a background service managed by the system.
+
+== Lifecycle functions
+
+Zoi calls these in order when building a package.
+
+*prepare*(_args_)::
+  Fetch source code or binaries into *BUILD_DIR*.
+
+*build*(_args_)::
+  Compile the package in *BUILD_DIR*.
+
+*package*(_args_)::
+  Stage files into *STAGING_DIR*.
+
+*verify*(_args_)::
+  Verify the integrity of the fetched files; return `true` or `false`.
+
+*test*(_args_)::
+  Validate the staged files during `zoi package test`.
+
+*uninstall*()::
+  Clean up external state when the package is uninstalled.
+
+== Utility functions
+
+*cmd*(_command_)::
+  Execute a shell command in a persistent session shared across calls in the
+  same phase. It returns *stdout*, *stderr*, and *exit_code*.
+
+*IMPORT*(_file_name_)::
+  Read a file located next to the script. JSON, YAML, and TOML files are
+  parsed into tables.
+
+*INCLUDE*(_file_name_)::
+  Execute another Lua script located next to this one.
+
+*UTILS.FETCH*, *UTILS.PARSE*, *UTILS.DOWNLOAD*, *UTILS.FILE*,
+*UTILS.EXTRACT*, *UTILS.ARCHIVE*, *UTILS.MAKE_ARCHIVE*, *UTILS.FS*,
+*UTILS.FIND*::
+  Download, parse, extract, and archive helpers. Downloads can verify a
+  `sha512-` or `sha256-` hash.
+
+*verifyHash*(_file_, _"algo-hash"_)::
+  Verify a file's checksum.
+
+*verifySignature*(_file_, _signature_, _key_)::
+  Verify a PGP detached signature.
+
+*addPgpKey*(_url_or_path_, _name_)::
+  Trust a PGP key for verification.
+
+== See also
+
+*zoi*(1), *zoi-rs*(3)
+
+== Copying
+
+Copyright (C) Zillowe Foundation. Licensed under Apache-2.0.

@@ -1,0 +1,220 @@
+= zoi(1)
+:doctype: manpage
+:manmanual: Zoi Manual
+:mansource: zoi
+
+== Name
+
+zoi - the advanced package manager and environment orchestrator
+
+== Synopsis
+
+*zoi* [_OPTIONS_] _COMMAND_ [_ARGS_...]
+
+== Description
+
+Zoi is part of the Zillowe Development Suite (ZDS). It streamlines development
+workflows by managing tools, packages, and project environments across
+operating systems. Packages come from registries of cryptographically signed
+archives; both binary archives (.zpa) and source bundles (.zsa) are supported.
+Zoi also manages declarative user environments and the underlying ZoiOS system.
+
+== Options
+
+*-v*, *--version*::
+  Print detailed version and build information.
+
+*-y*, *--yes*::
+  Automatically answer yes to all prompts.
+
+*--root*=_PATH_::
+  Operate on a different root directory.
+
+*--offline*::
+  Do not attempt to connect to the network.
+
+*--pkg-dir*=_PATH_::
+  Additional directory to search for .zpa archives.
+
+*-h*, *--help*::
+  Print help. Run *zoi COMMAND --help* for help on a specific command.
+
+== Commands
+
+*about*::
+  Show detailed application information and credits.
+
+*audit*::
+  Audit installed packages for security vulnerabilities.
+
+*autoremove*::
+  Remove packages installed as dependencies that are no longer needed.
+
+*cache*::
+  Manage Zoi's local cache of package archives.
+
+*clone*::
+  Clone the git repository of a package.
+
+*create*::
+  Create an application using a package template.
+
+*dev*::
+  Enter a development shell for the current project.
+
+*doctor*::
+  Check for common issues and provide actionable suggestions.
+
+*download*::
+  Download a package archive or source bundle.
+
+*downgrade*::
+  Install an older version of a package from the local store or cache.
+
+*env*::
+  Manage and set up project environments defined in zoi.yaml.
+
+*exec*::
+  Execute a package binary directly with its dependencies resolved.
+
+*extension*::
+  Manage Zoi extensions.
+
+*files*::
+  List all files owned by a package.
+
+*helper*::
+  Helper commands for various tasks.
+
+*history*::
+  Show the history of package operations.
+
+*home*::
+  Manage declarative user environments (ZoiOS only).
+
+*info*::
+  Display detected operating system and architecture information.
+
+*install*::
+  Install one or more packages from a name, local file, URL, or git
+  repository.
+
+*list*::
+  List installed or all available packages.
+
+*man*::
+  Show a package's manual.
+
+*mark*::
+  Modify the installation reason of a package.
+
+*migrate*::
+  Migration helpers for converting external manifests to Zoi package files.
+
+*owner*::
+  Find which package owns a file.
+
+*package*::
+  Build, create, and manage Zoi packages.
+
+*pgp*::
+  Manage PGP keys for package signature verification.
+
+*pin*::
+  Pin a package to a specific version.
+
+*provides*::
+  Find which package provides a specific command or file.
+
+*registry*::
+  Manage and author Zoi registries.
+
+*repo*::
+  Manage package repositories.
+
+*rollback*::
+  Roll a package back to the previously installed version.
+
+*run*::
+  Execute a command defined in a local zoi.yaml file.
+
+*search*::
+  Search for packages by name or description.
+
+*service*::
+  Manage background services for installed packages.
+
+*shell*::
+  Set up shell completions or enter an ephemeral environment with specific
+  packages.
+
+*show*::
+  Show detailed information about a package.
+
+*sync*::
+  Download or update the package database from the remote repository.
+
+*system*::
+  Manage the underlying ZoiOS system (ZoiOS only).
+
+*telemetry*::
+  Manage opt-in anonymous telemetry.
+
+*transaction*::
+  Inspect recorded transactions.
+
+*tree*::
+  Visualize the dependency tree of a package.
+
+*uninstall*::
+  Uninstall one or more packages previously installed by Zoi.
+
+*unpin*::
+  Unpin a package so it can be updated.
+
+*update*::
+  Update one or more packages to their latest versions.
+
+*upgrade*::
+  Upgrade the Zoi binary to the latest version.
+
+*use*::
+  Add a tool to the current project or global configuration and install it.
+
+*version*::
+  Print concise version and build information.
+
+*why*::
+  Explain why a package is installed.
+
+== Files
+
+*/etc/zoi/config.yaml*::
+  System-wide configuration file.
+
+*~/.config/zoi/config.yaml*::
+  User configuration file.
+
+*$XDG_DATA_HOME/zoi/*::
+  User data directory (database, store, and caches). Falls back to
+  *~/.local/share/zoi/* on most systems.
+
+*./zoi.yaml*::
+  Per-project configuration and dependencies.
+
+*./.zoi/*::
+  Per-project lockfile and local package store.
+
+== Exit status
+
+*0*:: Success.
+
+*1*:: An error occurred during the operation.
+
+== See also
+
+*zbsdiff*(1), *zbspatch*(1), *zoi-rs*(3), *zoi-lua*(5)
+
+== Copying
+
+Copyright (C) Zillowe Foundation. Licensed under Apache-2.0.

@@ -30,8 +30,6 @@ pub mod exec;
 pub mod extension;
 /// The `files` command.
 pub mod files;
-/// The `gen_man` command.
-pub mod gen_man;
 /// The `helper` command.
 pub mod helper;
 /// The `history` command.

@@ -19,6 +19,7 @@ Source0:        %{url}/-/archive/Prod-Release-%{version}/Prod-Release-%{version}
 BuildRequires:  cargo
 BuildRequires:  rust
 BuildRequires:  gcc
+BuildRequires:  rubygem-asciidoctor
 BuildRequires:  openssl-devel
 BuildRequires:  pkgconfig
 BuildRequires:  xz-devel
@@ -61,8 +62,11 @@ mkdir -p %{buildroot}%{_datadir}/fish/vendor_completions.d
 ./target/release/zoi generate-completions fish > %{buildroot}%{_datadir}/fish/vendor_completions.d/zoi.fish
 
 mkdir -p %{buildroot}%{_mandir}/man1
-./target/release/zoi generate-manual
-cp manuals/*.1 %{buildroot}%{_mandir}/man1/
+mkdir -p %{buildroot}%{_mandir}/man3
+mkdir -p %{buildroot}%{_mandir}/man5
+asciidoctor -b manpage -D %{buildroot}%{_mandir}/man1 man/zoi.adoc
+asciidoctor -b manpage -D %{buildroot}%{_mandir}/man3 man/zoi-rs.adoc
+asciidoctor -b manpage -D %{buildroot}%{_mandir}/man5 man/zoi-lua.adoc
 
 %files
 %license LICENSE
@@ -71,7 +75,9 @@ cp manuals/*.1 %{buildroot}%{_mandir}/man1/
 %{_datadir}/bash-completion/completions/zoi
 %{_datadir}/zsh/site-functions/_zoi
 %{_datadir}/fish/vendor_completions.d/zoi.fish
-%{_mandir}/man1/zoi*.1*
+%{_mandir}/man1/zoi.1*
+%{_mandir}/man3/zoi-rs.3*
+%{_mandir}/man5/zoi-lua.5*
 
 %changelog
 * Wed Jul 08 2026 Zillowe Foundation <contact@zillowe.qzz.io> - 1.21.0-1

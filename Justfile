@@ -134,11 +134,12 @@ uninstall:
     fi
     @echo "Binaries uninstalled."
 
-# Generate man pages
+# Generate man pages from the asciidoc sources in man/
 man:
-    @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
+    @if ! command -v asciidoctor >/dev/null 2>&1; then echo "Error: 'asciidoctor' is not installed. It is required to render man pages."; exit 1; fi
     @mkdir -p "{{ DEV_MANDIR }}"
-    @OUT_DIR="{{ DEV_MANDIR }}" {{ DEBUG_SRC_BIN }} generate-manual
+    @asciidoctor -b manpage -D "{{ DEV_MANDIR }}" man/*.adoc
+    @echo "Man pages rendered to {{ DEV_MANDIR }}."
 
 # Clean project artifacts
 clean:

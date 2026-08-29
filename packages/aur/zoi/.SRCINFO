@@ -8,6 +8,7 @@ pkgbase = zoi
 	license = Apache-2.0
 	makedepends = cargo
 	makedepends = just
+	makedepends = asciidoctor
 	depends = git
 	depends = gnupg
 	optdepends = bash-completion: for bash shell completion

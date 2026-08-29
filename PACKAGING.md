@@ -204,19 +204,36 @@ These should be included in the package.
   Where `<shell>` can be `bash`, `fish`, `zsh`, etc.
 
 - **Man Pages:**
-  The man pages can be generated using the `generate-manual` command.
-This will create a `manuals/` directory containing man pages for `zoi` and
-all of its subcommands.
+  The man page sources are AsciiDoc files in the `man/` directory
+  (`zoi.adoc`, `zoi-rs.adoc`, and `zoi-lua.adoc`).
+  They are rendered to man pages with `asciidoctor` using the manpage
+  backend. The rendered section is taken from the page title
+  (e.g. `zoi.adoc` renders `zoi.1`).
+
+  To render all man pages (equivalent to `just man`):
 
   ```sh
-  ./target/release/zoi generate-manual
-  # This creates a `manuals/` directory with `zoi.1`, `zoi-install.1`, etc.
-  OUT_DIR=dist/man/ ./target/release/zoi generate-manual
-  # This creates `zoi.1`, `zoi-install.1`, etc. in `dist/man/`
+  asciidoctor -b manpage -D dist/man man/*.adoc
   ```
 
-  These files should be installed to the appropriate man page directory
-  (e.g. `/usr/share/man/man1`).
+  To render a single page:
+
+  ```sh
+  mkdir -p dist/man
+  asciidoctor -b manpage -D dist/man man/zoi.adoc
+  asciidoctor -b manpage -D dist/man man/zoi-rs.adoc
+  asciidoctor -b manpage -D dist/man man/zoi-lua.adoc
+  ```
+
+  This produces `dist/man/zoi.1`, `dist/man/zoi-rs.3`, and
+  `dist/man/zoi-lua.5`. Install each page into the matching man directory
+  (e.g. `zoi.1` goes into `/usr/share/man/man1`, `zoi-rs.3` into
+  `/usr/share/man/man3`, and `zoi-lua.5` into `/usr/share/man/man5`).
+
+  Pre-built binary archives do not include man pages. Source-based packages
+  should render them from the `man/` directory at build time with
+  `asciidoctor`; require it as a build dependency (`rubygem-asciidoctor` on
+  Fedora/RHEL, `asciidoctor` on Arch Linux).
 
 ## Existing Packaging Files
 

@@ -126,10 +126,6 @@ enum Commands {
         words: Vec<String>
     },
 
-    /// Generates man pages for zoi
-    #[command(hide = true)]
-    GenerateManual,
-
     /// Prints concise version and build information
     #[command(
         alias = "v",
@@ -934,7 +930,6 @@ pub fn run() -> anyhow::Result<()> {
                 index,
                 words
             } => cmd::complete::run(shell, index, &words),
-            Commands::GenerateManual => cmd::gen_man::run().map_err(Into::into),
             Commands::Version => {
                 cmd::version::run(BRANCH, STATUS, NUMBER, commit);
                 Ok(())
