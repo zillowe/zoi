@@ -92,21 +92,12 @@ impl SemVersion {
             };
 
         let clean = sanitize_version_string(version_str);
-        match Version::parse(&clean) {
-            Ok(parsed) => Ok(SemVersion {
-                epoch,
-                v: parsed,
-                original: v.to_string()
-            }),
-            Err(_) => {
-                // Fallback for extremely weird versions: use 0.0.0+original
-                Ok(SemVersion {
-                    epoch,
-                    v: Version::new(0, 0, 0),
-                    original: v.to_string()
-                })
-            }
-        }
+        let parsed = Version::parse(&clean)?;
+        Ok(SemVersion {
+            epoch,
+            v: parsed,
+            original: v.to_string()
+        })
     }
 }
 
