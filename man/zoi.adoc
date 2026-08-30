@@ -216,7 +216,7 @@ Zoi also manages declarative user environments and the underlying ZoiOS system.
 
 == See also
 
-*zbsdiff*(1), *zbspatch*(1), *zoi-rs*(3), *zoi-lua*(5)
+*zoi-rs*(3), *zoi-lua*(5)
 
 == Copying
 
