@@ -4,8 +4,8 @@ use std::fs;
 
 use tempfile::tempdir;
 use zoi::pkg::hooks::global::{
-    GlobalHook, HookTrigger, HookWhen, load_all_hooks,
-    trigger_matches_modified_files
+    GlobalHook, HookTrigger, HookWhen, get_system_hooks_dir,
+    get_user_hooks_dir, load_all_hooks, trigger_matches_modified_files
 };
 
 mod common;
@@ -160,7 +160,7 @@ fn test_hook_loading_is_deterministic_by_name() {
     ctx.set_env_var("HOME", &home);
     common::TestContextGuard::set_sysroot(root.clone());
 
-    let user_hooks = home.join(".zoi").join("hooks");
+    let user_hooks = get_user_hooks_dir().expect("user hooks dir should exist");
     let system_hooks = root.join("etc").join("zoi").join("hooks");
     fs::create_dir_all(&user_hooks).expect("user hooks dir should be created");
     fs::create_dir_all(&system_hooks)
@@ -212,8 +212,10 @@ fn test_hook_loading_precedence_and_builtin_flag() {
     ctx.set_env_var("HOME", &home);
     common::TestContextGuard::set_sysroot(root.clone());
 
-    let user_hooks_dir = home.join(".zoi").join("hooks");
-    let system_hooks_dir = root.join("etc").join("zoi").join("hooks");
+    let user_hooks_dir =
+        get_user_hooks_dir().expect("user hooks dir should exist");
+    let system_hooks_dir =
+        get_system_hooks_dir().expect("system hooks dir should exist");
     fs::create_dir_all(&user_hooks_dir)
         .expect("user hooks dir should be created");
     fs::create_dir_all(&system_hooks_dir)

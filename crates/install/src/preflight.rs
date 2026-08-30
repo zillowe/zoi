@@ -393,12 +393,12 @@ fn license_contains_denied(license: &str, denied: &HashSet<String>) -> bool {
     }
 
     if let Ok(expr) = spdx::Expression::parse(license) {
-        return !expr.evaluate(|req| match req.license {
+        return expr.requirements().any(|req| match &req.req.license {
             spdx::LicenseItem::Spdx { id, .. } => {
-                !denied.contains(&id.name.to_ascii_lowercase())
+                denied.contains(&id.name.to_ascii_lowercase())
             }
-            spdx::LicenseItem::Other { .. } => {
-                !denied.contains(&license.to_ascii_lowercase())
+            spdx::LicenseItem::Other(lic_ref) => {
+                denied.contains(&lic_ref.to_string().to_ascii_lowercase())
             }
         });
     }

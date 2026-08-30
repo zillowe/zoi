@@ -75,56 +75,14 @@ lint:
     - if: $CI_COMMIT_BRANCH
       changes: *code_changes
 
-test:unit:
+test:
   stage: test
   extends:
     - .rust_setup
   variables:
     RUSTFLAGS: "-Dwarnings"
   script:
-    - cargo test --all-features --workspace --exclude zoi-tests -- --test-threads=1
-  rules:
-    - if: $CI_COMMIT_TAG
-      when: never
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-      changes: *code_changes
-    - if: $CI_COMMIT_BRANCH
-      changes: *code_changes
-
-test:integration:
-  stage: test
-  extends:
-    - .rust_setup
-  variables:
-    RUSTFLAGS: "-Dwarnings"
-  script:
-    - |
-      set -euo pipefail
-      args=()
-      for test_file in ${TEST_FILES}; do
-        args+=(--test "${test_file}")
-      done
-      cargo test --all-features -p zoi-tests "${args[@]}" -- --test-threads=1
-  parallel:
-    matrix:
-      - TEST_FILES:
-          - >-
-            atomic_shims audit backup bwrap cli config conflicts db_collision
-            dependency_detection dependency_resolution dependency_types doctor
-            ephemeral extensions external_managers fakeroot
-          - >-
-            frozen_lockfile helper hooks install_reinstall_guard
-            install_scoping integration license_expressions
-            local_install_resolution lock man merge_3way mini offline
-            package_delta package_doctor package_parsing package_verify
-          - >-
-            plugins policy project_config project_workflows provides purl
-            registry relocation resolution revision rollback rollback_shim
-            sandbox security security_advisories service shell_hooks shims
-          - >-
-            split_packages stateful_shell sysroot task_runner telemetry
-            tool_versions transactions uninstall use_cmd utils ux zoiignore
-            zoios_detection zsa
+    - cargo test --workspace --all-targets --all-features 
   rules:
     - if: $CI_COMMIT_TAG
       when: never

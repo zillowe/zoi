@@ -81,19 +81,14 @@ fn test_remote_policy_merging() {
     let root = tmp.path().to_path_buf();
     common::TestContextGuard::set_sysroot(root.clone());
 
-    let policy_dir = if cfg!(windows) {
-        root.join("ProgramData/zoi")
-    } else {
-        root.join("etc/zoi")
-    };
-    std::fs::create_dir_all(&policy_dir).expect("unwrap failed");
-
+    let cache_dir = root.join("var").join("cache").join("zoi");
+    std::fs::create_dir_all(&cache_dir).expect("unwrap failed");
     let remote_policy_yaml = r"
 denied_packages:
   - evil-pkg
 allow_deny_lists_unoverridable: true
 ";
-    std::fs::write(policy_dir.join("policy.cache.yaml"), remote_policy_yaml)
+    std::fs::write(cache_dir.join("policy.cache.yaml"), remote_policy_yaml)
         .expect("unwrap failed");
 
     let cfg =

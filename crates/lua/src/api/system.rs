@@ -167,105 +167,124 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let cmd_fn = lua.create_function(move |lua, command: String| {
         let build_dir: String = lua.globals().get("BUILD_DIR")?;
 
-        let session_is_dead =
-            if let Some(session) = lua.app_data_ref::<ShellSession>() {
+        // A command such as `exit` can terminate the shell mid-call. Retry the
+        // command once against a freshly spawned session so `cmd` transparently
+        // recovers instead of failing on the next invocation.
+        let mut retried = false;
+
+        let (stdout_accum, stderr, exit_code) =
+            loop {
+                let session_is_dead =
+                    if let Some(session) = lua.app_data_ref::<ShellSession>() {
+                        let mut inner =
+                            session.inner.lock().expect("lock poisoned");
+                        inner.child.try_wait().map_or(true, |s| s.is_some())
+                    } else {
+                        true
+                    };
+
+                if retried || session_is_dead {
+                    let session =
+                        ShellSession::new(lua, &build_dir).map_err(|e| {
+                            mlua::Error::RuntimeError(e.to_string())
+                        })?;
+                    lua.set_app_data(session);
+                }
+
+                let session = lua
+                    .app_data_ref::<ShellSession>()
+                    .expect("ShellSession missing from app_data");
                 let mut inner = session.inner.lock().expect("lock poisoned");
-                inner.child.try_wait().map_or(true, |s| s.is_some())
-            } else {
-                true
+
+                if !quiet {
+                    println!("Executing: {command}");
+                }
+
+                // Clear stderr buffer before running command
+                if let Ok(mut buf) = inner.stderr_buffer.lock() {
+                    buf.clear();
+                }
+
+                let sentinel = inner.sentinel.clone();
+
+                if cfg!(target_os = "windows") {
+                    let cmd_text = format!(
+                        "$ErrorActionPreference = 'Continue'; & {{ {command} \
+                         }}; \"{sentinel} $LASTEXITCODE\"\n"
+                    );
+                    inner.stdin.write_all(cmd_text.as_bytes()).map_err(
+                        |e| mlua::Error::RuntimeError(e.to_string())
+                    )?;
+                    inner.stdin.flush().map_err(|e| {
+                        mlua::Error::RuntimeError(e.to_string())
+                    })?;
+                } else {
+                    let cmd_text = format!(
+                        "{{ {command} ; }} ; printf \"\\n%s %d\\n\" \
+                         {sentinel:?} $?\n"
+                    );
+                    inner.stdin.write_all(cmd_text.as_bytes()).map_err(
+                        |e| mlua::Error::RuntimeError(e.to_string())
+                    )?;
+                    inner.stdin.flush().map_err(|e| {
+                        mlua::Error::RuntimeError(e.to_string())
+                    })?;
+                }
+
+                let mut stdout_accum = String::new();
+                let mut line = String::new();
+                let mut exit_code = 0;
+
+                let mut session_died = false;
+                loop {
+                    line.clear();
+                    let n = inner.stdout.read_line(&mut line).map_err(|e| {
+                        mlua::Error::RuntimeError(e.to_string())
+                    })?;
+                    if n == 0 {
+                        session_died = true;
+                        break;
+                    }
+
+                    if let Some(idx) = line.find(&sentinel) {
+                        let out_part = &line[..idx];
+                        stdout_accum.push_str(out_part);
+
+                        let rest = line[idx..]
+                            .strip_prefix(&sentinel)
+                            .expect("sentinel missing")
+                            .trim();
+                        exit_code = rest.parse::<i32>().unwrap_or(0);
+                        break;
+                    }
+                    stdout_accum.push_str(&line);
+                }
+
+                if session_died && !retried {
+                    retried = true;
+                    continue;
+                }
+                if session_died {
+                    return Err(mlua::Error::RuntimeError(
+                        "Shell session ended unexpectedly".to_string()
+                    ));
+                }
+
+                // Retrieve captured stderr
+                let stderr = inner
+                    .stderr_buffer
+                    .lock()
+                    .map(|b| b.clone())
+                    .unwrap_or_default();
+
+                if exit_code != 0 && !quiet {
+                    eprintln!("[cmd] {stderr}");
+                }
+
+                break (stdout_accum.trim_end().to_string(), stderr, exit_code);
             };
 
-        if session_is_dead {
-            let session = ShellSession::new(lua, &build_dir)
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            lua.set_app_data(session);
-        }
-
-        let session = lua
-            .app_data_ref::<ShellSession>()
-            .expect("ShellSession missing from app_data");
-        let mut inner = session.inner.lock().expect("lock poisoned");
-
-        if !quiet {
-            println!("Executing: {command}");
-        }
-
-        // Clear stderr buffer before running command
-        if let Ok(mut buf) = inner.stderr_buffer.lock() {
-            buf.clear();
-        }
-
-        let sentinel = inner.sentinel.clone();
-
-        if cfg!(target_os = "windows") {
-            let cmd_text = format!(
-                "$ErrorActionPreference = 'Continue'; & {{ {command} }}; \
-                 \"{sentinel} $LASTEXITCODE\"\n"
-            );
-            inner
-                .stdin
-                .write_all(cmd_text.as_bytes())
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            inner
-                .stdin
-                .flush()
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-        } else {
-            let cmd_text = format!(
-                "{{ {command} ; }} ; printf \"\\n%s %d\\n\" {sentinel:?} $?\n"
-            );
-            inner
-                .stdin
-                .write_all(cmd_text.as_bytes())
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            inner
-                .stdin
-                .flush()
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-        }
-
-        let mut stdout_accum = String::new();
-        let mut line = String::new();
-        let exit_code;
-
-        loop {
-            line.clear();
-            let n = inner
-                .stdout
-                .read_line(&mut line)
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            if n == 0 {
-                return Err(mlua::Error::RuntimeError(
-                    "Shell session ended unexpectedly".to_string()
-                ));
-            }
-
-            if let Some(idx) = line.find(&sentinel) {
-                let out_part = &line[..idx];
-                stdout_accum.push_str(out_part);
-
-                let rest = line[idx..]
-                    .strip_prefix(&sentinel)
-                    .expect("sentinel missing")
-                    .trim();
-                exit_code = rest.parse::<i32>().unwrap_or(0);
-                break;
-            }
-            stdout_accum.push_str(&line);
-        }
-
-        // Retrieve captured stderr
-        let stderr = inner
-            .stderr_buffer
-            .lock()
-            .map(|b| b.clone())
-            .unwrap_or_default();
-
-        if exit_code != 0 && !quiet {
-            eprintln!("[cmd] {stderr}");
-        }
-
-        Ok((stdout_accum.trim_end().to_string(), stderr, exit_code))
+        Ok((stdout_accum, stderr, exit_code))
     })?;
     lua.globals().set("cmd", cmd_fn)?;
     Ok(())

@@ -178,7 +178,7 @@ lint-fix:
 
 # Run Zoi test suite
 test:
-    @cargo test --all-features -- --test-threads=1
+    @cargo test --workspace --all-targets --all-features
 
 # Bump Zoi version
 bump *args:
