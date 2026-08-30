@@ -93,8 +93,14 @@ pub struct AuditVerification {
     pub message: String
 }
 
-/// Returns the path to the audit log file.
-fn get_audit_log_path() -> Result<PathBuf> {
+/// Returns the path to the audit log file, creating the parent directory if
+/// needed.
+///
+/// # Errors
+///
+/// Returns an error if no suitable user state directory can be found, or if
+/// the audit directory cannot be created.
+pub fn get_audit_log_path() -> Result<PathBuf> {
     let zoi_dir = utils::get_user_state_dir()?.join("audit");
     if !zoi_dir.exists() {
         fs::create_dir_all(&zoi_dir)?;

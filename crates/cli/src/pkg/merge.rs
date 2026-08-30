@@ -182,7 +182,7 @@ mod tests {
         handle_backup_files(
             &old_dir,
             &new_dir,
-            &["config.txt".to_string()],
+            &["${pkgstore}/config.txt".to_string()],
             crate::pkg::types::Scope::User
         )
         .expect("Failed to handle backup files");
@@ -214,7 +214,7 @@ mod tests {
         handle_backup_files(
             &old_dir,
             &new_dir,
-            &["config.txt".to_string()],
+            &["${pkgstore}/config.txt".to_string()],
             crate::pkg::types::Scope::User
         )
         .expect("Failed to handle backup files");
@@ -246,7 +246,7 @@ mod tests {
         handle_backup_files(
             &old_dir,
             &new_dir,
-            &["config.txt".to_string()],
+            &["${pkgstore}/config.txt".to_string()],
             crate::pkg::types::Scope::User
         )
         .expect("Failed to handle backup files");
@@ -277,7 +277,7 @@ mod tests {
         handle_backup_files(
             &old_dir,
             &new_dir,
-            &["config.txt".to_string()],
+            &["${pkgstore}/config.txt".to_string()],
             crate::pkg::types::Scope::User
         )
         .expect("Failed to handle backup files");

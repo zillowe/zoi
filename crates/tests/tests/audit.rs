@@ -92,7 +92,8 @@ fn test_audit_hash_chain_verification_and_tamper_detection() {
     assert_eq!(report.total_entries, 2);
     assert_eq!(report.hashed_entries, 2);
 
-    let log_path = tmp.path().join(".zoi").join("audit.json");
+    let log_path =
+        audit::get_audit_log_path().expect("audit log path should resolve");
     let content =
         fs::read_to_string(&log_path).expect("audit log should exist");
     let mut log: audit::AuditLog =

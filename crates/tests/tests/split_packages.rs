@@ -189,6 +189,6 @@ fn db_update_and_query_sub_package() {
 fn local_file_source_with_sub_package_parses_correctly() {
     let source = format!("{}:dev", test_split_source());
     let req = resolve::parse_source_string(&source).expect("unwrap failed");
-    assert_eq!(req.name, "test-split");
+    assert_eq!(req.name, "test_sub_packages");
     assert_eq!(req.sub_package, Some("dev".to_string()));
 }

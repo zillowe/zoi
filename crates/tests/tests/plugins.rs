@@ -220,7 +220,7 @@ fn test_plugin_load_all_uses_deterministic_sorted_order() {
 
     ctx.set_env_var("HOME", root.clone());
 
-    let plugin_dir = root.join(".zoi/plugins");
+    let plugin_dir = root.join(".local/share/zoi/plugins");
     fs::create_dir_all(&plugin_dir).expect("unwrap failed");
     fs::write(
         plugin_dir.join("z-last.lua"),

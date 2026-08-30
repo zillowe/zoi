@@ -10,6 +10,9 @@
         "docs",
         "devel"
       ],
+      "main_sub_packages": [
+        "docs"
+      ],
       "vuln": [
         {
           "id": "ZSA-2026-D0042",
@@ -24,13 +27,19 @@
       "repo": "community",
       "repo_type": "community",
       "version": "1.0.0",
-      "description": "Community package"
+      "description": "Community package",
+      "sub_packages": [],
+      "main_sub_packages": [],
+      "vuln": []
     },
     "collision": {
       "repo": "extra",
       "repo_type": "official",
       "version": "1.2.3",
-      "description": "Colliding package"
+      "description": "Colliding package",
+      "sub_packages": [],
+      "main_sub_packages": [],
+      "vuln": []
     }
   }
 }
