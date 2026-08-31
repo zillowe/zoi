@@ -15,7 +15,8 @@ fn test_ephemeral_environment_path() {
     let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
 
-    common::TestContextGuard::set_sysroot(root.clone());
+    // Don't set sysroot to avoid bubblewrap sandbox
+    // common::TestContextGuard::set_sysroot(root.clone());
 
     let home = root.join("home");
     fs::create_dir_all(&home).expect("unwrap failed");
@@ -57,7 +58,29 @@ end
     );
 
     let db_root = resolve::get_db_root().expect("unwrap failed");
-    let pkg_db_dir = db_root.join(handle).join("core").join(pkg_name);
+    let registry_root = db_root.join(handle);
+    fs::create_dir_all(&registry_root).expect("unwrap failed");
+
+    // Create minimal repo.yaml so the resolver recognizes this as a synced
+    // registry
+    let repo_yaml_content = r#"name: "Test-Registry"
+description: "A test registry"
+handle: "zoidberg"
+advisory_prefix: "RSA"
+
+git:
+  - type: main
+    url: "https://example.com/registry.git"
+
+repos:
+  - name: core
+    type: official
+    active: true
+"#;
+    fs::write(registry_root.join("repo.yaml"), repo_yaml_content)
+        .expect("unwrap failed");
+
+    let pkg_db_dir = registry_root.join("core").join(pkg_name);
     fs::create_dir_all(&pkg_db_dir).expect("unwrap failed");
     let pkg_lua_path = pkg_db_dir.join(format!("{pkg_name}.pkg.lua"));
     fs::write(&pkg_lua_path, &pkg_lua_content).expect("unwrap failed");
