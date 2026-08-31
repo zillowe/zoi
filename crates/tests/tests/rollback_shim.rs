@@ -35,7 +35,7 @@ fn test_rollback_restores_shims() {
     fs::write(&bin_path, "echo hello").expect("unwrap failed");
 
     let manifest = types::InstallManifest {
-        name: "test-pkg".to_string(),
+        name: pkg_name.to_string(),
         version: "1.0.0".to_string(),
         epoch: 0,
         revision: "1".to_string(),

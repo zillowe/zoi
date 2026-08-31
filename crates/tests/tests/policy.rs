@@ -102,7 +102,10 @@ fn enforces_allowed_repo_exact_path() {
 }
 
 #[test]
-fn blocks_denied_license_in_expression() {
+fn allows_or_expression_with_denied_alternative() {
+    // MIT OR GPL-3.0-only. One is denied, but the other is not, so the
+    // package can legitimately satisfy the expression without the denied
+    // license and must NOT be blocked.
     let graph =
         graph_with_package("hello", "core", "MIT OR GPL-3.0-only", None);
     let policy = Policy {
@@ -110,7 +113,7 @@ fn blocks_denied_license_in_expression() {
         ..Default::default()
     };
 
-    assert!(check_policy_compliance_with_policy(&graph, &policy).is_err());
+    assert!(check_policy_compliance_with_policy(&graph, &policy).is_ok());
 }
 
 #[test]

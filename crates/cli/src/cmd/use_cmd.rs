@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use colored::Colorize;
 
 use crate::pkg::{config, types};
@@ -59,25 +59,24 @@ fn run_global(packages: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// Installs project packages and prompts to update 'zoi.lua'.
+/// Installs project packages, persisting them to 'zoi.yaml' when the project
+/// uses a declarative config, or instructing the user for scriptable 'zoi.lua'
+/// configs whose automatic saving is not supported.
 fn run_project(packages: &[String]) -> Result<()> {
-    if !std::path::Path::new("zoi.lua").exists() {
-        return Err(anyhow!(
-            "No 'zoi.lua' found in the current directory. Run 'zoi use \
-             --global' or initialize a project first."
-        ));
-    }
-
-    println!(
-        "{} Project uses zoi.lua. Automatic saving is not supported for Lua \
-         configurations.",
-        "Note:".yellow().bold()
-    );
-    println!(
-        "   Please add the following to your packages() block in zoi.lua:"
-    );
-    for pkg in packages {
-        println!("   - \"{pkg}\"");
+    if std::path::Path::new("zoi.lua").exists() {
+        println!(
+            "{} Project uses zoi.lua. Automatic saving is not supported for \
+             Lua configurations.",
+            "Note:".yellow().bold()
+        );
+        println!(
+            "   Please add the following to your packages() block in zoi.lua:"
+        );
+        for pkg in packages {
+            println!("   - \"{pkg}\"");
+        }
+    } else {
+        crate::project::config::add_packages_to_config(packages)?;
     }
 
     println!("{} Installing project packages...", "::".bold().blue());

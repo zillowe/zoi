@@ -137,5 +137,8 @@ fn test_package_rollback_requires_explicit_source_for_ambiguous_name_matches() {
     local::write_manifest(&extra_manifest).expect("unwrap failed");
 
     let err = rollback::run("shared", true).expect_err("unwrap_err failed");
-    assert!(err.to_string().contains("ambiguous"));
+    assert!(
+        err.to_string().to_lowercase().contains("ambiguous"),
+        "expected an ambiguous-name error, got: {err}"
+    );
 }

@@ -29,6 +29,9 @@ DEBUG_SRC_BIN := "target/debug/" + NAME + EXE_EXT
 MINI_DEBUG_SRC_BIN := "target/debug/" + MINI_NAME + EXE_EXT
 DAEMON_DEBUG_SRC_BIN := "target/debug/" + DAEMON_NAME + EXE_EXT
 
+export RUSTFLAGS := "-Dwarnings"
+export RUST_BACKTRACE := "1"
+
 [private]
 _is_configured := if path_exists("config.just") == "true" { "true" } else { "false" }
 
@@ -146,6 +149,7 @@ clean:
     @echo "Cleaning project artifacts..."
     @cargo clean
     @rm -f config.just
+    @rm -rf dist/
     @echo "Cleaned."
 
 # Configure the Justfile
@@ -170,11 +174,11 @@ check:
 
 # Run lints on Rust code
 lint:
-    @cargo clippy --workspace --all-targets --all-features -- -D warnings
+    @cargo clippy --workspace --all-targets --all-features
 
 # Run lints on Rust code and apply fixes where possible
 lint-fix:
-    @cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged -- -D warnings
+    @cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged
 
 # Run Zoi test suite
 test:

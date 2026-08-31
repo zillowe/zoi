@@ -23,6 +23,28 @@
         }
       ]
     },
+    "@zillowe/hello": {
+      "repo": "zillowe",
+      "repo_type": "official",
+      "version": "4.0.0",
+      "description": "Hello World",
+      "sub_packages": [
+        "docs",
+        "devel"
+      ],
+      "main_sub_packages": [
+        "docs"
+      ],
+      "vuln": [
+        {
+          "id": "ZSA-2026-D0042",
+          "severity": "critical",
+          "affected_range": ">=3.0.0, <4.0.0",
+          "fixed_in": "4.0.0",
+          "summary": "Buffer overflow"
+        }
+      ]
+    },
     "test-community": {
       "repo": "community",
       "repo_type": "community",
@@ -32,7 +54,25 @@
       "main_sub_packages": [],
       "vuln": []
     },
+    "@community/test-community": {
+      "repo": "community",
+      "repo_type": "community",
+      "version": "1.0.0",
+      "description": "Community package",
+      "sub_packages": [],
+      "main_sub_packages": [],
+      "vuln": []
+    },
     "collision": {
+      "repo": "extra",
+      "repo_type": "official",
+      "version": "1.2.3",
+      "description": "Colliding package",
+      "sub_packages": [],
+      "main_sub_packages": [],
+      "vuln": []
+    },
+    "@extra/collision": {
       "repo": "extra",
       "repo_type": "official",
       "version": "1.2.3",

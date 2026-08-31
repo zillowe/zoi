@@ -1111,8 +1111,10 @@ pub struct Config {
     #[serde(default)]
     pub native_package_manager: Option<String>,
     /// Whether telemetry collection is enabled.
+    #[serde(default)]
     pub telemetry_enabled: bool,
     /// Whether audit logging is enabled.
+    #[serde(default)]
     pub audit_log_enabled: bool,
     /// The handle of the primary registry.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1139,11 +1141,13 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub jobs: Option<usize>,
     /// Whether to protect the Zoi database from unauthorized modifications.
+    #[serde(default)]
     pub protect_db: bool,
     /// The maximum depth for recursive dependency resolution.
     #[serde(default)]
     pub max_resolution_depth: Option<u8>,
     /// Whether Zoi should operate in offline mode.
+    #[serde(default)]
     pub offline_mode: bool,
     /// The list of directories where packages are stored.
     #[serde(default)]

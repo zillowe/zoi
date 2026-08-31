@@ -393,12 +393,18 @@ fn license_contains_denied(license: &str, denied: &HashSet<String>) -> bool {
     }
 
     if let Ok(expr) = spdx::Expression::parse(license) {
-        return expr.requirements().any(|req| match &req.req.license {
+        // An expression counts as "denied" only when it cannot be satisfied
+        // without relying on a denied license. For `A OR B` where only B is
+        // denied, `evaluate` succeeds (the A branch is acceptable) so the
+        // package must NOT be blocked - the user can legitimately choose A.
+        // For `A AND B`, `evaluate` fails because B is required, so the
+        // package IS blocked.
+        return !expr.evaluate(|req| match &req.license {
             spdx::LicenseItem::Spdx { id, .. } => {
-                denied.contains(&id.name.to_ascii_lowercase())
+                !denied.contains(&id.name.to_ascii_lowercase())
             }
             spdx::LicenseItem::Other(lic_ref) => {
-                denied.contains(&lic_ref.to_string().to_ascii_lowercase())
+                !denied.contains(&lic_ref.to_string().to_ascii_lowercase())
             }
         });
     }

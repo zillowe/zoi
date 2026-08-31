@@ -137,8 +137,18 @@ repos:
     assert!(final_content.contains(&format!("id: {expected_id}")));
 
     let advisories_json = fs::read_to_string(reg_path.join("advisories.json"))?;
-    assert!(advisories_json.contains("\"0001\": \"vuln-pkg\""));
-    assert!(advisories_json.contains("\"version\": \"1\""));
+    assert!(
+        advisories_json.contains(&expected_id),
+        "advisories.json should key the advisory by its full ID"
+    );
+    assert!(
+        advisories_json.contains("vuln-pkg"),
+        "advisories.json should point to the advisory file path"
+    );
+    assert!(
+        advisories_json.contains("\"version\": \"2\""),
+        "advisories.json should use the current format version"
+    );
 
     Ok(())
 }

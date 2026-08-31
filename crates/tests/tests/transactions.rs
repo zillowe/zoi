@@ -78,9 +78,9 @@ fn test_transaction_lifecycle() {
 
     let mut transaction = transaction::begin().expect("unwrap failed");
     let id = transaction.id.clone();
-    let transaction_path = tmp
-        .path()
-        .join(".zoi/transactions")
+    let transaction_path = zoi::pkg::utils::get_user_state_dir()
+        .expect("unwrap failed")
+        .join("transactions")
         .join(format!("{id}.json"));
 
     assert!(
@@ -239,11 +239,13 @@ fn rollback_should_retain_log_when_an_operation_fails() {
     .expect("unwrap failed");
 
     assert!(transaction::rollback(&id).is_err());
+    let transaction_path = zoi::pkg::utils::get_user_state_dir()
+        .expect("unwrap failed")
+        .join("transactions")
+        .join(format!("{id}.json"));
     assert!(
-        tmp.path()
-            .join(".zoi/transactions")
-            .join(format!("{id}.json"))
-            .exists()
+        transaction_path.exists(),
+        "failed rollback should retain the transaction log"
     );
 }
 

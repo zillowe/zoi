@@ -73,7 +73,7 @@ fn test_lua_zlicense_records_zcp_operation() {
     );
     assert_eq!(
         op.get::<String>("destination").expect("unwrap failed"),
-        "${pkgstore}/LICENSE"
+        "${pkgstore}/LICENSE.txt"
     );
 }
 

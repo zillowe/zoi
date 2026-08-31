@@ -45,8 +45,12 @@ metadata({
     )
     .expect("unwrap failed");
 
-    let plugin_path = root.join(".zoi/plugins/my-plugin.lua");
-    let hook_path = root.join(".zoi/hooks/my-hook.hook.yaml");
+    let plugin_path = zoi_core::utils::get_user_data_dir()
+        .expect("unwrap failed")
+        .join("plugins/my-plugin.lua");
+    let hook_path = zoi_hooks::global::get_user_hooks_dir()
+        .expect("unwrap failed")
+        .join("my-hook.hook.yaml");
 
     assert!(plugin_path.exists(), "Plugin file should be created");
     assert!(hook_path.exists(), "Hook file should be created");
@@ -355,7 +359,10 @@ metadata({
         Some(&pm)
     )
     .expect("unwrap failed");
-    assert!(root.join(".zoi/plugins/original-plugin.lua").exists());
+    let plugin_path = zoi_core::utils::get_user_data_dir()
+        .expect("unwrap failed")
+        .join("plugins/original-plugin.lua");
+    assert!(plugin_path.exists(), "Plugin file should be created");
 
     fs::write(
         &pkg_lua_path,
@@ -384,8 +391,11 @@ metadata({
         Some(&pm)
     )
     .expect("unwrap failed");
+    let plugin_path = zoi_core::utils::get_user_data_dir()
+        .expect("unwrap failed")
+        .join("plugins/original-plugin.lua");
     assert!(
-        !root.join(".zoi/plugins/original-plugin.lua").exists(),
+        !plugin_path.exists(),
         "remove should revert the installed extension metadata, not the \
          current source metadata"
     );
@@ -443,7 +453,10 @@ metadata({
         Some(&pm)
     )
     .expect("unwrap failed");
-    assert!(root.join(".zoi/plugins/hook-plugin.lua").exists());
+    let plugin_path = zoi_core::utils::get_user_data_dir()
+        .expect("unwrap failed")
+        .join("plugins/hook-plugin.lua");
+    assert!(plugin_path.exists());
 
     extension::remove(
         pkg_lua_path.to_str().expect("unwrap failed"),
@@ -451,5 +464,8 @@ metadata({
         Some(&pm)
     )
     .expect("unwrap failed");
-    assert!(!root.join(".zoi/plugins/hook-plugin.lua").exists());
+    let plugin_path = zoi_core::utils::get_user_data_dir()
+        .expect("unwrap failed")
+        .join("plugins/hook-plugin.lua");
+    assert!(!plugin_path.exists());
 }

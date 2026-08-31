@@ -82,7 +82,7 @@ test:
   variables:
     RUSTFLAGS: "-Dwarnings"
   script:
-    - cargo test --workspace --all-targets --all-features 
+    - cargo test --workspace --all-targets --all-features
   rules:
     - if: $CI_COMMIT_TAG
       when: never

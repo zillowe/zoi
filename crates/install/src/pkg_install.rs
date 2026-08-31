@@ -509,7 +509,13 @@ fn finalize_installation(
                 version_dir,
                 scope
             )?;
-            let backup_src = PathBuf::from(expanded_path);
+            // Backup paths in package metadata are relative to the package
+            // store (version dir), so resolve them against it here.
+            let backup_src = if Path::new(&expanded_path).is_absolute() {
+                PathBuf::from(expanded_path)
+            } else {
+                version_dir.join(expanded_path)
+            };
 
             if backup_src.exists() && backup_src.is_file() {
                 let mut orig_path = backup_src.clone();

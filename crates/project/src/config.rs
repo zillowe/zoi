@@ -72,8 +72,10 @@ pub struct ProjectConfig {
     /// Declarative package checks (legacy v1).
     #[serde(default)]
     pub packages: Vec<PackageCheck>,
-    /// A flat list of simple package dependencies.
-    #[serde(default)]
+    /// A flat list of simple package dependencies. Each entry may be a plain
+    /// package name (e.g. `eza`) or a version requirement expressed as a map
+    /// (e.g. `fzf: "0.44.1"`, which is normalized to `fzf@0.44.1`).
+    #[serde(default, deserialize_with = "deserialize_pkgs")]
     pub pkgs: Vec<String>,
     /// A map of packages defining explicit version requirements and options.
     #[serde(default)]
@@ -90,6 +92,40 @@ pub struct ProjectConfig {
     /// Ephemeral shell configurations.
     #[serde(default)]
     pub shell: Option<ShellSpec>
+}
+
+/// Deserializes the flat `pkgs` list where each entry can either be a plain
+/// package name or a map of `name -> version` (e.g. `fzf: "0.44.1"`). Versioned
+/// entries are normalized to the canonical `name@version` form.
+fn deserialize_pkgs<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>
+{
+    let entries = Vec::<serde_yaml::Value>::deserialize(deserializer)
+        .map_err(serde::de::Error::custom)?;
+
+    let mut pkgs = Vec::new();
+    for entry in entries {
+        match entry {
+            serde_yaml::Value::String(name) => pkgs.push(name),
+            serde_yaml::Value::Mapping(map) => {
+                for (name, version) in map {
+                    let name =
+                        name.as_str().map(str::to_string).unwrap_or_default();
+                    if let Some(ver) = version.as_str() {
+                        pkgs.push(format!("{name}@{ver}"));
+                    } else if let serde_yaml::Value::Number(num) = version {
+                        pkgs.push(format!("{name}@{num}"));
+                    } else {
+                        pkgs.push(name);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(pkgs)
 }
 
 /// A declarative package check.

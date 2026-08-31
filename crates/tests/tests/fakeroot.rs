@@ -1,10 +1,12 @@
 //! Integration tests for fakeroot-based package building.
 
 use std::fs;
+use std::io::Read;
 
 use tar::Archive;
 use tempfile::tempdir;
 use zoi::pkg::package::build;
+use zoi_core::types::PooledZpaManifest;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
 mod common;
@@ -68,24 +70,74 @@ end
     let archive_path = output_dir.join(archive_filename);
     assert!(archive_path.exists());
 
-    let file = fs::File::open(archive_path).expect("unwrap failed");
+    // Read the pooled manifest to verify the binary is mapped to the pool as
+    // root-owned.
+    let file = fs::File::open(&archive_path).expect("unwrap failed");
+    let decoder = ZstdDecoder::new(file).expect("unwrap failed");
+    let mut archive = Archive::new(decoder);
+    let mut manifest = None;
+    for entry in archive.entries().expect("unwrap failed") {
+        let mut entry = entry.expect("unwrap failed");
+        if entry
+            .path()
+            .expect("unwrap failed")
+            .to_string_lossy()
+            .ends_with("manifest.json")
+        {
+            let mut json = String::new();
+            entry.read_to_string(&mut json).expect("unwrap failed");
+            manifest = Some(
+                serde_json::from_str::<PooledZpaManifest>(&json)
+                    .expect("manifest should be a valid pooled manifest")
+            );
+        }
+    }
+    let manifest = manifest.expect("manifest.json should exist in the archive");
+    assert!(!manifest.pool.is_empty(), "pool should not be empty");
+
+    let scope_mapping = manifest
+        .mappings
+        .get("")
+        .and_then(|m| m.scopes.get(&zoi_core::types::Scope::User))
+        .expect("main package should have a User scope mapping");
+    let mapped = scope_mapping
+        .files
+        .iter()
+        .find(|f| f.dest.ends_with("bin/test-bin"))
+        .expect("bin/test-bin should be in the manifest");
+    assert_eq!(
+        mapped.owner.as_deref(),
+        Some("root"),
+        "manifest should record the binary as owned by root"
+    );
+    assert_eq!(
+        mapped.group.as_deref(),
+        Some("root"),
+        "manifest should record the binary as grouped by root"
+    );
+
+    // Stream the pooled file (whose name is the manifest hash key) out of the
+    // archive and verify its on-disk tar owner matches root (UID/GID 0).
+    let file = fs::File::open(&archive_path).expect("unwrap failed");
     let decoder = ZstdDecoder::new(file).expect("unwrap failed");
     let mut archive = Archive::new(decoder);
 
     let mut found_bin = false;
     for entry in archive.entries().expect("unwrap failed") {
         let entry = entry.expect("unwrap failed");
-        let header = entry.header();
         let path = entry.path().expect("unwrap failed");
+        let path_str = path.to_string_lossy();
 
-        if path.to_string_lossy().contains("bin/test-bin") {
+        // Pool files are named after their manifest hash key
+        // ("sha256-<hex>").
+        if path_str.ends_with(&format!("/{}", mapped.hash)) {
             assert_eq!(
-                header.uid().expect("unwrap failed"),
+                entry.header().uid().expect("unwrap failed"),
                 0,
                 "UID should be 0 (root)"
             );
             assert_eq!(
-                header.gid().expect("unwrap failed"),
+                entry.header().gid().expect("unwrap failed"),
                 0,
                 "GID should be 0 (root)"
             );
@@ -93,5 +145,8 @@ end
         }
     }
 
-    assert!(found_bin, "Should have found test-bin in the archive");
+    assert!(
+        found_bin,
+        "Should have found the pooled binary in the archive"
+    );
 }

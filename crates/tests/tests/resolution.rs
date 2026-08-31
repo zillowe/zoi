@@ -150,6 +150,16 @@ fn test_resolve_requested_version_spec_registry_channel_and_exact() {
     };
     config::write_user_config(&cfg).expect("config should write");
 
+    // The resolver only treats a directory as a synced registry when it
+    // carries a `repo.yaml`/`packages.json` marker at its root.
+    let reg_root = db_dir.join("testreg");
+    fs::create_dir_all(&reg_root).expect("reg dir should be created");
+    fs::write(
+        reg_root.join("repo.yaml"),
+        "name: testreg\nhandle: testreg\n"
+    )
+    .expect("repo.yaml should write");
+
     let pkg_dir = db_dir
         .join("testreg")
         .join("core")

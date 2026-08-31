@@ -24,9 +24,13 @@ pub(crate) struct TestContextGuard {
 
 impl TestContextGuard {
     pub(crate) fn acquire() -> Self {
+        // The lock only serializes environment/working-directory mutations
+        // between tests. A panic while another test holds the lock poisons it;
+        // recover rather than failing so a single failure doesn't cascade and
+        // mask the results of the remaining tests.
         let lock = test_context_mutex()
             .lock()
-            .expect("test context lock should not be poisoned");
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let previous_sysroot = sysroot::get_sysroot();
 
         let mut guard = Self {

@@ -45,8 +45,24 @@ pub fn handle_backup_files(
             scope
         )?;
 
-        let old_path = std::path::PathBuf::from(old_expanded);
-        let new_path = std::path::PathBuf::from(new_expanded);
+        // Backup paths in package metadata are relative to the package store
+        // (version dir), so resolve them against the corresponding version dir.
+        let old_path = {
+            let p = std::path::PathBuf::from(old_expanded);
+            if p.is_absolute() {
+                p
+            } else {
+                old_version_dir.join(p)
+            }
+        };
+        let new_path = {
+            let p = std::path::PathBuf::from(new_expanded);
+            if p.is_absolute() {
+                p
+            } else {
+                new_version_dir.join(p)
+            }
+        };
 
         // Zoi creates .zoiorig in pkg_install.rs
         let mut old_orig_path = old_path.clone();

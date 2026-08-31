@@ -93,7 +93,8 @@ fn read_config_from_path(path: &Path) -> Result<Config> {
 ///
 /// Returns an error if any of the configuration files cannot be read or parsed.
 pub fn read_config() -> Result<Config> {
-    let system_val = read_yaml_value(&get_system_config_path())?;
+    let system_path = get_system_config_path();
+    let system_val = read_yaml_value(&system_path)?;
     let user_val = read_yaml_value(&get_user_config_path()?)?;
     let project_val = read_yaml_value(&get_project_config_path()?)?;
 

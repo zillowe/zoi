@@ -318,8 +318,10 @@ pub fn fetch_and_store_purl_package(purl_str: &str) -> Result<String> {
     let db_root = zoi_core::utils::get_db_root()?;
 
     let mut fetched = std::collections::HashSet::new();
-    let packages_key =
-        format!("@{}/{}", resolved.package_info.repo, resolved.package_path);
+    let repo_path =
+        format!("{}/{}", resolved.package_info.repo, resolved.package_path);
+    // The leading `@` marks the key as repo-scoped for the index lookup.
+    let packages_key = format!("@{repo_path}");
     fetch_and_store_recursive(
         &resolved.registry_handle,
         &resolved.registry,
@@ -330,8 +332,8 @@ pub fn fetch_and_store_purl_package(purl_str: &str) -> Result<String> {
     )?;
 
     let ident = format!(
-        "#{}@{}@{}",
-        resolved.registry_handle, packages_key, resolved.version
+        "#{}@{repo_path}@{}",
+        resolved.registry_handle, resolved.version
     );
     Ok(ident)
 }

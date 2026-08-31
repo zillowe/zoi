@@ -46,7 +46,9 @@ fn test_use_cmd_global_updates_config() {
 
     let _ = use_cmd::run(&[pkg_spec], true);
 
-    let config_path = root.join(".zoi/pkgs/config.yaml");
+    let config_path = zoi::pkg::utils::get_user_config_dir()
+        .expect("unwrap failed")
+        .join("config.yaml");
     assert!(config_path.exists(), "Config file should have been created");
 
     let content = fs::read_to_string(&config_path).expect("unwrap failed");
