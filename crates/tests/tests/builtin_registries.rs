@@ -72,6 +72,10 @@ fn set_registry_persists_metadata_from_builtin() -> Result<()> {
         default.url, "https://gitlab.com/zillowe/zillwen/zusty/zoidberg",
         "URL should come from the built-in definition"
     );
+    assert!(
+        default.authorities.as_ref().is_none_or(|v| !v.is_empty()),
+        "authorities must be None or a non-empty list, never Some(vec![])"
+    );
     Ok(())
 }
 

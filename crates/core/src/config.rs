@@ -780,6 +780,26 @@ pub fn remove_cache_mirror(url: &str) -> Result<()> {
     }
 }
 
+/// Returns the built-in trust authorities for a built-in registry.
+///
+/// Only the official `set` registry carries Zoi's built-in Root-of-Trust
+/// authorities (the PGP keys embedded at build time). Third-party and other
+/// built-in registries have no authorities and return `None` so their state is
+/// not implicitly trusted.
+fn authorities_for_builtin(
+    builtin: &crate::types::BuiltinRegistry
+) -> Option<Vec<String>> {
+    if !builtin.set {
+        return None;
+    }
+    let authorities = get_builtin_authorities();
+    if authorities.is_empty() {
+        None
+    } else {
+        Some(authorities)
+    }
+}
+
 /// Sets the default registry in the user-specific configuration.
 ///
 /// Accepts either a built-in registry handle (e.g. `zoidberg`) or a URL. When
@@ -796,13 +816,14 @@ pub fn set_default_registry(url_or_handle: &str) -> Result<()> {
 
     let registry =
         if let Some(builtin) = crate::builtin::registry::get(url_or_handle) {
+            let authorities = authorities_for_builtin(&builtin);
             Registry {
                 handle: builtin.handle.clone(),
                 url: builtin.git,
                 name: Some(builtin.name),
                 description: Some(builtin.description),
                 advisory_prefix: None,
-                authorities: None
+                authorities
             }
         } else {
             Registry {
@@ -846,16 +867,18 @@ pub fn set_user_default_registry(
 pub fn add_added_registry(url_or_handle: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
 
-    let (handle, url, name, description) =
+    let (handle, url, name, description, authorities) =
         if let Some(builtin) = crate::builtin::registry::get(url_or_handle) {
+            let authorities = authorities_for_builtin(&builtin);
             (
                 Some(builtin.handle),
                 builtin.git,
                 Some(builtin.name),
-                Some(builtin.description)
+                Some(builtin.description),
+                authorities
             )
         } else {
-            (None, url_or_handle.to_string(), None, None)
+            (None, url_or_handle.to_string(), None, None, None)
         };
 
     if config.added_registries.iter().any(|r| r.url == url)
@@ -875,7 +898,7 @@ pub fn add_added_registry(url_or_handle: &str) -> Result<()> {
         name,
         description,
         advisory_prefix: None,
-        authorities: None
+        authorities
     });
     write_user_config(&config)
 }
