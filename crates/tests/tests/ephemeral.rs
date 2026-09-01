@@ -31,6 +31,8 @@ fn test_ephemeral_environment_path() {
         default_registry: Some(types::Registry {
             handle: handle.to_string(),
             url: "http://dummy".to_string(),
+            name: None,
+            description: None,
             advisory_prefix: None,
             authorities: None
         }),

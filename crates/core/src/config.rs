@@ -355,17 +355,50 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.default_registry = Some(Registry {
             handle: String::new(),
             url,
+            name: None,
+            description: None,
             advisory_prefix: None,
             authorities: None
         });
     }
 
     if merged_cfg.default_registry.is_none() {
+        // Derive the default registry from the single built-in `set` registry
+        // (Zoidberg) when none has been configured by the user.
+        let set_registry = crate::builtin::registry::get_set();
+        let (handle, url, advisory_prefix, authorities) = match set_registry {
+            Ok(Some(reg)) => {
+                let builtin = get_builtin_authorities();
+                (
+                    reg.handle,
+                    reg.git,
+                    Some("ZSA".to_string()),
+                    if builtin.is_empty() {
+                        None
+                    } else {
+                        Some(builtin)
+                    }
+                )
+            }
+            // No set registry found, or the built-in definitions are
+            // invalid. Fall back to the historical zoidberg defaults.
+            Ok(None) | Err(_) => (
+                "zoidberg".to_string(),
+                get_default_registry(),
+                Some("ZSA".to_string()),
+                {
+                    let b = get_builtin_authorities();
+                    if b.is_empty() { None } else { Some(b) }
+                }
+            )
+        };
         merged_cfg.default_registry = Some(Registry {
-            handle: "zoidberg".to_string(),
-            url: get_default_registry(),
-            advisory_prefix: Some("ZSA".to_string()),
-            authorities: Some(get_builtin_authorities())
+            handle,
+            url,
+            name: None,
+            description: None,
+            advisory_prefix,
+            authorities
         });
     } else if let Some(ref mut reg) = merged_cfg.default_registry
         && reg.url == get_default_registry()
@@ -747,19 +780,42 @@ pub fn remove_cache_mirror(url: &str) -> Result<()> {
     }
 }
 
-/// Sets the default registry URL in the user-specific configuration.
+/// Sets the default registry in the user-specific configuration.
+///
+/// Accepts either a built-in registry handle (e.g. `zoidberg`) or a URL. When
+/// a handle matching a built-in registry is given, its metadata is used to
+/// populate the registry entry. This effectively marks that registry as the
+/// single "set" (default) registry for Zoi, so setting a new registry clears
+/// any previously set default.
 ///
 /// # Errors
 ///
 /// Returns an error if the configuration cannot be written.
-pub fn set_default_registry(url: &str) -> Result<()> {
+pub fn set_default_registry(url_or_handle: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
-    config.default_registry = Some(Registry {
-        handle: String::new(),
-        url: url.to_string(),
-        advisory_prefix: None,
-        authorities: None
-    });
+
+    let registry =
+        if let Some(builtin) = crate::builtin::registry::get(url_or_handle) {
+            Registry {
+                handle: builtin.handle.clone(),
+                url: builtin.git,
+                name: Some(builtin.name),
+                description: Some(builtin.description),
+                advisory_prefix: None,
+                authorities: None
+            }
+        } else {
+            Registry {
+                handle: String::new(),
+                url: url_or_handle.to_string(),
+                name: None,
+                description: None,
+                advisory_prefix: None,
+                authorities: None
+            }
+        };
+
+    config.default_registry = Some(registry);
     write_user_config(&config)
 }
 
@@ -776,21 +832,48 @@ pub fn set_user_default_registry(
     write_user_config(&config)
 }
 
-/// Adds a registry URL to the list of added registries in the user-specific
+/// Adds a registry to the list of added registries in the user-specific
 /// configuration.
+///
+/// Accepts either a built-in registry handle (e.g. `docker`) or a URL. When a
+/// handle matching a built-in registry is given, its metadata is used to
+/// populate the registry entry.
 ///
 /// # Errors
 ///
-/// Returns an error if the registry already exists or the configuration cannot
-/// be written.
-pub fn add_added_registry(url: &str) -> Result<()> {
+/// Returns an error if the registry already exists, or if the configuration
+/// cannot be written.
+pub fn add_added_registry(url_or_handle: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
-    if config.added_registries.iter().any(|r| r.url == url) {
-        return Err(anyhow!("Registry with URL '{url}' already exists."));
+
+    let (handle, url, name, description) =
+        if let Some(builtin) = crate::builtin::registry::get(url_or_handle) {
+            (
+                Some(builtin.handle),
+                builtin.git,
+                Some(builtin.name),
+                Some(builtin.description)
+            )
+        } else {
+            (None, url_or_handle.to_string(), None, None)
+        };
+
+    if config.added_registries.iter().any(|r| r.url == url)
+        || config
+            .added_registries
+            .iter()
+            .any(|r| handle.as_deref().is_some_and(|h| r.handle == h))
+    {
+        return Err(anyhow!(
+            "Registry with URL or handle '{url_or_handle}' already exists."
+        ));
     }
+
     config.added_registries.push(Registry {
-        handle: String::new(),
-        url: url.to_string(),
+        handle: handle.unwrap_or_default(),
+        url,
+        name,
+        description,
         advisory_prefix: None,
         authorities: None
     });

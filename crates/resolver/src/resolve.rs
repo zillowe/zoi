@@ -439,6 +439,17 @@ fn find_package_in_db(
                     Some(registry.handle.clone())
                 )
             } else {
+                // The handle is neither the default nor an added registry. If
+                // it corresponds to a known built-in registry, guide the user
+                // to add it.
+                if let Some(builtin) = zoi_core::builtin::registry::get(h) {
+                    return Err(anyhow!(
+                        "This package is from registry '{}' which you haven't \
+                         added. Run 'zoi sync add {}' to add it.",
+                        builtin.handle,
+                        builtin.handle
+                    ));
+                }
                 return Err(anyhow!("Registry with handle '{h}' not found."));
             }
         } else {
@@ -1629,6 +1640,11 @@ fn resolve_source_recursive(
             git_sha: None
         }
     } else if zoi_core::utils::is_mini_mode() {
+        let set_reg = zoi_core::builtin::registry::get_set()?;
+        let registry_handle = set_reg
+            .as_ref()
+            .map_or_else(|| "default".to_string(), |r| r.handle.clone());
+
         let index = crate::mini_resolve::fetch_registry_index()?;
 
         let (repo, repo_type) = if let Some(r) = &request.repo {
@@ -1645,7 +1661,7 @@ fn resolve_source_recursive(
             let pkg_info =
                 index.packages.get(&request.name).ok_or_else(|| {
                     anyhow!(
-                        "Package '{}' not found in Zoidberg registry index",
+                        "Package '{}' not found in registry index",
                         request.name
                     )
                 })?;
@@ -1657,7 +1673,7 @@ fn resolve_source_recursive(
         let mut resolved = download_from_url(&lua_url)?;
         resolved.repo_name = Some(repo.clone());
         resolved.repo_type = Some(repo_type.clone());
-        resolved.registry_handle = Some("zoidberg".to_string());
+        resolved.registry_handle = Some(registry_handle);
 
         resolved.source_type = if repo_type == "official" {
             SourceType::OfficialRepo

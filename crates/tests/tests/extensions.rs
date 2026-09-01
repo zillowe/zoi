@@ -79,6 +79,8 @@ fn test_extension_remove_restores_previous_default_registry() {
         default_registry: Some(types::Registry {
             handle: String::new(),
             url: "https://example.com/original.git".to_string(),
+            name: None,
+            description: None,
             advisory_prefix: None,
             authorities: None
         }),
@@ -147,6 +149,8 @@ fn test_extension_add_failure_restores_previous_default_registry() {
         default_registry: Some(types::Registry {
             handle: String::new(),
             url: "https://example.com/original.git".to_string(),
+            name: None,
+            description: None,
             advisory_prefix: None,
             authorities: None
         }),

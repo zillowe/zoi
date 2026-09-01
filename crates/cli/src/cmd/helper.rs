@@ -20,8 +20,8 @@ pub enum HelperCommands {
     /// Get a hash of a local file or a file from a URL
     GetHash(GetHashCommand),
 
-    /// Validate a Zoi specification file (e.g. registries.json, repo.yaml,
-    /// advisories.json)
+    /// Validate a Zoi specification file (e.g. repo.yaml, a built-in
+    /// `<registry>.yaml`, a `<hook>.hook.yaml`, advisories.json)
     #[command(alias = "val")]
     Validate(ValidateCommand),
 

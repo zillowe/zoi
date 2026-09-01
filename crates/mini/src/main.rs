@@ -123,12 +123,23 @@ fn main() {
     }
 }
 
+/// Returns the handle of the set (default) built-in registry, falling back to
+/// "zoidberg" if the built-in definitions are invalid.
+fn set_registry_handle() -> String {
+    zoi_core::builtin::registry::get_set()
+        .ok()
+        .flatten()
+        .map_or_else(|| "zoidberg".to_string(), |r| r.handle)
+}
+
 /// Resolves and installs a package from the central registry.
 fn install(package_spec: &str, yes: bool) -> Result<()> {
+    let registry_handle = set_registry_handle();
     println!(
-        "{} Resolving {} from Zoidberg...",
+        "{} Resolving {} from {}...",
         "::".bold().blue(),
-        package_spec.cyan()
+        package_spec.cyan(),
+        registry_handle.cyan()
     );
 
     let index = mini_resolve::fetch_registry_index()?;
@@ -145,7 +156,9 @@ fn install(package_spec: &str, yes: bool) -> Result<()> {
         (explicit_repo, match_in_index)
     } else {
         let pkg_info = index.packages.get(&pkg_name).ok_or_else(|| {
-            anyhow!("Package '{pkg_name}' not found in Zoidberg registry")
+            anyhow!(
+                "Package '{pkg_name}' not found in {registry_handle} registry"
+            )
         })?;
 
         let is_repo_active = repo_config
@@ -177,7 +190,11 @@ fn install(package_spec: &str, yes: bool) -> Result<()> {
     }
 
     let source = zoi_cli::pkg::local::package_source_string(
-        "zoidberg", &repo, &pkg_name, None, ""
+        &registry_handle,
+        &repo,
+        &pkg_name,
+        None,
+        ""
     );
     let normalized_source = source.trim_end_matches('@');
 
@@ -192,10 +209,12 @@ fn install(package_spec: &str, yes: bool) -> Result<()> {
 
 /// Updates a previously installed package.
 fn update(package_name: &str, yes: bool) -> Result<()> {
+    let registry_handle = set_registry_handle();
     println!(
-        "{} Checking for updates for {}...",
+        "{} Checking for updates for {} from {}...",
         "::".bold().blue(),
-        package_name.cyan()
+        package_name.cyan(),
+        registry_handle.cyan()
     );
 
     let index = mini_resolve::fetch_registry_index()?;
@@ -212,7 +231,9 @@ fn update(package_name: &str, yes: bool) -> Result<()> {
         (explicit_repo, match_in_index)
     } else {
         let pkg_info = index.packages.get(&pkg_name).ok_or_else(|| {
-            anyhow!("Package '{pkg_name}' not found in Zoidberg registry")
+            anyhow!(
+                "Package '{pkg_name}' not found in {registry_handle} registry"
+            )
         })?;
 
         let is_repo_active = repo_config
@@ -244,7 +265,11 @@ fn update(package_name: &str, yes: bool) -> Result<()> {
     }
 
     let source = zoi_cli::pkg::local::package_source_string(
-        "zoidberg", &repo, &pkg_name, None, ""
+        &registry_handle,
+        &repo,
+        &pkg_name,
+        None,
+        ""
     );
     let normalized_source = source.trim_end_matches('@');
 

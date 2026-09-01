@@ -52,12 +52,14 @@ A list of active repository tiers from the default registry that Zoi will search
 
 ### `default_registry`
 
-Configures the primary package database (registry) that Zoi syncs with.
+Configures the primary package database (registry) that Zoi syncs with. The `handle` may refer to a built-in registry definition (see [Specifications](/docs/zds/zoi/specs#1-built-in-registry-definition)); when it does, Zoi auto-populates the `name`, `description`, and `url` fields from that definition when you run `zoi sync set <handle>`.
 
 - **Type:** `object`
 - **Fields:**
   - `handle`: (string) A short, unique name for the registry. Zoi will determine this automatically on the first sync if left empty.
-  - `url`: (string) The Git URL of the registry repository.
+  - `url`: (string) The Git URL of the registry repository. Left for Zoi to derive when the `handle` matches a built-in registry.
+  - `name`: (string, optional) Display name. Populated automatically for built-in registries.
+  - `description`: (string, optional) Short description. Populated automatically for built-in registries.
   - `advisory_prefix`: (string, optional) The prefix for security advisory IDs from this registry (e.g. `ZSA` for Zoidberg Security Advisories).
   - `authorities`: (list of string, optional) PGP key identifiers trusted as authorities for this registry. Used to verify both registry git commit signatures and pre-built package archive signatures.
 - **Example:**
@@ -73,7 +75,7 @@ Configures the primary package database (registry) that Zoi syncs with.
 
 ### `added_registries`
 
-A list of supplementary package registries to sync with, in addition to the `default_registry`.
+A list of supplementary package registries to sync with, in addition to the `default_registry`. As with `default_registry`, a `handle` that matches a built-in definition auto-populates the metadata when you run `zoi sync add <handle>`.
 
 - **Type:** `list` of `object`
 - **Fields:** Same as `default_registry`.

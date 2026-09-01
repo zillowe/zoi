@@ -67,46 +67,119 @@ pub fn run_local(
     Ok(())
 }
 
-/// Set the default registry URL or use a pre-defined keyword.
+/// Print a warning for non-official (third-party) registries.
+fn warn_third_party(name: &str, registry_type: &str) {
+    if registry_type != "official" {
+        eprintln!(
+            "{} {} is a third-party registry. Use with caution and verify its \
+             authenticity before installing packages.",
+            "!".yellow().bold(),
+            name.cyan()
+        );
+    }
+}
+
+/// Set the default registry by handle or URL.
+///
+/// When a built-in registry handle is given, the registry is resolved from the
+/// pre-defined YAML and its metadata is used. A local directory or an HTTP URL
+/// is also accepted. The `default` keyword resolves to the built-in `set: true`
+/// registry.
+///
+/// Only one built-in registry may be marked as the "set" (default) registry at
+/// a time.
 ///
 /// # Errors
 ///
-/// Returns an error if the configuration cannot be updated.
-pub fn set_registry(url_or_keyword: &str) -> Result<()> {
-    let url_storage;
-    let url = match url_or_keyword {
-        "default" => {
-            url_storage = pkg::config::get_default_registry();
-            &url_storage
-        }
-        "gitlab" => "https://gitlab.com/zillowe/zillwen/zusty/zoidberg.git",
-        "github" => "https://github.com/zillowe/zoidberg.git",
-        "codeberg" => "https://codeberg.org/zillowe/zoidberg.git",
-        _ => url_or_keyword
+/// Returns an error if the configuration cannot be updated or the one-set rule
+/// is violated.
+pub fn set_registry(url_or_handle: &str) -> Result<()> {
+    // Resolve the "default" keyword to the built-in `set: true` registry.
+    let handle_or_url_storage;
+    let handle_or_url = if url_or_handle == "default" {
+        handle_or_url_storage = pkg::builtin_registries::get_set()?
+            .map_or_else(|| "zoidberg".to_string(), |r| r.handle);
+        &handle_or_url_storage
+    } else {
+        url_or_handle
     };
 
-    pkg::config::set_default_registry(url)?;
-    let url_cyan = url.cyan();
-    println!("Default registry set to: {url_cyan}");
+    // --- resolve built-in if possible ---
+    let builtin = pkg::builtin_registries::get(handle_or_url);
+
+    // Print the third-party warning for the resolved registry
+    if let Some(ref reg) = builtin {
+        warn_third_party(&reg.name, &reg.registry_type);
+    }
+
+    // The config helper (set_default_registry) handles writing the user config;
+    // if the handle matches a built-in registry it populates the metadata
+    // fields automatically.
+    pkg::config::set_default_registry(handle_or_url)?;
+
+    // Determine what to display to the user
+    let (display_handle, display_url) = match builtin {
+        Some(ref reg) => (reg.handle.as_str(), reg.git.as_str()),
+        None => (handle_or_url, handle_or_url)
+    };
+
+    println!("Default registry set to: {}", display_handle.cyan());
+    if !display_url.is_empty() && display_url != display_handle {
+        println!("  Git: {display_url}");
+    }
     println!("The new registry will be used the next time you run 'zoi sync'");
     Ok(())
 }
 
-/// Add a new registry URL to the list of tracked registries.
+/// Add a new registry by handle or URL.
+///
+/// When a built-in registry handle is given (e.g. `docker`), the registry is
+/// resolved from the pre-defined YAML and its metadata is used. A local
+/// directory or an HTTP URL is also accepted. The `default` keyword resolves to
+/// the built-in `set: true` registry.
 ///
 /// # Errors
 ///
 /// Returns an error if the directory path is invalid or if the configuration
 /// cannot be updated.
-pub fn add_registry(url: &str) -> Result<()> {
-    let mut final_url = url.to_string();
-    let path = std::path::Path::new(url);
+pub fn add_registry(handle_or_url: &str) -> Result<()> {
+    // Resolve the "default" keyword to the built-in `set: true` registry.
+    let resolved_storage;
+    let handle_or_url = if handle_or_url == "default" {
+        resolved_storage = pkg::builtin_registries::get_set()?
+            .map_or_else(|| "zoidberg".to_string(), |r| r.handle);
+        &resolved_storage
+    } else {
+        handle_or_url
+    };
+
+    // Check for local directories first
+    let path = std::path::Path::new(handle_or_url);
     if path.is_dir() {
-        final_url = std::fs::canonicalize(path)?.to_string_lossy().to_string();
+        let final_url =
+            std::fs::canonicalize(path)?.to_string_lossy().to_string();
+        pkg::config::add_added_registry(&final_url)?;
+        let url_cyan = final_url.cyan();
+        println!("Registry '{url_cyan}' added.");
+        println!("It will be synced on the next 'zoi sync' run.");
+        return Ok(());
     }
 
-    pkg::config::add_added_registry(&final_url)?;
-    let url_cyan = final_url.cyan();
+    // Try resolving as a built-in handle
+    if let Some(reg) = pkg::builtin_registries::get(handle_or_url) {
+        warn_third_party(&reg.name, &reg.registry_type);
+
+        pkg::config::add_added_registry(handle_or_url)?;
+        println!("Registry {} added.", reg.handle.cyan());
+        println!("  Name: {}", reg.name);
+        println!("  Git: {}", reg.git);
+        println!("It will be synced on the next 'zoi sync' run.");
+        return Ok(());
+    }
+
+    // Fallback: treat as a raw URL
+    pkg::config::add_added_registry(handle_or_url)?;
+    let url_cyan = handle_or_url.cyan();
     println!("Registry '{url_cyan}' added.");
     println!("It will be synced on the next 'zoi sync' run.");
     Ok(())
@@ -124,72 +197,97 @@ pub fn remove_registry(handle: &str) -> Result<()> {
     Ok(())
 }
 
-/// List all configured and tracked registries.
+/// List all configured registries and show which built-in registries are
+/// available but not yet added.
+///
+/// Output format:
+///
+/// ```text
+/// :: Configured Registries
+/// [Set] zoidberg: Zoidberg
+///       - Official Zoi packages repository
+///       - Git: https://gitlab.com/zillowe/zillwen/zusty/zoidberg
+/// [Added] registry-handle: Registry Name
+///         - Registry description
+///         - Git: https://github/registry/database
+///
+/// :: Available Registries
+/// [Unadded] registry-handle: Registry Name
+///           - Registry description
+///           - Git: https://github/registry/database
+/// ```
 ///
 /// # Errors
 ///
 /// Returns an error if the configuration cannot be read.
 pub fn list_registries() -> Result<()> {
-    let config = crate::pkg::config::read_config()?;
-    let db_root = crate::pkg::resolve::get_db_root()?;
+    let config = pkg::config::read_config()?;
+    let all_builtins = pkg::builtin_registries::load_all();
+
+    // Collect handles that are already configured (set or added)
+    let mut configured_handles: Vec<&str> = Vec::new();
 
     println!("{} Configured Registries", "::".bold().blue());
 
-    if let Some(default) = config.default_registry {
+    // --- set registry (default_registry) ---
+    if let Some(ref default) = config.default_registry {
         let handle = &default.handle;
-        let mut desc = String::new();
-        if !handle.is_empty() {
-            let repo_path = db_root.join(handle);
-            if let Ok(repo_config) =
-                crate::pkg::config::read_repo_config(&repo_path)
-            {
-                let repo_desc = &repo_config.description;
-                desc = format!(" - {repo_desc}");
-            }
-        }
+        let display_name = default.name.as_deref().unwrap_or(handle);
+        let display_desc = default.description.as_deref();
+
+        configured_handles.push(handle.as_str());
+
         let handle_str = if handle.is_empty() {
             "<not synced>".italic().to_string()
         } else {
             handle.cyan().to_string()
         };
-        let url_cyan = default.url.cyan();
-        let url = &default.url;
-        println!("[Set] {handle_str}: {url}{url_cyan}");
-        if !desc.is_empty() {
-            let desc_dimmed = desc.dimmed();
-            println!("      {desc_dimmed}");
+        println!("[Set] {handle_str}: {}", display_name.white());
+        if let Some(desc) = display_desc {
+            println!("      - {desc}");
         }
+        println!("      - Git: {}", default.url);
     } else {
-        println!("[Set]: <not set>");
+        println!("[Set] {} not set", "<none>".dimmed());
     }
 
-    if !config.added_registries.is_empty() {
+    // --- added registries ---
+    for reg in &config.added_registries {
+        let handle = &reg.handle;
+        let display_name = reg.name.as_deref().unwrap_or(handle);
+        let display_desc = reg.description.as_deref();
+
+        configured_handles.push(handle.as_str());
+
+        let handle_str = if handle.is_empty() {
+            "<not synced>".italic().to_string()
+        } else {
+            handle.cyan().to_string()
+        };
         println!();
-        for reg in config.added_registries {
-            let handle = &reg.handle;
-            let mut desc = String::new();
-            if !handle.is_empty() {
-                let repo_path = db_root.join(handle);
-                if let Ok(repo_config) =
-                    crate::pkg::config::read_repo_config(&repo_path)
-                {
-                    let repo_desc = &repo_config.description;
-                    desc = format!(" - {repo_desc}");
-                }
-            }
-            let handle_str = if handle.is_empty() {
-                "<not synced>".italic().to_string()
-            } else {
-                handle.cyan().to_string()
-            };
-            let url_cyan = reg.url.cyan();
-            let url = &reg.url;
-            println!("[Add] {handle_str}: {url}{url_cyan}");
-            if !desc.is_empty() {
-                let desc_dimmed = desc.dimmed();
-                println!("      {desc_dimmed}");
-            }
+        println!("[Added] {handle_str}: {}", display_name.white());
+        if let Some(desc) = display_desc {
+            println!("          - {desc}");
+        }
+        println!("          - Git: {}", reg.url);
+    }
+
+    // --- available but unadded builtins ---
+    let unadded: Vec<_> = all_builtins
+        .iter()
+        .filter(|r| !configured_handles.contains(&r.handle.as_str()))
+        .collect();
+
+    if !unadded.is_empty() {
+        println!();
+        println!("{} Available Registries", "::".bold().blue());
+        for reg in unadded {
+            let handle_str = reg.handle.cyan().to_string();
+            println!("[Unadded] {handle_str}: {}", reg.name.white());
+            println!("          - {}", reg.description);
+            println!("          - Git: {}", reg.git);
         }
     }
+
     Ok(())
 }

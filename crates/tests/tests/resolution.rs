@@ -142,6 +142,8 @@ fn test_resolve_requested_version_spec_registry_channel_and_exact() {
         default_registry: Some(types::Registry {
             handle: "testreg".to_string(),
             url: "https://example.invalid/testreg.git".to_string(),
+            name: None,
+            description: None,
             advisory_prefix: None,
             authorities: None
         }),

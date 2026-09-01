@@ -372,7 +372,8 @@ pub mod validate {
     use anyhow::{Result, anyhow};
     use colored::Colorize;
 
-    /// Validates a Zoi specification file (e.g. registries.json, repo.yaml).
+    /// Validates a Zoi specification file (e.g. repo.yaml, a built-in
+    /// `<registry>.yaml`, advisories.json, packages.json).
     ///
     /// # Errors
     ///
@@ -393,16 +394,7 @@ pub mod validate {
         let path = file.display();
         println!("{} Validating {path}...", "::".bold().blue());
 
-        if file_name == "registries.json" {
-            let _: crate::pkg::purl::CentralDbSpec =
-                serde_json::from_str(&content).map_err(|e| {
-                    anyhow!("Invalid registries.json spec: {e}")
-                })?;
-            println!(
-                "{} file is a valid registries.json spec.",
-                "OK".bold().green()
-            );
-        } else if file_name == "repo.yaml" || file_name == "repo.yml" {
+        if file_name == "repo.yaml" || file_name == "repo.yml" {
             let _: crate::pkg::types::RepoConfig =
                 serde_yaml::from_str(&content)
                     .map_err(|e| anyhow!("Invalid repo.yaml spec: {e}"))?;
@@ -432,19 +424,40 @@ pub mod validate {
                     anyhow!("Invalid security advisory (.sec.yaml) spec: {e}")
                 })?;
             println!("{} file is a valid .sec.yaml spec.", "OK".bold().green());
+        } else if file_name.ends_with(".hook.yaml")
+            || file_name.ends_with(".hook.yml")
+        {
+            let _: crate::pkg::hooks::global::GlobalHook =
+                serde_yaml::from_str(&content).map_err(|e| {
+                    anyhow!("Invalid global hook (.hook.yaml) spec: {e}")
+                })?;
+            println!(
+                "{} file is a valid .hook.yaml spec.",
+                "OK".bold().green()
+            );
         } else if file.extension().and_then(|e| e.to_str()) == Some("json") {
-            if serde_json::from_str::<crate::pkg::purl::CentralDbSpec>(&content).is_ok() {
-                println!("{} file matches registries.json spec.", "OK".bold().green());
-            } else if serde_json::from_str::<crate::pkg::types::AdvisoryRegistry>(&content)
-                .is_ok()
+            if serde_json::from_str::<crate::pkg::types::AdvisoryRegistry>(
+                &content
+            )
+            .is_ok()
             {
-                println!("{} file matches advisories.json spec.", "OK".bold().green());
-            } else if serde_json::from_str::<crate::pkg::purl::RegistryIndex>(&content).is_ok()
+                println!(
+                    "{} file matches advisories.json spec.",
+                    "OK".bold().green()
+                );
+            } else if serde_json::from_str::<crate::pkg::purl::RegistryIndex>(
+                &content
+            )
+            .is_ok()
             {
-                println!("{} file matches packages.json spec.", "OK".bold().green());
+                println!(
+                    "{} file matches packages.json spec.",
+                    "OK".bold().green()
+                );
             } else {
                 return Err(anyhow!(
-                    "File does not match any known Zoi JSON spec (registries.json, advisories.json, or packages.json)"
+                    "File does not match any known Zoi JSON spec \
+                     (advisories.json, or packages.json)"
                 ));
             }
         } else if file.extension().and_then(|e| e.to_str()) == Some("yaml")
@@ -464,6 +477,15 @@ pub mod validate {
             {
                 println!(
                     "{} file matches .sec.yaml spec.",
+                    "OK".bold().green()
+                );
+            } else if serde_yaml::from_str::<crate::pkg::types::BuiltinRegistry>(
+                &content
+            )
+            .is_ok()
+            {
+                println!(
+                    "{} file matches a built-in registry YAML spec.",
                     "OK".bold().green()
                 );
             } else {

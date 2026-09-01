@@ -1,0 +1,10 @@
+name: test-hook
+description: Configuring dynamic linker run-time bindings...
+platforms: ["linux"]
+trigger:
+  dirs: ["usr/lib"]
+  paths: ["etc/ld.so.conf"]
+  operation: ["install", "upgrade", "remove"]
+action:
+  when: PostTransaction
+  exec: "/usr/bin/ldconfig -r /"

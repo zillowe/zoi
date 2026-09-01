@@ -277,7 +277,7 @@ Common fixes:
 | ------------------------------------------- | ------------------------------------------------------------------------------- |
 | Installed commands are not found            | Run `zoi shell <shell>` or add Zoi's user bin directory to `PATH`.              |
 | Package cannot be found                     | Run `zoi sync`, then check active repos with `zoi repo list`.                   |
-| You need a mirror                           | Use `zoi sync set github`, `zoi sync set codeberg`, or a custom registry URL.   |
+| You need a mirror                           | Set the registry to a mirror's git URL via `zoi sync set` (e.g. `https://github.com/zillowe/zoidberg.git`). |
 | You need offline installs                   | Pre-populate archives with `zoi cache add` or use `--pkg-dir` with `--offline`. |
 | You need to know why something is installed | Run `zoi why <package>`.                                                        |
 | You need to know which package owns a file  | Run `zoi owner <path>`.                                                         |

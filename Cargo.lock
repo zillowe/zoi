@@ -4661,6 +4661,7 @@ dependencies = [
  "yaml_serde",
  "zoi-core",
  "zoi-lua",
+ "zoi-purl",
 ]
 
 [[package]]

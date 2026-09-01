@@ -171,6 +171,23 @@ On startup, Zoi automatically imports these embedded keys into the user's
 local keyring (`~/.zoi/pgps/`). This is the recommended way to distribute
 "Root of Trust" keys for custom or internal registries.
 
+## Built-in Registries
+
+Zoi ships the official and supported package registries as YAML definitions
+embedded into the binary, so registry resolution does not depend on a remote
+central database at runtime. Applications can reference these by handle via
+`zoi sync set <handle>` / `zoi sync add <handle>`.
+
+1. Place a registry definition in `crates/core/src/builtin/registries/<handle>.yaml`.
+   The file must declare a `handle`, `name`, `description`, `git` URL,
+   `branch`, a `type` (`official` or `third-party`), and whether it is the
+   single `set` registry.
+2. Build Zoi as usual. The build system embeds every YAML file in that
+   directory and resolves handles against them at runtime.
+
+Exactly one built-in registry should be marked `set: true`; this becomes the
+default registry that is used when none is configured by the user.
+
 ## Embedding Global Hooks
 
 Similar to PGP keys, Zoi can embed global transaction hooks directly into

@@ -1,0 +1,8 @@
+version: "2"
+handle: "zoidberg"
+name: "Zoidberg"
+description: "Official Zoi packages repository"
+git: "https://gitlab.com/zillowe/zillwen/zusty/zoidberg"
+branch: "main"
+type: "official"
+set: true

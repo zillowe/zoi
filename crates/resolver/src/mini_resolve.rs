@@ -63,7 +63,23 @@ pub struct MiniRegistryIndex {
     pub packages: HashMap<String, MiniPackageIndex>
 }
 
-/// Fetches the optimized JSON index from the official Zoidberg registry.
+/// Returns the set (default) built-in registry to use for Mini resolution.
+///
+/// # Errors
+///
+/// Returns an error if no built-in registry is marked as the set registry or
+/// if the built-in definitions are invalid.
+fn set_registry_info() -> Result<(String, String)> {
+    let reg = zoi_core::builtin::registry::get_set()?.ok_or_else(|| {
+        anyhow!(
+            "No set registry is defined in the built-in registries. Please \
+             reinstall Zoi."
+        )
+    })?;
+    Ok((reg.git, reg.branch))
+}
+
+/// Fetches the optimized JSON index from the set built-in registry.
 ///
 /// This index is the backbone of Zoi Mini, providing a pre-resolved mapping
 /// of package names to their current versions and metadata.
@@ -72,12 +88,13 @@ pub struct MiniRegistryIndex {
 ///
 /// Returns an error if the index cannot be fetched or parsed.
 pub fn fetch_registry_index() -> Result<MiniRegistryIndex> {
-    let url = "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/packages.json";
+    let (git, branch) = set_registry_info()?;
+    let url = zoi_purl::construct_raw_url(&git, &branch, "packages.json")?;
     let client = zoi_core::utils::get_http_client()?;
     let response = client.get(url).send()?;
     if !response.status().is_success() {
         return Err(anyhow!(
-            "Failed to fetch packages.json from Zoidberg registry: {}",
+            "Failed to fetch packages.json from registry: {}",
             response.status()
         ));
     }
@@ -85,18 +102,19 @@ pub fn fetch_registry_index() -> Result<MiniRegistryIndex> {
     Ok(index)
 }
 
-/// Fetches the repository configuration from the official Zoidberg registry.
+/// Fetches the repository configuration from the set built-in registry.
 ///
 /// # Errors
 ///
 /// Returns an error if the configuration cannot be fetched or parsed.
 pub fn fetch_registry_config() -> Result<zoi_core::types::RepoConfig> {
-    let url = "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/repo.yaml";
+    let (git, branch) = set_registry_info()?;
+    let url = zoi_purl::construct_raw_url(&git, &branch, "repo.yaml")?;
     let client = zoi_core::utils::get_http_client()?;
     let response = client.get(url).send()?;
     if !response.status().is_success() {
         return Err(anyhow!(
-            "Failed to fetch repo.yaml from Zoidberg registry: {}",
+            "Failed to fetch repo.yaml from registry: {}",
             response.status()
         ));
     }
@@ -105,12 +123,21 @@ pub fn fetch_registry_config() -> Result<zoi_core::types::RepoConfig> {
     Ok(config)
 }
 
-/// Returns the URL to download a package's `.pkg.lua` file from the official
-/// registry.
+/// Returns the URL to download a package's `.pkg.lua` file from the set
+/// built-in registry.
 pub fn get_package_lua_url(repo: &str, name: &str) -> String {
-    format!(
-        "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/{repo}/{name}/{name}.pkg.lua"
-    )
+    let file_path = if repo.is_empty() {
+        format!("{name}/{name}.pkg.lua")
+    } else {
+        format!("{repo}/{name}/{name}.pkg.lua")
+    };
+    let (git, branch) = set_registry_info().unwrap_or_else(|_| {
+        (
+            "https://gitlab.com/zillowe/zillwen/zusty/zoidberg".to_string(),
+            "main".to_string()
+        )
+    });
+    zoi_purl::construct_raw_url(&git, &branch, &file_path).unwrap_or(file_path)
 }
 
 /// Scans the package metadata for known security advisories.

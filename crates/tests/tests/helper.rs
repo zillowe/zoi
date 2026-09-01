@@ -36,9 +36,16 @@ fn test_helper_get_hash_sha512() {
 }
 
 #[test]
-fn test_helper_validate_registries_json() {
+fn test_helper_validate_registry_yaml() {
     let res =
-        helper::validate::run(&PathBuf::from("tests/assets/registries.json"));
+        helper::validate::run(&PathBuf::from("tests/assets/zoidberg.yaml"));
+    assert!(res.is_ok(), "Validation failed: {res:?}");
+}
+
+#[test]
+fn test_helper_validate_hook_yaml() {
+    let res =
+        helper::validate::run(&PathBuf::from("tests/assets/test.hook.yaml"));
     assert!(res.is_ok(), "Validation failed: {res:?}");
 }
 

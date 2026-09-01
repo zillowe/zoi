@@ -79,40 +79,64 @@ pub struct RegistryIndex {
     pub packages: BTreeMap<String, PurlPackageIndex>
 }
 
-/// Fetches the central Zoi registry database from a remote URL or local file.
+/// Builds the registry database used for PURL resolution.
 ///
-/// The URL can be overridden by the `ZOI_PURL_DB_URL` environment variable.
+/// The registry list is assembled from:
+/// - All pre-defined built-in registries (embedded at compile time).
+/// - The configured `default_registry` and `added_registries`, which override
+///   or extend the built-in list.
 ///
 /// # Errors
-/// Returns an error if the database cannot be fetched, verified, or parsed.
+///
+/// Returns an error if the configured registries cannot be read.
 pub fn fetch_central_db() -> Result<HashMap<String, RegistryInfo>> {
-    let url = std::env::var("ZOI_PURL_DB_URL").unwrap_or_else(|_| {
-        "https://zillowe.pages.dev/zoi/registries.json".to_string()
-    });
-
-    let is_test = std::env::var("ZOI_TEST").is_ok();
-    let data = if url.starts_with("http") {
-        let trusted_keys = zoi_core::config::get_builtin_authorities();
-        if !trusted_keys.is_empty() && !is_test {
-            zoi_core::config::verify_remote_file(&url, &trusted_keys)?
-        } else {
-            let client = zoi_core::utils::get_http_client()?;
-            let response = client.get(&url).send()?;
-            if !response.status().is_success() {
-                return Err(anyhow!(
-                    "Failed to fetch central Zoi registry database: {}",
-                    response.status()
-                ));
+    // Start from the pre-defined built-in registries.
+    let mut registries: HashMap<String, RegistryInfo> = HashMap::new();
+    for r in zoi_core::builtin::registry::load_all() {
+        registries.insert(
+            r.handle.clone(),
+            RegistryInfo {
+                name: r.name,
+                description: r.description,
+                git: r.git,
+                branch: r.branch
             }
-            response.bytes()?.to_vec()
-        }
-    } else {
-        std::fs::read(&url)
-            .map_err(|e| anyhow!("Failed to read central DB from {url}: {e}"))?
-    };
+        );
+    }
 
-    let spec: CentralDbSpec = serde_json::from_slice(&data)?;
-    Ok(spec.registries)
+    // Overlay and extend with the configured registries. The configured
+    // entries take precedence and may add previously unseen handles.
+    let config = zoi_core::config::read_config().unwrap_or_default();
+    let mut apply = |reg: &zoi_core::types::Registry| {
+        if reg.handle.is_empty() {
+            return;
+        }
+        let entry = registries.entry(reg.handle.clone()).or_insert_with(|| {
+            RegistryInfo {
+                name: reg.handle.clone(),
+                description: String::new(),
+                git: reg.url.clone(),
+                branch: "main".to_string()
+            }
+        });
+        if !reg.url.is_empty() {
+            entry.git.clone_from(&reg.url);
+        }
+        if let Some(n) = &reg.name {
+            entry.name.clone_from(n);
+        }
+        if let Some(d) = &reg.description {
+            entry.description.clone_from(d);
+        }
+    };
+    if let Some(default) = &config.default_registry {
+        apply(default);
+    }
+    for added in &config.added_registries {
+        apply(added);
+    }
+
+    Ok(registries)
 }
 
 /// Constructs a raw content URL for a file in a Git repository.
@@ -277,8 +301,19 @@ pub fn resolve_purl(purl_str: &str) -> Result<ResolvedPurl> {
 
     let central_db = fetch_central_db()?;
     let registry = central_db.get(registry_handle).ok_or_else(|| {
+        // If the handle is a known built-in registry, guide the user to add it.
+        if let Some(builtin) = zoi_core::builtin::registry::get(registry_handle)
+        {
+            return anyhow!(
+                "This package is from registry '{}' which you haven't added. \
+                 Run 'zoi sync add {}' to add it.",
+                builtin.handle,
+                builtin.handle
+            );
+        }
         anyhow!(
-            "Registry handle '{registry_handle}' not found in central database"
+            "Registry handle '{registry_handle}' not found in resolved \
+             registry database"
         )
     })?;
 

@@ -9,36 +9,37 @@ This document outlines the v2 specifications for the core metadata files used by
 
 All Zoi specification files support a `version` field to ensure future compatibility. Version `"2"` is the current standard for Zoi Specification v2. There is no backward compatibility with version `"1"`.
 
-## 1. registries.json
+## 1. Built-in Registry Definition
 
-The `registries.json` file is the central database of all official and supported registries. It maps registry handles (short identifiers) to their corresponding Git repository details.
+The official and supported registries are defined as built-in YAML files embedded into the Zoi binary at compile time. Each file is named `<handle>.yaml` and ships with the tool, so registry resolution never depends on fetching a remote central database at runtime.
 
-**Source of Truth:** The official central database is hosted at `https://zillowe.pages.dev/zoi/registries.json`. This can be overridden for testing or private mirrors via the `ZOI_PURL_DB_URL` environment variable.
+When you run `zoi sync set <handle>` or `zoi sync add <handle>`, Zoi resolves the handle against these built-in definitions and populates the matching metadata automatically.
 
-**Format:** JSON
+**Format:** YAML
 
-### Structure
+### Example (`zoidberg.yaml`)
 
-```json
-{
-  "version": "2",
-  "zoidberg": {
-    "name": "Zoidberg Official Registry",
-    "description": "The primary official registry for Zoi packages.",
-    "git": "https://github.com/zillowe/zoidberg",
-    "branch": "main"
-  }
-}
+```yaml
+version: "2"
+handle: "zoidberg"
+name: "Zoidberg"
+description: "Official Zoi packages repository"
+git: "https://gitlab.com/zillowe/zillwen/zusty/zoidberg"
+branch: "main"
+type: "official"
+set: true
 ```
 
 ### Fields
 
 - **`version`** (String): Spec version. Defaults to `"2"`.
-- **`[registry-handle]`** (Object): The short name of the registry (e.g. `zoidberg`).
-  - **`name`** (String): Full display name of the registry.
-  - **`description`** (String): A short description of the registry's purpose.
-  - **`git`** (String): The Git repository URL where the registry is hosted.
-  - **`branch`** (String): The default branch to clone or fetch from.
+- **`handle`** (String): The short, unique name of the registry (e.g. `zoidberg`). This is what users reference in `@handle/repo/package` and `zoi sync` commands.
+- **`name`** (String): Full display name of the registry.
+- **`description`** (String): A short description of the registry's purpose.
+- **`git`** (String): The Git repository URL where the registry is hosted.
+- **`branch`** (String): The default branch to clone or fetch from.
+- **`type`** (String): The trust level of the registry. `official` for first-party Zoi registries; `third-party` for all others. Third-party registries trigger a warning when you add them via `zoi sync`.
+- **`set`** (Boolean): Marks the single registry used as the default (`set`) registry. Exactly one built-in registry may set this to `true`.
 
 ---
 

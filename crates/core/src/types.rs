@@ -1076,12 +1076,54 @@ pub struct Registry {
     /// The URL of the registry.
     #[serde(default)]
     pub url: String,
+    /// The human-readable display name of the registry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// A short description of the registry's purpose.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
     /// The prefix used for security advisories in this registry.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub advisory_prefix: Option<String>,
     /// The list of trusted authorities for this registry.
     #[serde(default, skip_serializing_if = "skip_authorities")]
     pub authorities: Option<Vec<String>>
+}
+
+/// Returns the default registry specification version ("2").
+fn default_registry_version() -> String {
+    "2".to_string()
+}
+
+/// A pre-defined registry bundled with Zoi.
+///
+/// These are defined in `crates/core/src/builtin/registries/<handle>.yaml` and
+/// are embedded into the binary at compile time. They describe registries that
+/// Zoi recognizes out of the box for convenience and UX, but they are still
+/// third-party registries. The only official registry for Zoi is the one marked
+/// with `set: true` (Zoidberg), all the others should be treated with care.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BuiltinRegistry {
+    /// The specification version of the registry definition.
+    #[serde(default = "default_registry_version")]
+    pub version: String,
+    /// The unique handle/short identifier of the registry.
+    pub handle: String,
+    /// The human-readable display name of the registry.
+    pub name: String,
+    /// A short description of the registry's purpose.
+    pub description: String,
+    /// The Git URL of the registry repository.
+    pub git: String,
+    /// The default branch to fetch from the Git repository.
+    pub branch: String,
+    /// The type of the registry (e.g. "official" or "third-party"). Just like
+    /// the `type` field of a repo in a registry's `repo.yaml`.
+    #[serde(rename = "type")]
+    pub registry_type: String,
+    /// Whether this registry is the single `set` (default) registry for Zoi.
+    #[serde(default)]
+    pub set: bool
 }
 
 /// Configuration for remote policy enforcement.

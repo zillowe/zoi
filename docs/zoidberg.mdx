@@ -30,16 +30,16 @@ zoi install @zillowe/hello
 
 ## Using Mirrors
 
-If you wish to use one of the official Zoidberg mirrors (GitHub or Codeberg), you can change your active registry:
+If you wish to use one of the official Zoidberg mirrors (GitHub or Codeberg), you can change your active registry by setting it to the mirror's git URL:
 
 ```sh
 # Set to GitHub mirror
-zoi sync set github
+zoi sync set https://github.com/zillowe/zoidberg.git
 
 # Set to Codeberg mirror
-zoi sync set codeberg
+zoi sync set https://codeberg.org/zillowe/zoidberg.git
 
-# Revert to default
+# Revert to the built-in set registry
 zoi sync set default
 ```
 

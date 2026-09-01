@@ -13,15 +13,15 @@ This page explains Zoi's official repositories and mirrors, and how package repo
 
 ## Managing the Package Database Registry
 
-The package database is the core git repository that Zoi clones to its user data directory under `zoi/pkgs/db`. This repository contains all the package definitions organized into tiers. While you can manage which repositories inside the database are active using `zoi repo`, you can also change the URL of the entire database registry itself using `zoi sync`.
+The package database is the core git repository that Zoi clones to its user data directory under `zoi/pkgs/db`. This repository contains all the package definitions organized into tiers. While you can manage which repositories inside the database are active using `zoi repo`, you can also change which package database registry Zoi uses via `zoi sync`.
 
-This is useful if you want to use a mirror or a completely different package database.
+Official and supported registries are shipped as built-in definitions embedded in the Zoi binary (see [Specifications](/docs/zds/zoi/specs#1-built-in-registry-definition)). You can reference them by their handle instead of a full URL, and Zoi derives the git URL and metadata automatically.
 
 | Command                          | Description                                                                                  |
 | -------------------------------- | -------------------------------------------------------------------------------------------- |
-| `zoi sync set <url-or-keyword>`  | Sets the package database registry URL. Keywords: `default`, `gitlab`, `github`, `codeberg`. |
-| `zoi sync list`                  | Displays the current configured registries.                                                  |
-| `zoi sync add <url>`             | Adds a new registry to be synced.                                                            |
+| `zoi sync set <handle-or-url>`   | Sets the registry used as the default. You can pass a built-in handle, the `default` keyword, or a custom URL. |
+| `zoi sync list`                  | Displays the configured registries (set and added) plus available built-in registries that are not yet added. |
+| `zoi sync add <handle-or-url>`   | Adds a registry to be synced, resolving built-in handles automatically.                      |
 | `zoi sync remove <handle>`       | Removes a configured registry by its handle.                                                 |
 | `zoi sync --force`               | Rebuilds all registry databases from scratch by removing existing caches and re-cloning.     |
 | `zoi sync --local`               | Sync registries to the project's `.zoi/pkgs/db/` using revisions from `zoi.lua`.             |
@@ -47,14 +47,20 @@ Zoi is intelligent about where it stores metadata:
 - **Normal User?** Zoi defaults to `--scope user` in the user data directory under `zoi/pkgs/db`.
 
 ```sh
-# Show the current configured registries
+# Show the current configured registries, including unadded built-ins
 zoi sync list
 
-# Set the registry to the official GitHub mirror
-zoi sync set github
+# Set the default registry to the official Zoidberg registry (by handle)
+zoi sync set zoidberg
 
-# Set the registry to a custom URL
+# Set the default registry to the built-in set registry
+zoi sync set default
+
+# Set the default registry to a custom URL
 zoi sync set https://my-custom-registry.com/zoidberg.git
+
+# Add an additional registry by handle (third-party registries warn first)
+zoi sync add my-company
 
 # Force a full re-sync from scratch (preserves installed packages)
 zoi sync --force

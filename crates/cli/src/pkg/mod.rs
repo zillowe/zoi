@@ -3,6 +3,10 @@ pub use zoi_core::{
     cache, config, dependency, frozen, hash, lock, offline, pgp, pin, pkgdir,
     recorder, sysroot, types, utils
 };
+/// Built-in registry lookup and loading.
+pub mod builtin_registries {
+    pub use zoi_core::builtin::registry::*;
+}
 pub use zoi_db as db;
 pub use zoi_deps as dependencies;
 pub use zoi_plugins::extension;

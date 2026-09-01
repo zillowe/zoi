@@ -20,6 +20,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=ZOI_AUTHORITIES_KEY_7");
     println!("cargo:rerun-if-env-changed=ZOI_AUTHORITIES_KEY_8");
     println!("cargo:rerun-if-env-changed=ZOI_AUTHORITIES_KEY_9");
+    println!("cargo:rerun-if-changed=src/builtin/registries");
 
     let zoi_registry = env::var("ZOI_DEFAULT_REGISTRY").unwrap_or_else(|_| {
         "https://gitlab.com/zillowe/zillwen/zusty/zoidberg.git".into()
@@ -44,6 +45,46 @@ fn main() {
         env::var_os("OUT_DIR").expect("OUT_DIR should be set by cargo");
     let dest_path = Path::new(&out_dir).join("generated_pgp_keys.rs");
     generate_pgp_keys(&dest_path);
+
+    let regs_path = Path::new(&out_dir).join("generated_registries.rs");
+    generate_builtin_registries(&regs_path);
+}
+
+/// Reads the pre-defined registry YAML files from the
+/// `src/builtin/registries` directory and generates a Rust source file
+/// containing them as (handle, `raw_yaml`) string pairs so they are embedded in
+/// the binary at compile time.
+fn generate_builtin_registries(dest_path: &Path) {
+    use std::fmt::Write;
+    let reg_dir = PathBuf::from("src/builtin/registries");
+    let mut output = String::from(
+        "/// A list of pre-defined registries.\n///\n/// Each entry is a \
+         tuple of (`handle`, `raw_yaml`).\npub static BUILTIN_REGISTRIES: \
+         &[(&str, &str)] = &[\n"
+    );
+
+    if reg_dir.exists()
+        && let Ok(entries) = fs::read_dir(&reg_dir)
+    {
+        let mut files: Vec<_> =
+            entries.filter_map(std::result::Result::ok).collect();
+        files.sort_by_key(std::fs::DirEntry::file_name);
+        for entry in files {
+            let path = entry.path();
+            if path.extension().is_some_and(|ext| ext == "yaml")
+                && let Ok(data) = fs::read_to_string(&path)
+            {
+                let handle = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown");
+                let _ = writeln!(output, "    (\"{handle}\", r#\"{data}\"#),");
+            }
+        }
+    }
+
+    output.push_str("];\n");
+    fs::write(dest_path, output).ok();
 }
 
 /// Reads PGP key files from the `src/builtin/pgp` directory and generates a

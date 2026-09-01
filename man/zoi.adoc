@@ -152,7 +152,10 @@ Zoi also manages declarative user environments and the underlying ZoiOS system.
   Show detailed information about a package.
 
 *sync*::
-  Download or update the package database from the remote repository.
+  Download or update the package database from the remote repository. Also
+  manages registries: `set <handle-or-url>`, `add <handle-or-url>`,
+  `remove <handle>`, and `list`. Handles resolve against built-in registry
+  definitions, and `default` resolves to the built-in `set: true` registry.
 
 *system*::
   Manage the underlying ZoiOS system (ZoiOS only).

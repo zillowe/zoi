@@ -50,6 +50,8 @@ fn test_man_resolution_by_provides() {
         default_registry: Some(types::Registry {
             handle: handle.to_string(),
             url: "http://dummy".to_string(),
+            name: None,
+            description: None,
             advisory_prefix: None,
             authorities: None
         }),
@@ -181,6 +183,8 @@ fn test_man_run_raw() {
         default_registry: Some(types::Registry {
             handle: handle.to_string(),
             url: "http://dummy".to_string(),
+            name: None,
+            description: None,
             advisory_prefix: None,
             authorities: None
         }),
