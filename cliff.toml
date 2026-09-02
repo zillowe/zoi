@@ -164,11 +164,6 @@ postprocessors = [
     # Replace the placeholder <REPO> with a URL.
     #{ pattern = '<REPO>', replace = "https://github.com/orhun/git-cliff" },
 ]
-commit_preprocessors = [
-    # strip leading emoji tokens (e.g. "🩹 Fix: x" -> "Fix: x") so the commit
-    # is still registered but the emoji is dropped from the rendered message
-    { pattern = '^[^\x00-\x7F]{1,4}\s*', replace = "" },
-]
 output = "CHANGELOG.md"
 
 [git]
