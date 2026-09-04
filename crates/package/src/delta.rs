@@ -22,7 +22,7 @@ use anyhow::{Result, anyhow};
 use colored::Colorize;
 use serde_json::json;
 use tar::Archive;
-use zoi_core::delta::{self, ZDELTA_FORMAT_ID, ZDelta};
+use zbsdiff::zdelta::{self as delta, ZDELTA_FORMAT_ID, ZDelta};
 use zoi_core::types::PooledZpaManifest;
 use zstd::stream::read::Decoder as ZstdDecoder;
 

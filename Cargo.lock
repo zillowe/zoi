@@ -4209,13 +4209,16 @@ dependencies = [
 
 [[package]]
 name = "zbsdiff"
-version = "1.5.4"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e9ad65e4464d3a32f8892c62bf628dcaabf7d1d89dec76ffa01e2b488d72bfb"
+checksum = "86584fcc29ff22e5772f158b6f63592cbea956464832f337190c6b205982ce6c"
 dependencies = [
  "bzip2",
  "rayon",
+ "serde_json",
  "suffix_array",
+ "tar",
+ "zstd",
 ]
 
 [[package]]
@@ -4572,6 +4575,7 @@ dependencies = [
  "tempfile",
  "walkdir",
  "yaml_serde",
+ "zbsdiff",
  "zoi-core",
  "zoi-db",
  "zoi-deps",
