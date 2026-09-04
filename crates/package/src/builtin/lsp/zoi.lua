@@ -201,7 +201,8 @@ function zman(source, section) end
 
 --- Stages a shell completion file for a specific shell.
 --- The file is copied to ${pkgstore}/shell/{shell}/{filename} and symlinked
---- into the global completions directory (~/.zoi/pkgs/shell/{shell}/{package}/).
+--- into the user completions directory (<data-dir>/pkgs/shell/{shell}/{package}/,
+--- e.g. ~/.local/share/zoi/pkgs/shell/{shell}/{package}/ on Linux).
 ---@param source string Path relative to BUILD_DIR or ${pkgluadir}.
 ---@param shell string The shell name: "bash", "zsh", "fish", or "elvish".
 function zshell(source, shell) end

@@ -168,8 +168,9 @@ Any `.asc` file placed in the `crates/core/src/builtin/pgp/` directory will
 be embedded at build time.
 
 On startup, Zoi automatically imports these embedded keys into the user's
-local keyring (`~/.zoi/pgps/`). This is the recommended way to distribute
-"Root of Trust" keys for custom or internal registries.
+local keyring (`<data-dir>/pgps/`, e.g. `~/.local/share/zoi/pgps/` on Linux;
+see [Storage Locations](https://zillowe.qzz.io/docs/zds/zoi/storage.mdx)).
+This is the recommended way to distribute "Root of Trust" keys for custom or internal registries.
 
 ## Built-in Registries
 
@@ -200,7 +201,9 @@ tasks triggered by file modifications.
 
 The build system will automatically embed these hooks.
 They are loaded on every transaction and can be overridden by users in
-`~/.zoi/hooks/` if they use the same name.
+`<data-dir>/hooks/` (e.g. `~/.local/share/zoi/hooks/` on Linux;
+see [Storage Locations](https://zillowe.qzz.io/docs/zds/zoi/storage.mdx)
+if they use the same name.
 
 ## Completions and Man Pages
 
