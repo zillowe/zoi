@@ -326,6 +326,14 @@ fn print_beautiful(
                         print_dependency_group(group, 3);
                     }
                 }
+                types::BuildDependencies::List(entries) => {
+                    for entry in entries {
+                        println!("    {}:", entry.build_type.cyan());
+                        for package in &entry.packages {
+                            println!("      - {package}");
+                        }
+                    }
+                }
             }
         }
 

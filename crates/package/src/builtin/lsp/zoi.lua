@@ -96,9 +96,13 @@ SUBPKG = nil
 ---@class TypedBuildDependencies
 ---@field types table<string, DependencyGroup> Map of build type to dependencies.
 
+---@class BuildDependencyEntry
+---@field type string Build type (e.g. "source").
+---@field packages string[] List of dependency strings for that build type.
+
 ---@class Dependencies
 ---@field runtime DependencyGroup? Runtime dependencies.
----@field build (DependencyGroup|TypedBuildDependencies)? Build-time dependencies.
+---@field build (DependencyGroup|TypedBuildDependencies|BuildDependencyEntry[])? Build-time dependencies.
 ---@field test DependencyGroup? Test-time dependencies.
 
 ---@class Service

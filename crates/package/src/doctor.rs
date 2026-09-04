@@ -182,6 +182,32 @@ pub fn run(
                         );
                     }
                 }
+                types::BuildDependencies::List(entries) => {
+                    if entries.is_empty() {
+                        report.errors.push(
+                            "dependencies.build list is empty.".to_string()
+                        );
+                    }
+                    for entry in entries {
+                        let context =
+                            format!("build.type={}", entry.build_type);
+                        if !package.types.contains(&entry.build_type) {
+                            report.warnings.push(format!(
+                                "dependencies.build has type '{}' but \
+                                 metadata.types does not list it.",
+                                entry.build_type,
+                            ));
+                        }
+                        for dep in &entry.packages {
+                            validate_dependency_string(
+                                dep,
+                                &context,
+                                "packages",
+                                &mut report
+                            );
+                        }
+                    }
+                }
             }
         }
     }

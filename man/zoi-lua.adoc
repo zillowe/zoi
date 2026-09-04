@@ -110,7 +110,9 @@ Longer guides live at https://zillowe.qzz.io/zds/zoi.
   *build*, and *test*. Each group is a list of dependency strings, or a
   table with *required*, *optional*, *options* (named optional sets with
   their own dependencies), and *sub_packages*. The *build* group may
-  additionally be keyed by build type. A dependency string looks like
+  additionally be keyed by build type through a *types* table, or be a
+  list of `{type, packages}` entries (the form used by published registry
+  indexes). A dependency string looks like
   `[manager:]package[@version][:description]`; the manager defaults to
   `zoi`, for example `"zoi:core/foo@1.2.3"` or `"pacman:zip"`.
 

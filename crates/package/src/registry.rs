@@ -657,6 +657,14 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                                     });
                                 }
                             }
+                            types::BuildDependencies::List(l) => {
+                                for entry in l {
+                                    build.push(types::BuildDependencyV2 {
+                                        build_type: entry.build_type,
+                                        packages: entry.packages
+                                    });
+                                }
+                            }
                         }
                     }
 

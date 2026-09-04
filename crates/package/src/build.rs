@@ -100,17 +100,30 @@ pub fn get_build_dependencies(
     if let Some(deps) = &pkg_for_meta.dependencies
         && let Some(build_deps) = &deps.build
     {
-        let group: Option<&types::DependencyGroup> = match build_deps {
-            types::BuildDependencies::Group(g) => Some(g),
-            types::BuildDependencies::Typed(t) => {
-                t.types.get(&resolved_build_type)
+        match build_deps {
+            types::BuildDependencies::Group(g) => {
+                let mut all_deps = Vec::new();
+                collect_deps_from_group_no_prompt(g, &mut all_deps);
+                return Ok(Some(all_deps));
             }
-        };
-
-        if let Some(g) = group {
-            let mut all_deps = Vec::new();
-            collect_deps_from_group_no_prompt(g, &mut all_deps);
-            return Ok(Some(all_deps));
+            types::BuildDependencies::Typed(t) => {
+                if let Some(g) = t.types.get(&resolved_build_type) {
+                    let mut all_deps = Vec::new();
+                    collect_deps_from_group_no_prompt(g, &mut all_deps);
+                    return Ok(Some(all_deps));
+                }
+            }
+            types::BuildDependencies::List(l) => {
+                let mut all_deps = Vec::new();
+                for entry in l {
+                    if entry.build_type == resolved_build_type {
+                        all_deps.extend(entry.packages.iter().cloned());
+                    }
+                }
+                if !all_deps.is_empty() {
+                    return Ok(Some(all_deps));
+                }
+            }
         }
     }
 

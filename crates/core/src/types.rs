@@ -707,14 +707,19 @@ pub struct TypedBuildDependencies {
     pub types: HashMap<String, DependencyGroup>
 }
 
-/// Represents build dependencies, which can be typed or a single group.
+/// Represents build dependencies, which can be typed, a single group, or a
+/// list of per-type entries.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum BuildDependencies {
     /// Build dependencies categorized by type.
     Typed(TypedBuildDependencies),
     /// A single group of build dependencies.
-    Group(DependencyGroup)
+    Group(DependencyGroup),
+    /// A list of per-type entries, each pairing a build type with its
+    /// packages. This is the form used by published registry indexes.
+    /// It must stay last so an empty list keeps matching `Group`.
+    List(Vec<BuildDependencyV2>)
 }
 
 /// Defines the dependencies of a package, including runtime, build, and test.
@@ -781,6 +786,18 @@ impl Dependencies {
                             build.push(BuildDependencyV2 {
                                 build_type: bt.clone(),
                                 packages
+                            });
+                        }
+                    }
+                }
+                BuildDependencies::List(l) => {
+                    for entry in l {
+                        if build_type.is_none()
+                            || build_type == Some(entry.build_type.as_str())
+                        {
+                            build.push(BuildDependencyV2 {
+                                build_type: entry.build_type.clone(),
+                                packages: entry.packages.clone()
                             });
                         }
                     }
@@ -862,6 +879,14 @@ pub fn to_dependencies_v2(deps: Dependencies) -> DependenciesV2 {
                     build.push(BuildDependencyV2 {
                         build_type: bt,
                         packages
+                    });
+                }
+            }
+            BuildDependencies::List(l) => {
+                for entry in l {
+                    build.push(BuildDependencyV2 {
+                        build_type: entry.build_type,
+                        packages: entry.packages
                     });
                 }
             }

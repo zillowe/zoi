@@ -266,10 +266,32 @@ pub struct ResolvedPurl {
 ///
 /// Expected format: `pkg:zoi/[registry-handle]/[repo]/[package]`
 ///
+/// This reads the central registry database from the environment and
+/// delegates to [`resolve_purl_with_db`].
+///
 /// # Errors
 /// Returns an error if the PURL is invalid, unsupported, or cannot be found in
 /// the registry.
 pub fn resolve_purl(purl_str: &str) -> Result<ResolvedPurl> {
+    let central_db = fetch_central_db()?;
+    resolve_purl_with_db(purl_str, &central_db)
+}
+
+/// Resolves a Zoi PURL string against a caller-provided registry database.
+///
+/// Expected format: `pkg:zoi/[registry-handle]/[repo]/[package]`
+///
+/// Unlike [`resolve_purl`], this performs no environment lookup, so it can
+/// resolve against local directory registries (where `git` is a filesystem
+/// path) without any network access.
+///
+/// # Errors
+/// Returns an error if the PURL is invalid, unsupported, or cannot be found in
+/// the registry.
+pub fn resolve_purl_with_db<S: ::std::hash::BuildHasher>(
+    purl_str: &str,
+    central_db: &HashMap<String, RegistryInfo, S>
+) -> Result<ResolvedPurl> {
     let purl: GenericPurl<String> =
         purl_str.parse().map_err(|e| anyhow!("Invalid PURL: {e}"))?;
 
@@ -299,7 +321,6 @@ pub fn resolve_purl(purl_str: &str) -> Result<ResolvedPurl> {
     }
     let expected_repo = remaining_ns.join("/");
 
-    let central_db = fetch_central_db()?;
     let registry = central_db.get(registry_handle).ok_or_else(|| {
         // If the handle is a known built-in registry, guide the user to add it.
         if let Some(builtin) = zoi_core::builtin::registry::get(registry_handle)
@@ -346,10 +367,30 @@ pub fn resolve_purl(purl_str: &str) -> Result<ResolvedPurl> {
 /// Fetches a package and all its Zoi dependencies by PURL and stores them
 /// locally.
 ///
+/// This reads the central registry database from the environment and
+/// delegates to [`fetch_and_store_purl_package_with_db`].
+///
 /// # Errors
 /// Returns an error if resolution, fetching, or local storage fails.
 pub fn fetch_and_store_purl_package(purl_str: &str) -> Result<String> {
-    let resolved = resolve_purl(purl_str)?;
+    let central_db = fetch_central_db()?;
+    fetch_and_store_purl_package_with_db(purl_str, &central_db)
+}
+
+/// Fetches a package and all its Zoi dependencies by PURL against a
+/// caller-provided registry database, and stores them locally.
+///
+/// Unlike [`fetch_and_store_purl_package`], this performs no environment
+/// lookup, so it can fetch from local directory registries (where `git`
+/// is a filesystem path) without any network access.
+///
+/// # Errors
+/// Returns an error if resolution, fetching, or local storage fails.
+pub fn fetch_and_store_purl_package_with_db<S: ::std::hash::BuildHasher>(
+    purl_str: &str,
+    central_db: &HashMap<String, RegistryInfo, S>
+) -> Result<String> {
+    let resolved = resolve_purl_with_db(purl_str, central_db)?;
     let db_root = zoi_core::utils::get_db_root()?;
 
     let mut fetched = std::collections::HashSet::new();
