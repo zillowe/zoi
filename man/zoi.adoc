@@ -9,186 +9,504 @@ zoi - the advanced package manager and environment orchestrator
 
 == Synopsis
 
-*zoi* [_OPTIONS_] _COMMAND_ [_ARGS_...]
+*zoi* [_GLOBAL-OPTIONS_] _COMMAND_ [_ARGS_...]
+
+*zoi* [_GLOBAL-OPTIONS_] _COMMAND_ *--help*
 
 == Description
 
-Zoi is part of the Zillowe Development Suite (ZDS). It streamlines development
-workflows by managing tools, packages, and project environments across
-operating systems. Packages come from registries of cryptographically signed
-archives; both binary archives (.zpa) and source bundles (.zsa) are supported.
-Zoi also manages declarative user environments and the underlying ZoiOS system.
+Zoi is part of the Zillowe Development Suite (ZDS). It streamlines
+development workflows by managing tools, packages, and project environments
+across operating systems. Packages come from registries of cryptographically
+signed archives; both pre-compiled binary archives (.zpa) and source bundles
+(.zsa) are supported. Zoi also manages declarative user environments and the
+underlying ZoiOS system.
 
-== Options
+Key capabilities include SAT-based dependency resolution with a two-phase
+transactional installer, bandwidth-efficient delta upgrades, PGP signature
+verification, project environments with lockfiles, background service
+management, and a Lua-based packaging format (see *zoi-lua*(5)). The same
+engine is available as a Rust library (see *zoi-rs*(3)).
 
-*-v*, *--version*::
-  Print detailed version and build information.
+This page documents every built-in command and its options. For the full
+online documentation, including guides and the registry specification, see
+https://zillowe.qzz.io/zds/zoi. Run *zoi COMMAND --help* for the
+authoritative per-command help.
+
+== Concepts
+
+*Package sources*::
+  Most commands accept a package source: a registry name such as
+  `@core/ripgrep`, a git source such as `#git@repo/name`, a local path to a
+  `.pkg.lua` file or `.zpa`/`.zsa` archive, or a URL. Some commands also
+  accept PURL identifiers.
+
+*Installation scopes*::
+  Packages install into one of three scopes: *user* (the current user,
+  the default), *system* (machine-wide, requires elevation), or *project*
+  (the current project directory). Use *--scope*, *--local* (project), or
+  *--global* (user) to select one.
+
+*Transactions*::
+  Installations run in two phases (prepare, then execute) and are recorded.
+  Use *zoi transaction* to inspect them and *zoi history* to review past
+  operations.
+
+*Delta upgrades*::
+  When a previous version of an archive is cached, upgrades try to fetch
+  and apply `.zdelta` patches instead of re-downloading the full archive.
+  If the cached version is several releases behind, each intermediate delta
+  is applied in sequence, up to the *max_delta_steps* configuration value
+  (default 3). Any failure falls back silently to a full download.
+
+== Global options
+
+These options may appear before any command.
 
 *-y*, *--yes*::
   Automatically answer yes to all prompts.
 
-*--root*=_PATH_::
+*--root*=_DIR_::
   Operate on a different root directory.
 
 *--offline*::
-  Do not attempt to connect to the network.
+  Do not attempt to connect to the network. Only local metadata and caches
+  are used.
 
-*--pkg-dir*=_PATH_::
-  Additional directory to search for .zpa archives.
+*--pkg-dir*=_DIR_::
+  Additional directory to search for .zpa archives. Repeatable.
+
+*-v*, *--version*::
+  Print detailed version and build information.
 
 *-h*, *--help*::
   Print help. Run *zoi COMMAND --help* for help on a specific command.
 
-== Commands
+== Package management
 
-*about*::
-  Show detailed application information and credits.
+*install*, *i*, *in*, *add* [_SOURCES_...] [_OPTIONS_]::
+  Install one or more packages from registry names, local files, URLs, or
+  git repositories.
++
+*--repo*=_REPO_:: Install from a git repository (conflicts with sources).
+*--force*:: Re-install even if already installed.
+*--all-optional*:: Accept all optional dependencies.
+*--scope*=_user|system|project_:: Installation scope.
+*--local*:: Alias for *--scope*=project. *--global*:: Alias for
+*--scope*=user.
+*--save*:: Save the package to zoi.yaml.
+*--deps-only*:: Install only dependencies, not the packages themselves.
+*--build-deps-only*:: Install only build dependencies.
+*--type*=_TYPE_:: Build type when building from source.
+*--dry-run*:: Show what would be done without changing anything.
+*-b*, *--build*:: Force building from source.
+*--frozen*:: Enforce zoi.lock exactly (project scope only).
+*--explain*:: Explain package selection decisions.
+*--plan-json*:: Print a machine-readable plan (requires *--dry-run*).
+*--retry*=_N_:: Failed download retries, minimum 1 (default 3).
+*-v*, *--verbose*:: Show origins and preflight details.
+*--purl*:: Resolve sources using the PURL specification.
 
-*audit*::
-  Audit installed packages for security vulnerabilities.
+*uninstall*, *un*, *rm*, *remove* _PACKAGES_... [_OPTIONS_]::
+  Uninstall one or more previously installed packages, removing their files
+  from the store and their binary shims.
++
+*--scope*=_user|system|project_:: Installation scope. *--local* and
+*--global* are aliases as in *install*.
+*--save*:: Also remove the package from zoi.yaml.
+*-r*, *--recursive*:: Recursively remove dependencies that are no longer
+needed.
+*--dry-run*:: Show what would be done. *--explain*:: Explain dependency
+impact and safety blocks. *--plan-json*:: Machine-readable plan (requires
+*--dry-run*).
 
-*autoremove*::
-  Remove packages installed as dependencies that are no longer needed.
+*update*, *up* [_PACKAGES_... | *--all*] [_OPTIONS_]::
+  Update one or more packages to their latest versions. With no packages
+  and no *--all*, behavior follows the command defaults; use *--all* to
+  update everything.
++
+*--all*:: Update all installed packages (conflicts with package list).
+*--dry-run*:: Show what would be done. *--explain*:: Explain decisions.
+*--plan-json*:: Machine-readable plan (requires *--dry-run*).
+*-v*, *--verbose*:: Verbose output. *--interactive*:: Interactively pick
+updates (requires *--all*).
 
-*cache*::
-  Manage Zoi's local cache of package archives.
+*use*, *u* _PACKAGES_... [*-g*, *--global*]::
+  Add a tool to the current project configuration (or the global
+  configuration with *--global*) and install it.
 
-*clone*::
-  Clone the git repository of a package.
+*downgrade*, *dg* _PACKAGE_::
+  Install an older version of a package from the local store or archive
+  cache. With no version given, offers an interactive selection.
 
-*create*::
-  Create an application using a package template.
+*rollback* _PACKAGE_::
+  Roll a package back to the previously installed version.
 
-*dev*::
-  Enter a development shell for the current project.
+*pin* _PACKAGE_ _VERSION_::
+  Pin a package to a specific version so updates skip it.
 
-*doctor*::
-  Check for common issues and provide actionable suggestions.
+*unpin* _PACKAGE_::
+  Remove a version pin so the package can be updated again.
 
-*download*::
-  Download a package archive or source bundle.
+*mark*, *m* _PACKAGES_... (*--as-dependency* | *--asexplicit*)::
+  Change the installation reason of a package. *--as-dependency*
+  (*--asdeps*) marks packages as dependencies; *--asexplicit*
+  (*--asexpl*) marks them as explicitly installed.
 
-*downgrade*::
-  Install an older version of a package from the local store or cache.
+*autoremove* [*--dry-run*]::
+  Remove packages that were installed as dependencies and are no longer
+  needed.
 
-*env*::
-  Manage and set up project environments defined in zoi.lua.
+*download*, *dl* _PACKAGE_ [_OPTIONS_]::
+  Download a package archive or source bundle without installing it.
++
+*--archive*:: Download the .zpa archive (default). *--source*:: Download
+the .zsa source bundle instead. *-o*, *--output-dir*=_DIR_:: Directory to
+write the download to.
 
-*exec*::
-  Execute a package binary directly with its dependencies resolved.
+*clone* _PACKAGE_ [_LOCATION_]::
+  Clone the upstream git repository of a package, optionally into
+  _LOCATION_.
 
-*extension*::
-  Manage Zoi extensions.
+*exec*, *x* _SOURCE_ [_ARGS_...] [_OPTIONS_]::
+  Execute a package binary directly with its dependencies resolved,
+  without a permanent install.
++
+*--bin*=_BIN_:: Select the binary for multi-binary packages.
+*-v*, *--verbose*:: Verbose output. Remaining arguments are passed to the
+binary.
 
-*files*::
-  List all files owned by a package.
+== Inspection and query
 
-*helper*::
-  Helper commands for various tasks.
+*list*, *ls* [_OPTIONS_]::
+  List installed packages, or all known packages with *-a*.
++
+*-a*, *--all*:: List packages from the database, not just installed ones.
+*-o*, *--outdated*:: Only show packages that can be upgraded.
+*--registry*=_HANDLE_:: Filter by registry. *--repo*=_REPO_:: Filter by
+repository tier. *-t*, *--type*=_TYPE_:: Filter by package type.
+*-m*, *--foreign*:: Show packages not present in any registry.
 
-*history*::
-  Show the history of package operations.
+*show* _PACKAGE_ [_OPTIONS_]::
+  Show detailed information about a package.
++
+*--raw*:: Print the unformatted package definition. *--purl*:: Resolve
+using the PURL specification.
 
-*home*::
-  Manage declarative user environments (ZoiOS only).
+*search*, *s* _TERM_ [_OPTIONS_]::
+  Search for packages by name or description.
++
+*--registry*=_HANDLE_, *--repo*=_REPO_, *--type*=_TYPE_:: Filters.
+*-t*, *--tag*=_TAGS_:: Filter by tags (comma-delimited, repeatable).
+*--sort*=_FIELD_:: Sort field (default name).
+*-f*, *--files*:: Search within provided files.
+*-i*, *--interactive*:: Interactive TUI picker.
 
 *info*::
   Display detected operating system and architecture information.
 
-*install*::
-  Install one or more packages from a name, local file, URL, or git
-  repository.
+*files* _PACKAGE_::
+  List all files owned by an installed package.
 
-*list*::
-  List installed or all available packages.
+*owner*, *owns* _PATH_::
+  Find which installed package owns a file.
 
-*man*::
-  Show a package's manual.
-
-*mark*::
-  Modify the installation reason of a package.
-
-*migrate*::
-  Migration helpers for converting external manifests to Zoi package files.
-
-*owner*::
-  Find which package owns a file.
-
-*package*::
-  Build, create, and manage Zoi packages.
-
-*pgp*::
-  Manage PGP keys for package signature verification.
-
-*pin*::
-  Pin a package to a specific version.
-
-*provides*::
+*provides* _TERM_::
   Find which package provides a specific command or file.
 
-*registry*::
-  Manage and author Zoi registries.
+*tree* _PACKAGES_...::
+  Visualize the dependency tree of one or more packages.
 
-*repo*::
-  Manage package repositories.
+*why* _PACKAGE_::
+  Explain why a package is installed (direct request or dependency chain).
 
-*rollback*::
-  Roll a package back to the previously installed version.
+*man* _PACKAGE_ [_OPTIONS_]::
+  Show a package's manual pages in a pager or TUI.
++
+*--upstream*:: Prefer upstream manuals. *--raw*:: Print without
+formatting. *--no-tui*:: Use the system pager instead of the TUI.
 
-*run*::
-  Execute a command defined in a local zoi.lua file.
+*history* [_OPTIONS_]::
+  Show the history of package operations.
++
+*--verify*:: Verify history integrity. *--export*=_FILE_:: Export history
+to a file. *--ndjson*:: Export in NDJSON format (requires *--export*).
 
-*search*::
-  Search for packages by name or description.
-
-*service*::
-  Manage background services for installed packages.
-
-*shell*::
-  Set up shell completions or enter an ephemeral environment with specific
-  packages.
-
-*show*::
-  Show detailed information about a package.
-
-*sync*::
-  Download or update the package database from the remote repository. Also
-  manages registries: `set <handle-or-url>`, `add <handle-or-url>`,
-  `remove <handle>`, and `list`. Handles resolve against built-in registry
-  definitions, and `default` resolves to the built-in `set: true` registry.
-
-*system*::
-  Manage the underlying ZoiOS system (ZoiOS only).
-
-*telemetry*::
-  Manage opt-in anonymous telemetry.
-
-*transaction*::
+*transaction*, *tx* _SUBCOMMAND_::
   Inspect recorded transactions.
++
+*list*, *ls*:: List known transaction logs. *show* _ID_:: Show transaction
+details. *files* _ID_:: List files modified by a transaction. *undo*,
+*rollback* [_ID_] [*--yes*]:: Undo a transaction (default: the last one).
 
-*tree*::
-  Visualize the dependency tree of a package.
+== Maintenance and health
 
-*uninstall*::
-  Uninstall one or more packages previously installed by Zoi.
+*sync*, *sy* [_SUBCOMMAND_] [_OPTIONS_]::
+  Download or update the package database from the remote repository.
++
+*-v*, *--verbose*:: Show underlying git output. *--fallback*:: Use
+fallback behavior. *--no-pm*:: Skip the native package-manager check.
+*--force*:: Force a fresh clone. *--local*:: Sync into ./.zoi/pkgs/db
+from zoi.lua. *--frozen*:: With *--local*, use zoi.lock.
+*--scope*=_user|system_:: Sync scope (conflicts with *--local*).
++
+Registry management subcommands: *add* _URL_:: Add a registry.
+*remove* _HANDLE_:: Remove a registry. *list*, *ls*:: List configured
+registries. *set* _URL_:: Set the default registry URL (accepts
+`default`, `github`, `gitlab`, `codeberg`, or a URL).
 
-*unpin*::
-  Unpin a package so it can be updated.
+*upgrade*, *ug* [_OPTIONS_]::
+  Upgrade the Zoi binary itself to the latest release, using a delta
+  patch when possible.
++
+*--force*:: Skip the delta patch and download the full binary.
+*--tag*=_TAG_:: Upgrade to a specific release tag.
+*--branch*=_BRANCH_:: Upgrade from a release branch such as Prod or Pub.
 
-*update*::
-  Update one or more packages to their latest versions.
+*doctor*::
+  Check the installation for common issues and print actionable
+  suggestions.
 
-*upgrade*::
-  Upgrade the Zoi binary to the latest version.
+*audit* [_OPTIONS_]::
+  Audit installed packages for known security vulnerabilities.
++
+*-a*, *--all*:: Audit all packages in the database, not just installed
+ones. *--registry*=_HANDLE_, *--repo*=_REPO_:: Scope the audit.
 
-*use*::
-  Add a tool to the current project or global configuration and install it.
+*cache* _SUBCOMMAND_::
+  Manage Zoi's local cache of package archives.
++
+*add* _FILES_...:: Add .zpa archives to the cache. *clear*, *clean*
+[*--dry-run*]:: Clear the entire cache. *list*, *ls*:: List cached
+archives. *mirror add* _URL_, *mirror remove* _URL_, *mirror list*
+(*ls*):: Manage fallback cache-mirror base URLs.
 
-*version*::
+*repo*, *repositories* _SUBCOMMAND_::
+  Manage package repositories.
++
+*add*, *a* [_REPO-OR-URL_]:: Enable an official repository or clone a git
+URL. *remove*, *rm* _REPO_:: Remove a repository from the active
+configuration. *list*, *ls* [*all*]:: List active repositories (`all`
+also shows discovered ones). *git list* (*ls*):: Show cloned git
+repositories. *git rm* _REPO_:: Remove a cloned git repository.
+
+*pgp* _SUBCOMMAND_::
+  Manage PGP keys used for package signature verification.
++
+*add*:: Import a key from *--path*=_ASC_, *--fingerprint*=_FP_ (via
+keys.openpgp.org), or *--url*=_URL_. *--name*=_NAME_ defaults to the
+filename stem and is required with *--fingerprint*.
+*remove*, *rm* [_NAME_] [*--fingerprint*=_FP_]:: Remove a key.
+*list*, *ls*:: List imported keys. *search* _TERM_:: Search keys by user
+ID or fingerprint. *show* _NAME_:: Print a public key. *verify*:: Verify
+a detached signature (*--file*, *--sig*, and *--key* are required).
+
+*telemetry* _ACTION_::
+  Manage opt-in anonymous telemetry (disabled by default). _ACTION_ is
+  one of *status*, *enable*, or *disable*.
+
+== Package authoring
+
+*package*, *pkg* _SUBCOMMAND_::
+  Build, create, test, and manage Zoi packages. Package definitions are
+  `.pkg.lua` scripts; see *zoi-lua*(5).
+
+*build* _FILE_ [_OPTIONS_]::
+  Build a distributable archive from a `.pkg.lua` definition.
++
+*--type*=_TYPE_:: Build type. *-p*, *--platform*=_P_:: Target platforms,
+repeatable (default: current; accepts values such as `linux-amd64` or
+`all`). *--sub*=_SUBS_:: Sub-packages to build, repeatable.
+*--sign*=_KEY_:: Sign with a PGP key from the keyring (name or
+fingerprint). *--sign-mode*=_embed|file_ (default embed).
+*--test*:: Run the package test phase. *-o*, *--output-dir*=_DIR_::
+Output directory. *--install-deps*:: Install build dependencies first.
+*--version-override*=_V_:: Override the package version.
+*--method*=_M_:: Build method: `native` (default), `bwrap`, or `docker`.
+*--image*=_IMG_:: Container image for docker builds. *--fakeroot*:: Fake
+UID/GID 0 during the build. *--pure*:: Build in a clean sysroot (forces
+bwrap). *--root-package*=_PKG_:: Root package for the build environment.
+*--no-zsa*:: Skip writing the .zsa source bundle.
+
+*bundle* _FILE_ [_OPTIONS_]::
+  Bundle a package definition and its local assets into a .zsa source
+  archive. Accepts *-o*, *--output-dir*, *--sign*, *--sign-mode*,
+  *--version-override*, and *-t*/*--build-type* as in *build*.
+
+*test* _FILE_ [_OPTIONS_]::
+  Run the `prepare`, `package`, and `test` phases of a `.pkg.lua`
+  definition (same options as *build*).
+
+*install* _FILE_ [_OPTIONS_]::
+  Install a local .zpa archive.
++
+*-s*, *--sub*=_SUBS_:: Sub-packages, repeatable.
+*--scope*=_user|system_ (default user). *--yes*:: Skip confirmation.
+
+*delta* _OLD_ _NEW_ [_OPTIONS_]::
+  Generate a `.zdelta` patch transforming the _OLD_ archive into the
+  _NEW_ archive, plus `.hash` and `.size` sidecars.
++
+*-o*, *--output*=_FILE_:: Output path (default: _NEW_ with a `.zdelta`
+extension). *--sign*=_KEY_:: Also write a detached `.sig` sidecar.
+
+*verify* [_TARGET_] [_OPTIONS_]::
+  Verify installed packages (like `rpm -V`) or a single archive.
++
+_TARGET_ is `installed` (default) or `archive`. For `installed`:
+_PACKAGES_... (default: all), *--scope*=_user|system_, *--json*. For
+`archive`: *--file*=_ZPA_ (required) and *--json*.
+
+*doctor* _FILE_ [_OPTIONS_]::
+  Lint and validate a package definition.
++
+*--platform*=_P_ (default current). *--version-override*=_V_.
+
+*init-lsp* [_PATH_]::
+  Initialize Lua language-server support (`.luarc.json` plus type
+  definitions) for authoring `.pkg.lua` files. Defaults to the current
+  directory.
+
+*inspect* _FILE_ [_OPTIONS_]::
+  Inspect a package definition and its output metadata.
++
+*--json*:: Machine-readable output. *--platform*=_P_.
+*--version-override*=_V_.
+
+*migrate scoop* _INPUT_ [_OPTIONS_]::
+  Convert a Scoop manifest into a `.pkg.lua` definition.
++
+*-o*, *--output*=_FILE_ (default: _<name>_.pkg.lua).
+*--repo*=_TIER_ (default community). *--name*=_NAME_,
+*--version*=_VER_, *--maintainer-name*=_N_,
+*--maintainer-email*=_E_:: Metadata overrides. *--dry-run*:: Print
+instead of writing.
+
+*create* _SOURCE_ [_APP-NAME_]::
+  Create a new application from a package template source.
+
+== Registry authoring
+
+*registry*, *reg* _SUBCOMMAND_::
+  Manage and author Zoi registries. See the registry specification in the
+  online documentation.
+
+*init* [_PATH_]::
+  Initialize a new registry layout (default: current directory).
+
+*generate-metadata*, *gen-meta*::
+  Generate `packages.json` and `advisories.json` for a registry.
+
+*check*, *lint*, *audit*::
+  Validate registry integrity and package definitions.
+
+*add-package*, *add-pkg* [_NAME_] [*-r*, *--repo*=_TIER_]::
+  Add a package to the registry.
+
+*add-advisory*, *sec* [_PACKAGE_] [*-r*, *--repo*=_TIER_]::
+  Add a security advisory for a package.
+
+== Environments and projects
+
+*dev*, *develop* [_OPTIONS_]::
+  Enter a development shell for the current project.
++
+*-r*, *--run*=_CMD_:: Run a command instead of opening an interactive
+shell. *--repo*=_REPO_:: Use a temporary clone.
+
+*run* [_ALIAS_] [_ARGS_...]::
+  Execute a command defined in the local zoi.yaml task runner. With no
+  alias, offers interactive selection.
+
+*env* [_ALIAS_] [_OPTIONS_]::
+  Manage and set up project environments defined in zoi.yaml.
+  *--export-shell* is internal.
+
+*shell* [_SHELL_] [_OPTIONS_]::
+  Set up shell completions, print the shell hook, or enter an ephemeral
+  environment with extra packages.
++
+*--hook*:: Print the shell hook script. *--scope*=_user|system_ (default
+user). *-p*, *--package*=_PKG_:: Extra packages for the ephemeral
+environment, repeatable. *-r*, *--run*=_CMD_:: Run a command.
+*-v*, *--verbose*:: Verbose output. With a _SHELL_ argument, installs
+completions for that shell.
+
+== Services and the system
+
+*service*, *svc* _SUBCOMMAND_::
+  Manage background services declared by installed packages.
+
+*start* _PACKAGE_:: Start a service. *stop* _PACKAGE_:: Stop a service.
+*restart* _PACKAGE_:: Restart a service. *status* _PACKAGE_:: Show service
+status. *enable* _PACKAGE_:: Start the service at boot.
+*disable* _PACKAGE_:: Do not start the service at boot. *list*, *ls*::
+List packages that define a service and their status.
+
+*home* _SUBCOMMAND_ (ZoiOS only)::
+  Manage declarative user environments.
+
+*apply* [*-f*, *--file*=_FILE_]::
+  Apply the declarative user configuration (default:
+  ~/.config/zoi/home.lua).
+
+*system* _SUBCOMMAND_ (ZoiOS only, except *secret* and *distro*)::
+  Manage the underlying ZoiOS system.
+
+*apply* [_FILE_]::
+  Apply a system configuration (default: /etc/zoi/system.lua).
+*list*:: List system generations. *status*:: Show the active generation.
+*rollback* _ID_:: Roll back to generation _ID_. *pin* _ID_:: Protect a
+generation from pruning. *unpin* _ID_:: Allow pruning again.
+*secret hash* _PASSWORD_:: One-way hash for system.lua.
+*secret encrypt* _VALUE_:: Encrypt a string for this machine.
+*secret decrypt* _SECRET_:: Decrypt a machine-local secret.
+*secret export-key*:: Export the master key (base64).
+*secret import-key* _KEY_:: Import a master key.
+*distro build* (*-t*, *--target*=_DEV|IMG_ and *-c*, *--config*=_LUA_
+required) [*--dry-run*]:: Build a ZoiOS image or install to disk.
+*distro chroot* _TARGET_ [*-r*, *--run*=_CMD_] [*-v*, *--verbose*]:: Enter
+a sysroot chroot with automatic mounts.
+
+== Miscellaneous
+
+*about*::
+  Show detailed application information and credits.
+
+*version*, *v*::
   Print concise version and build information.
 
-*why*::
-  Explain why a package is installed.
+*extension*, *ext* (*add* | *remove*) _NAME_::
+  Add or remove a Zoi extension.
+
+*helper* _SUBCOMMAND_::
+  Small utilities. *get-hash* _SOURCE_ [*--hash*=_sha512|sha256_]:: Hash
+  a local file or URL. *validate* (*val*) _FILE_:: Validate a
+  `repo.yaml`, registry, hook, or advisories file. The `elevate-*`
+  subcommands are internal helpers used for privilege escalation and are
+  not meant to be run directly.
+
+External subcommands (plugins)::
+  Any unknown subcommand is forwarded to an installed plugin, so *zoi
+  myplugin args...* runs the `zoi-myplugin` extension.
+
+== Configuration
+
+Zoi merges configuration from three layers; a project file overrides the
+user file, which overrides the system file unless a system *policy* locks
+a setting. See the online configuration reference for every key.
+
+*System* (/etc/zoi/config.yaml)::
+  Machine-wide defaults and administrator policy locks.
+
+*User* (~/.config/zoi/config.yaml)::
+  Per-user preferences. The most commonly adjusted keys include the
+  default registry, *jobs*, *max_delta_steps* (sequential delta-upgrade
+  limit, default 3), *offline_mode*, *cache_mirrors*, *pkg_dirs*, and
+  *system_generations_limit*.
+
+*Project* (./.zoi/pkgs/config.yaml)::
+  Per-project overrides for the current directory.
 
 == Files
 
@@ -203,23 +521,81 @@ Zoi also manages declarative user environments and the underlying ZoiOS system.
   *~/.local/share/zoi/* on most systems.
 
 *./zoi.yaml*::
-  Legacy per-project task runner.
+  Project task runner and dependency declarations.
 
 *./zoi.lua*::
   Per-project configuration and dependencies.
 
+*./zoi.lock*::
+  Pinned project dependency lockfile (used with *--frozen*).
+
 *./.zoi/*::
   Per-project lockfile and local package store.
 
+== Environment
+
+*XDG_CONFIG_HOME*, *XDG_DATA_HOME*, *XDG_CACHE_HOME*::
+  Respect the base-directory specification for configuration, data, and
+  cache locations.
+
+*HOME*::
+  Home directory, used to locate the user configuration and data when the
+  XDG variables are unset.
+
+*NO_COLOR*::
+  When set, colorized terminal output is disabled.
+
 == Exit status
 
-*0*:: Success.
+*0*::
+  Success.
 
-*1*:: An error occurred during the operation.
+*1*::
+  An error occurred during the operation.
+
+== Examples
+
+Install a package from the default registry, answering yes to prompts:
+
+  *zoi -y install @core/ripgrep*
+
+Preview an upgrade plan without changing anything:
+
+  *zoi update --all --dry-run*
+
+Update everything and explain the decisions:
+
+  *zoi update --all --explain*
+
+Build a package for the current platform and sign it:
+
+  *zoi package build ./mypkg.pkg.lua --sign mykey*
+
+Generate a delta patch between two archives:
+
+  *zoi package delta old.zpa new.zpa -o new.zdelta*
+
+Enter a development shell for the current project:
+
+  *zoi dev*
+
+Execute a binary without installing it:
+
+  *zoi exec @core/ripgrep -- --version*
+
+== Bugs
+
+Report bugs and request features in the project tracker at
+https://gitlab.com/zillowe/zillwen/zusty/zoi.
 
 == See also
 
 *zoi-rs*(3), *zoi-lua*(5)
+
+Full online documentation: https://zillowe.qzz.io/zds/zoi
+
+Project repository and issue tracker:
+https://gitlab.com/zillowe/zillwen/zusty/zoi
 
 == Copying
 

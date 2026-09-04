@@ -11,14 +11,30 @@ zoi-lua - Lua scripting environment for defining Zoi packages
 
 [source,lua]
 ----
-metadata { name = "hello", version = "1.0.0" }
+metadata {
+    name = "hello",
+    repo = "core",
+    version = "1.0.0",
+    description = "A friendly greeting",
+    maintainer = { name = "Jane", email = "jane@example.com" },
+    license = "MIT",
+    types = { "source" },
+}
+
+dependencies {
+    build = { "zoi:core/cmake" },
+}
+
+function prepare()
+    UTILS.EXTRACT("https://example.com/hello-1.0.0.tar.gz", "src")
+end
 
 function build()
-    cmd("make CFLAGS='-O2'")
+    cmd("cmake -S src -B build && cmake --build build")
 end
 
 function package()
-    zcp("hello", "${pkgstore}/bin/hello")
+    zcp("build/hello", "${pkgstore}/bin/hello")
     zman("hello.1", "1")
 end
 ----
@@ -31,63 +47,145 @@ paths, build helpers, and download utilities. The script declares package
 metadata and lifecycle functions; the contents of the staging directory
 become the package archive.
 
+Build a definition with *zoi package build* (see *zoi*(1)), and use
+*zoi package init-lsp* to get Lua language-server support while authoring.
+Longer guides live at https://zillowe.qzz.io/zds/zoi.
+
 == Global variables
 
 *SYSTEM*::
-  Host system information: OS, architecture, distribution, kernel, display
-  server, init system, and native package manager.
+  Host system information: *OS*, *ARCH*, *DISTRO*, *DISTRO_VER*, *DE*,
+  *SERVER*, *KERNEL_VER*, *INIT*, *CPU*, *GPU*, and *MANAGER* (native
+  package manager). Later entries are only present when detected. Use it
+  for conditional logic such as `if SYSTEM.OS == "linux" then ... end`.
+  Also exported to `cmd` subshells as `SYSTEM_*` variables.
 
 *ZOI*::
-  Zoi environment information, including the resolved package version.
-  *ZOI.scope* holds the requested installation scope (`user`, `system`, or
-  `project`).
+  Zoi environment information: *VERSION* (resolved package version),
+  *scope* (`user`, `system`, or `project`), *CREATE_PKG_DIR*, *PATH*
+  (user and system paths), plus copies of the *ZOI.PKG* and
+  *ZOI.LOCATION* tables.
 
 *ZOI.PKG*::
   Paths for the current package: the store, the template root, the system
-  root, the home directory, and the script itself.
+  root, the home directory, and the script path.
 
 *LOCATION*::
-  Absolute staging paths that match the `${...}` placeholders such as
-  `${pkgstore}` and `${usrroot}`.
+  Absolute staging paths. During builds, *PKGSTORE* points into the
+  staging area while *HOME*, *ROOT*, and *TEMPLATE* mirror the real
+  install roots; *PKGLUADIR* is the directory of the `.pkg.lua` script,
+  and *BUILDDIR*/*STAGINGDIR* are the active work directories.
 
 *PKG*::
-  The resolved metadata table.
+  The resolved metadata table. Every key passed to *metadata* is mirrored
+  here, so `PKG.name` and `PKG.version` are readable after the
+  declaration.
 
 *BUILD_DIR* and *STAGING_DIR*::
-  The temporary build directory and the staging directory whose contents
-  become the package archive.
+  The temporary build directory (also the working directory of *cmd*)
+  and the staging directory whose contents become the package archive.
 
 *BUILD_TYPE*::
-  The requested build method, e.g. `source` or `pre-compiled`.
+  The requested build method: `source` or `pre-compiled`. Also exported
+  to `cmd` subshells as `$BUILD_TYPE`.
 
 *SUBPKG*::
-  The sub-package name while processing split packages.
+  The sub-package name while split packages are processed, otherwise nil.
+  Lifecycle functions also receive it as `args.sub`.
+
+== Package definitions
+
+*metadata*(_table_)::
+  Define package properties. Required keys: *name*, *repo*, *description*,
+  *maintainer* (a table with *name* and *email*), and *types* (for example
+  `{"source"}` or `{"pre-compiled"}`). Common optional keys: *version*,
+  *revision*, *epoch*, *license* (SPDX identifier), *website*, *git*,
+  *author*, *platforms* (such as `"linux-amd64"`), *scope* or *scopes*,
+  *sub_packages* and *main_subs*, *type* (`package`, `app`,
+  `collection`, or `extension`), *conflicts*, *replaces*, *provides*,
+  *tags*, *bins*, *versions* (channel map), *rollback*, and *zoios*.
+
+*dependencies*(_table_)::
+  Define build-time and runtime requirements with the keys *runtime*,
+  *build*, and *test*. Each group is a list of dependency strings, or a
+  table with *required*, *optional*, *options* (named optional sets with
+  their own dependencies), and *sub_packages*. The *build* group may
+  additionally be keyed by build type. A dependency string looks like
+  `[manager:]package[@version][:description]`; the manager defaults to
+  `zoi`, for example `"zoi:core/foo@1.2.3"` or `"pacman:zip"`.
+
+*updates*(_list_)::
+  Update messages shown to the user during upgrades. Each entry has
+  *type* (`update`, `change`, or `vulnerability`) and *message*.
+
+*hooks*(_table_)::
+  Shell commands run at lifecycle points: *pre_install*,
+  *post_install*, *pre_upgrade*, *post_upgrade*, *pre_remove*, and
+  *post_remove*. Each value is a command list, optionally keyed by OS.
+
+*service*(_table_)::
+  Define a background service managed through *zoi service*, with *run*,
+  *run_at_load*, *working_dir*, *env*, *log_path*, and *error_log_path*.
+
+== Lifecycle functions
+
+Zoi calls these in order when building a package. Each takes an optional
+`args` table carrying `sub` for split packages.
+
+*prepare*([_args_])::
+  Fetch source code or binaries into *BUILD_DIR*. Also runs for
+  *zoi package bundle* and *zoi package test*.
+
+*build*([_args_])::
+  Compile the package in *BUILD_DIR*. Optional; runs only for
+  *zoi package build*, between *prepare* and *package*.
+
+*package*([_args_])::
+  Stage files into *STAGING_DIR* using the staging functions below. Runs
+  once per sub-package and scope combination.
+
+*verify*([_args_])::
+  Verify the integrity of the fetched files; return `true` or `false`.
+  Runs after pooling, before the archive is written.
+
+*test*([_args_])::
+  Validate the staged files during *zoi package test*. Must return a
+  boolean explicitly.
+
+*uninstall*()::
+  Clean up state outside the package store when the package is
+  uninstalled, using *zrm*.
 
 == Staging functions
 
+Destination paths must use the placeholders `${pkgstore}`, `${usrroot}`,
+and `${usrhome}`; source paths are relative to *BUILD_DIR* or use
+`${pkgluadir}` for files next to the script. Staging calls are queued and
+executed atomically by Zoi, except *zsed* and *zpatch*, which act
+immediately.
+
 *zcp*(_source_, _destination_)::
-  Stage a file or directory into the package. Use `${pkgluadir}` for files
-  next to the script.
+  Stage a file or directory into the package.
 
 *zlicense*(_source_)::
-  Stage a license file for the package.
+  Stage a license file into the package license directory.
 
 *zdoc*(_source_)::
-  Stage a documentation file for the package.
+  Stage a documentation file.
 
 *zman*(_source_, [_section_])::
-  Stage a manual page. If a directory is given, all manual files inside are
-  staged recursively. The section is inferred from the file extension when
-  omitted.
+  Stage a manual page or a directory of pages. The section is inferred
+  from the file extension when omitted.
 
 *zshell*(_source_, _shell_)::
-  Stage a shell completion file for bash, zsh, fish, or elvish.
+  Stage a shell completion file for `bash`, `zsh`, `fish`, or `elvish`,
+  and register it for global linking.
 
 *zln*(_target_, _link_)::
   Create a symbolic link in the package.
 
 *zchmod*(_path_, _mode_)::
-  Set file permissions, e.g. `0755`.
+  Set file permissions, for example `0755`.
 
 *zchown*(_path_, _owner_, _group_)::
   Set file ownership.
@@ -99,81 +197,129 @@ become the package archive.
   Remove files outside the package store while running `uninstall()`.
 
 *zsed*(_pattern_, _replacement_, _file_)::
-  Apply a regular expression replacement to a file in the build directory.
+  Apply a regular expression replacement to a file in the build
+  directory, immediately.
 
 *zpatch*(_patch_file_, [_strip_])::
-  Apply a patch file using the `patch` command.
-
-== Package definitions
-
-*metadata*(_table_)::
-  Define package properties such as name, version, and description.
-
-*dependencies*(_table_)::
-  Define build-time and runtime requirements.
-
-*updates*(_list_)::
-  Define update messages shown to the user.
-
-*hooks*(_table_)::
-  Define commands to run at lifecycle points such as `post_install`.
-
-*service*(_table_)::
-  Define a background service managed by the system.
-
-== Lifecycle functions
-
-Zoi calls these in order when building a package.
-
-*prepare*(_args_)::
-  Fetch source code or binaries into *BUILD_DIR*.
-
-*build*(_args_)::
-  Compile the package in *BUILD_DIR*.
-
-*package*(_args_)::
-  Stage files into *STAGING_DIR*.
-
-*verify*(_args_)::
-  Verify the integrity of the fetched files; return `true` or `false`.
-
-*test*(_args_)::
-  Validate the staged files during `zoi package test`.
-
-*uninstall*()::
-  Clean up external state when the package is uninstalled.
+  Apply a patch file with the `patch` command (default strip level 1),
+  immediately.
 
 == Utility functions
 
 *cmd*(_command_)::
-  Execute a shell command in a persistent session shared across calls in the
-  same phase. It returns *stdout*, *stderr*, and *exit_code*.
+  Execute a shell command in a persistent session shared across calls in
+  the same phase. Returns *stdout*, *stderr*, and *exit_code*; a nonzero
+  exit does not abort the script, so check *exit_code*.
 
 *IMPORT*(_file_name_)::
   Read a file located next to the script. JSON, YAML, and TOML files are
-  parsed into tables.
+  parsed into tables; anything else is returned as a string.
 
 *INCLUDE*(_file_name_)::
   Execute another Lua script located next to this one.
 
-*UTILS.FETCH*, *UTILS.PARSE*, *UTILS.DOWNLOAD*, *UTILS.FILE*,
-*UTILS.EXTRACT*, *UTILS.ARCHIVE*, *UTILS.MAKE_ARCHIVE*, *UTILS.FS*,
-*UTILS.FIND*::
-  Download, parse, extract, and archive helpers. Downloads can verify a
-  `sha512-` or `sha256-` hash.
-
 *verifyHash*(_file_, _"algo-hash"_)::
-  Verify a file's checksum.
+  Verify a file checksum such as `"sha256-<hex>"`. Returns boolean.
 
 *verifySignature*(_file_, _signature_, _key_)::
-  Verify a PGP detached signature.
+  Verify a detached PGP signature. The key may be a path, a URL, or a
+  keyring name. Returns boolean.
 
 *addPgpKey*(_url_or_path_, _name_)::
-  Trust a PGP key for verification.
+  Import a PGP key into the Zoi keyring for verification. Returns
+  boolean.
+
+== UTILS library
+
+*UTILS.FETCH.url*(_url_)::
+  GET a URL body as a string.
+
+*UTILS.FETCH.GITHUB* / *GITLAB* / *GITEA* / *FORGEJO*::
+  Query forge APIs for the latest tag, release, or commit of a
+  repository, for example
+  `UTILS.FETCH.GITHUB.LATEST.tag({repo = "owner/name"})`.
+
+*UTILS.PARSE.json* / *yaml* / *toml*(_string_)::
+  Parse a document into a Lua table.
+
+*UTILS.PARSE.checksumFile*(_content_, _filename_)::
+  Extract a hash from a `sha256sums`-style checksum file.
+
+*UTILS.FILE*(_url_, _path_)::
+  Download a URL to an exact path with progress reporting.
+
+*UTILS.DOWNLOAD*(_url_, [_out_name_], [_hash_])::
+  Download into *BUILD_DIR* (default: URL basename) with optional hash
+  verification and retries. Returns the filename.
+
+*UTILS.EXTRACT*(_source_, [_out_name_])::
+  Unpack an archive (zip, tar variants, zstd, 7z, deb, and more; dmg
+  and .pkg on macOS) into a subdirectory of *BUILD_DIR*. Accepts URLs
+  directly.
+
+*UTILS.ARCHIVE.list*(_path_)::
+  List archive entries.
+
+*UTILS.MAKE_ARCHIVE*(_source_, _output_, [_algo_])::
+  Create an archive from *BUILD_DIR*-relative paths.
+
+*UTILS.FS.exists* / *copy* / *move* / *chmod*::
+  Immediate filesystem operations.
+
+*UTILS.FIND.file*(_dir_, _name_)::
+  Recursively find a file under *BUILD_DIR* and return its relative
+  path.
+
+== Examples
+
+Minimal source package:
+
+[source,lua]
+----
+metadata {
+    name = "hello",
+    repo = "core",
+    version = "1.0.0",
+    description = "A friendly greeting",
+    maintainer = { name = "Jane", email = "jane@example.com" },
+    license = "MIT",
+    types = { "source" },
+}
+
+function prepare()
+    UTILS.EXTRACT("https://example.com/hello-1.0.0.tar.gz", "src")
+end
+
+function build()
+    cmd("cmake -S src -B build && cmake --build build")
+end
+
+function package()
+    zcp("build/hello", "${pkgstore}/bin/hello")
+end
+----
+
+Conditional dependency per operating system:
+
+[source,lua]
+----
+local runtime = { "zoi:core/zlib" }
+
+if SYSTEM.OS == "linux" then
+    table.insert(runtime, "pacman:glibc")
+end
+
+dependencies { runtime = runtime }
+----
 
 == See also
 
 *zoi*(1), *zoi-rs*(3)
+
+Online documentation: https://zillowe.qzz.io/zds/zoi
+
+Project repository and issue tracker:
+https://gitlab.com/zillowe/zillwen/zusty/zoi
 
 == Copying
 

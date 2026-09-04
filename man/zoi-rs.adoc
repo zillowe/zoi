@@ -27,81 +27,227 @@ fn main() -> Result<()> {
 
 == Description
 
-The *zoi-rs* crate exposes Zoi's package management, dependency resolution,
-and archive building capabilities as a Rust library. Its API is designed
-around "Pragmatic Transactionality": a two-phase installation process,
-SAT-based dependency resolution, and cryptographically verified registry
-state. The same code powers the *zoi*(1) command-line interface.
+The *zoi-rs* crate (imported as *zoi*) exposes Zoi's package management,
+dependency resolution, and archive building capabilities as a Rust library.
+Its API is designed around "Pragmatic Transactionality": a two-phase
+installation process, SAT-based dependency resolution, and
+cryptographically verified registry state. The same code powers the
+*zoi*(1) command-line interface.
 
-== Key functions
+The authoritative API reference with runnable examples is published at
+https://docs.rs/zoi-rs. The crate is distributed through crates.io at
+https://crates.io/crates/zoi-rs. Conceptual guides live at
+https://zillowe.qzz.io/zds/zoi.
 
-*build_with_options*::
-  Build a distributable .zpa archive from a `.pkg.lua` definition. Use
-  *BuildOptions* to select build type, target platforms, signing, and output.
+== Installation
 
-*install_package_with_options*::
+Add the crate to a Rust project with Cargo:
+
+  *cargo add zoi-rs*
+
+or declare the dependency manually in Cargo.toml:
+
+[source,toml]
+----
+[dependencies]
+zoi-rs = "1"
+anyhow = "1"
+----
+
+The library targets recent stable Rust (edition 2024) and defines no
+optional feature flags. All fallible functions return `anyhow::Result`.
+
+== Installing packages
+
+*install_sources*(_sources_, _options_)::
+  Install one or more package sources: registry names such as
+  `@core/ripgrep`, local `.pkg.lua` files, URLs, or local manifests.
+  Takes *SourceInstallOptions*. This is the same path the CLI install
+  command uses, including plugin loading.
+
+*install_package*(_archive_, _scope_, _registry_, _yes_, _subs_)::
   Install a local .zpa archive. Returns the list of installed files.
+  Simplified wrapper around *install_package_with_options* with binary
+  linking enabled.
 
-*install_sources*::
-  Install one or more package sources (registry names, local .pkg.lua files,
-  URLs, or local manifests).
+*install_package_with_options*(_archive_, _options_)::
+  Install a local .zpa archive with full control. Takes
+  *PackageInstallOptions* and returns the list of installed files.
 
-*update_packages*::
-  Update installed packages to their latest versions.
+*update_packages*(_all_, _names_, _yes_)::
+  Update installed packages to their latest versions through a
+  transactional upgrade check against the registries.
 
-*resolve_dependency_graph*::
-  Calculate the required packages and their dependencies without modifying
-  disk.
+*uninstall_package*(_name_, _scope_)::
+  Remove an installed package from the store and unlink its binaries.
+  The name may include registry, repository, sub-package, and version
+  selectors.
 
-*resolve_package*::
-  Resolve a single package source into *ResolvedPackage* metadata.
+== Resolving packages
 
-*bundle_package*::
-  Bundle a package and its local assets into a .zsa source archive.
+*resolve_package*(_source_, _yes_)::
+  Resolve a single source string into *ResolvedPackage* metadata
+  (package definition, exact version, origin, and registry handle)
+  without installing anything.
 
-*build*::
-  Build a package archive from source using a `.pkg.lua` definition.
+*resolve_dependency_graph*(_sources_, _options_)::
+  Calculate the full dependency graph for a set of sources without
+  modifying the disk. Returns a *DependencyResolution* holding the
+  install graph plus any non-Zoi (foreign manager) dependencies. Takes
+  *DependencyResolutionOptions*.
 
-*install_package*::
-  Install a package archive.
+== Building and bundling
 
-*uninstall_package*::
-  Uninstall an installed package.
+*build_with_options*(_package_file_, _options_)::
+  Build a distributable .zpa archive from a `.pkg.lua` definition (see
+  *zoi-lua*(5)). Takes *BuildOptions* to select build type, target
+  platforms, signing, output directory, build method, and testing.
 
-== Options structs
+*build*(_package_file_, _build_type_, _platforms_, _sign_key_,
+_install_deps_, _method_, _image_, _version_override_)::
+  Simplified wrapper around *build_with_options* with embedded
+  signatures and no test phase.
 
-*BuildOptions*::
-  Configure archive building.
+*bundle_package*(_package_file_, _output_dir_, _sign_, _version_override_,
+_build_type_)::
+  Bundle a package definition and its local assets into a .zsa source
+  archive, always with an embedded signature.
 
-*PackageInstallOptions*::
-  Configure local archive installation.
+== Option structs
 
 *SourceInstallOptions*::
-  Configure installation of package sources.
+  Configure source installation: *repo* (git spec), *force*,
+  *all_optional*, *yes*, *scope_override*, *save* (write to zoi.yaml),
+  *build_type*, *dry_run* (plan only), *build* (force a source build),
+  and *frozen* (enforce zoi.lock).
+
+*PackageInstallOptions*::
+  Configure local archive installation: *scope_override* (default User),
+  *registry_handle* (default "local"), *yes* (default true),
+  *sub_packages*, and *link_bins* (default true).
+
+*BuildOptions*::
+  Configure archive building: *build_type*, *platforms* (default:
+  current platform), *sign_key*, *sign_mode* (Embed or File),
+  *output_dir*, *sub_packages*, *install_deps* (default true), *test*,
+  *method* ("native", "bwrap", or "docker"), *image*, *version_override*,
+  and *fakeroot*.
 
 *DependencyResolutionOptions*::
-  Configure dependency graph resolution.
+  Configure graph resolution: *scope_override*, *force*, *yes*,
+  *all_optional*, *build_type*, and *quiet*.
 
-== Types
+== Key types
 
 *Scope*::
   Selects the *User*, *System*, or *Project* installation scope.
 
+*ResolvedPackage*::
+  The result of *resolve_package*: the package definition, exact
+  version, an optional shareable manifest, the source path, and origin
+  metadata (registry handle, repository type, git revision).
+
+*DependencyResolution*::
+  The result of *resolve_dependency_graph*: the dependency graph plus
+  foreign dependencies.
+
 *types*::
-  Package metadata types, including *types::Package* and *types::SignMode*.
+  Package metadata types, including *types::Package*,
+  *types::Config* and *types::Policy*, *types::InstallManifest*,
+  *types::SignMode*, registry types, services, hooks, and security
+  advisories.
 
 *utils*::
-  Shared helpers such as platform detection and hash utilities.
+  Shared helpers such as platform detection, well-known directory paths,
+  HTTP client construction, filesystem utilities, hashing, and prompting.
+
+== Modules
+
+*zoi::cli*, *zoi::cmd*::
+  Command-line argument parsing and the implementation of every *zoi*(1)
+  subcommand. Prefer the top-level functions above unless embedding the
+  full CLI behavior.
+
+*zoi::pkg*::
+  Facade over the lower-level crates: installation, resolution, local
+  store access, packaging, deltas, verification, PGP, caching,
+  transactions, services, and plugins.
+
+*zoi::project*::
+  Project support: configuration, environments, task execution,
+  lockfiles, and verification for zoi.yaml-based projects.
 
 == Errors
 
-Library functions return `anyhow::Result`. Failures report build, resolution,
-install, and verification errors. All examples are `no_run`; inspect the
-crate's documentation on docs.rs for full examples.
+Library functions return `anyhow::Result`. Failures report build,
+resolution, install, verification, and network errors with context.
+Callers should surface the error chain to the user; there are no custom
+error enums to match on.
+
+== Examples
+
+Install a registry package into the user scope:
+
+[source,rust]
+----
+use anyhow::Result;
+use zoi::{Scope, SourceInstallOptions, install_sources};
+
+fn main() -> Result<()> {
+    let options = SourceInstallOptions {
+        scope_override: Some(Scope::User),
+        yes: true,
+        ..Default::default()
+    };
+    install_sources(&["@core/ripgrep".to_string()], &options)?;
+    Ok(())
+}
+----
+
+Resolve without installing:
+
+[source,rust]
+----
+use anyhow::Result;
+use zoi::resolve_package;
+
+fn main() -> Result<()> {
+    let resolved = resolve_package("@core/ripgrep", true)?;
+    println!("{} {}", resolved.package.name, resolved.version);
+    Ok(())
+}
+----
+
+Build an archive from a package definition:
+
+[source,rust]
+----
+use std::path::Path;
+use anyhow::Result;
+use zoi::{BuildOptions, build_with_options};
+
+fn main() -> Result<()> {
+    let options = BuildOptions {
+        test: true,
+        ..Default::default()
+    };
+    build_with_options(Path::new("ripgrep.pkg.lua"), &options)?;
+    Ok(())
+}
+----
 
 == See also
 
 *zoi*(1), *zoi-lua*(5)
+
+Full API reference: https://docs.rs/zoi-rs
+
+Crate downloads: https://crates.io/crates/zoi-rs
+
+Online documentation: https://zillowe.qzz.io/zds/zoi
+
+Project repository and issue tracker:
+https://gitlab.com/zillowe/zillwen/zusty/zoi
 
 == Copying
 
