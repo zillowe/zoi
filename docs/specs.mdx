@@ -126,6 +126,8 @@ delta:
 
 When upgrading, Zoi looks up the delta URL using the **target version** (the version being upgraded to). The delta patch is verified against its hash and signature before application. If no delta is configured, unavailable, or fails verification, Zoi silently falls back to downloading the full archive.
 
+When the cached version is more than one release behind the target, Zoi applies deltas sequentially: each intermediate delta is downloaded, verified, and applied on top of the previously rebuilt archive until the target version is reached. The number of steps is limited by the `max_delta_steps` user config (default `3`); anything beyond that falls back to a full download.
+
 ---
 
 ## 3. advisories.json / \*.sec.yaml

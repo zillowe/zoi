@@ -442,6 +442,18 @@ pub fn read_config() -> Result<Config> {
             system_cfg.system_generations_limit;
     }
 
+    if project_val.get("max_delta_steps").is_some()
+        && !system_policy.max_delta_steps_unoverridable
+    {
+        merged_cfg.max_delta_steps = project_cfg.max_delta_steps;
+    } else if user_val.get("max_delta_steps").is_some()
+        && !system_policy.max_delta_steps_unoverridable
+    {
+        merged_cfg.max_delta_steps = user_cfg.max_delta_steps;
+    } else {
+        merged_cfg.max_delta_steps = system_cfg.max_delta_steps;
+    }
+
     Ok(merged_cfg)
 }
 

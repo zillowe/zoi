@@ -127,3 +127,76 @@ fn test_zpa_delta_roundtrip() {
     let content = fs::read_to_string(expanded).expect("unwrap failed");
     assert_eq!(content, "shared-common-content-v2");
 }
+
+#[test]
+fn test_zpa_delta_chain_roundtrip() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("failed to create temp dir");
+    let root = tmp.path().to_path_buf();
+
+    ctx.set_env_var("HOME", root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
+
+    // Three consecutive versions with small content changes each.
+    let v1 =
+        build_package(&root, "delta-chain", "1.0.0", "shared-content-step-1");
+    let v2 =
+        build_package(&root, "delta-chain", "1.1.0", "shared-content-step-2");
+    let v3 =
+        build_package(&root, "delta-chain", "1.2.0", "shared-content-step-3");
+
+    // One delta per hop: 1.0.0 -> 1.1.0, then 1.1.0 -> 1.2.0.
+    let delta_12 = root.join("delta-chain-12.zdelta");
+    zoi::pkg::delta::create_zpa_delta(&v1, &v2, &delta_12, None)
+        .expect("delta creation should succeed");
+    let delta_23 = root.join("delta-chain-23.zdelta");
+    zoi::pkg::delta::create_zpa_delta(&v2, &v3, &delta_23, None)
+        .expect("delta creation should succeed");
+
+    // Apply the deltas sequentially starting from only the oldest archive,
+    // mimicking a client that is two versions behind the latest release.
+    let rebuilt_v2 = root.join("rebuilt-v2.zpa");
+    zoi::pkg::delta::apply_zpa_delta(&v1, &delta_12, &rebuilt_v2)
+        .expect("first delta application should succeed");
+    let rebuilt_v3 = root.join("rebuilt-v3.zpa");
+    zoi::pkg::delta::apply_zpa_delta(&rebuilt_v2, &delta_23, &rebuilt_v3)
+        .expect("second delta application should succeed");
+
+    // The chained rebuild must be structurally sound...
+    let report = verify::verify_archive(&rebuilt_v3).expect("unwrap failed");
+    assert!(report.ok, "issues: {:?}", report.issues);
+
+    // ...and installing it must produce exactly the v3 file content.
+    let (installed_files, _digests) = zoi::pkg::install::pkg_install::run(
+        &rebuilt_v3,
+        Some(types::Scope::User),
+        "local",
+        Some("1.2.0"),
+        true,
+        None,
+        true,
+        None
+    )
+    .expect("Install of chained rebuilt archive should succeed");
+
+    let version_dir = local::get_package_version_dir(
+        types::Scope::User,
+        "local",
+        "core",
+        "delta-chain",
+        "1.2.0"
+    )
+    .expect("unwrap failed");
+    let installed_file = installed_files
+        .iter()
+        .find(|f| f.contains("data.txt"))
+        .expect("installed files should reference data.txt");
+    let expanded = zoi_core::utils::expand_placeholders(
+        installed_file,
+        &version_dir,
+        types::Scope::User
+    )
+    .expect("unwrap failed");
+    let content = fs::read_to_string(expanded).expect("unwrap failed");
+    assert_eq!(content, "shared-content-step-3");
+}

@@ -52,7 +52,7 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Transaction Inspection:** Inspect recorded package operations and touched files with `zoi transaction list`, `zoi transaction show`, and `zoi transaction files`.
 
-- **Delta Upgrades:** When a previous version of an archive is cached, upgrades automatically try to fetch and apply a `.zdelta` (bsdiff-based) instead of re-downloading the full archive. Delta patches are explicitly configured in the registry's `repo.yaml` (delta section) with their own URLs, hash files, and PGP signatures. The delta patch is verified for integrity and authenticity before application, falling back silently to a full download whenever a delta is unavailable or fails verification.
+- **Delta Upgrades:** When a previous version of an archive is cached, upgrades automatically try to fetch and apply a `.zdelta` (bsdiff-based) instead of re-downloading the full archive. When the cached version is several releases behind, Zoi applies each intermediate delta in sequence until the target version is reached, limited by the `max_delta_steps` config (default `3`). Delta patches are explicitly configured in the registry's `repo.yaml` (delta section) with their own URLs, hash files, and PGP signatures. Each delta patch is verified for integrity and authenticity before application, falling back silently to a full download whenever a delta is unavailable or fails verification.
 
 - **Embedded Signatures:** Packages can be signed so the signature travels inside the archive itself (`manifest.sig`), in addition to the legacy detached `.sig` sidecar which remains fully supported. Delta patches can also be signed and verified.
 

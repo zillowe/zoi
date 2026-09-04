@@ -100,22 +100,23 @@ pub fn download_and_cache_archive(
             ));
         }
 
-        // Delta fast-path: if a previous version of this archive is cached,
-        // try to fetch and apply a `.zdelta` instead of downloading the full
-        // archive. Any failure here silently falls back to the full
-        // download below. The rebuilt archive is written to
-        // `cached_archive_path` so the normal signature checks still run
-        // against it. Note: the whole-archive checksum is skipped for
-        // delta-rebuilt archives because the tar+zstd byte stream differs
-        // from the original while per-pool-entry integrity is already
-        // verified by `apply_zpa_delta`.
-        delta_applied = try_delta_upgrade(
+        // Delta fast-path: try to fetch and apply `.zdelta` patches
+        // sequentially from the cached version up to the target version.
+        // Any failure here silently falls back to the full download below.
+        // The rebuilt archive is written to `cached_archive_path` so the
+        // normal signature checks still run against it. Note: the
+        // whole-archive checksum is skipped for delta-rebuilt archives
+        // because the tar+zstd byte stream differs from the original while
+        // per-pool-entry integrity is already verified during delta
+        // application.
+        delta_applied = try_delta_upgrade_sequence(
             node,
             &archive_cache_root,
             &cached_archive_path,
             pb,
             verbose,
-            pgp_identifiers.as_deref()
+            pgp_identifiers.as_deref(),
+            config.max_delta_steps
         )
         .unwrap_or(false);
 
@@ -309,75 +310,51 @@ pub fn download_and_cache_archive(
     Ok(archive_path)
 }
 
-/// Attempts to upgrade a package archive via a `.zdelta` against a cached
-/// previous version.
+/// Downloads and applies a single `.zdelta` patch upgrading `base_path`
+/// (`base_version`) to `to_version`, writing the rebuilt archive into
+/// `work_dir`.
 ///
-/// Uses explicit delta URLs from repo.yaml (delta section). Verifies the
-/// delta patch file's hash and signature, then applies it. Returns
-/// `Ok(false)` whenever a delta is unavailable or cannot be applied so the
-/// caller can fall back to a full download.
-fn try_delta_upgrade(
+/// Uses explicit delta URLs from repo.yaml (delta section). The `{version}`
+/// placeholder in delta URLs refers to the version being upgraded to.
+/// Verifies the delta patch file's hash and signature before applying it.
+///
+/// # Errors
+///
+/// Returns an error when no delta is configured, the delta cannot be
+/// downloaded, its hash or signature fails verification, or the patch
+/// cannot be applied. The caller treats any error as "delta unavailable"
+/// and falls back to a full download.
+fn fetch_and_apply_delta(
     node: &InstallNode,
-    archive_cache_root: &Path,
-    target_path: &Path,
+    base_path: &Path,
+    base_version: &str,
+    to_version: &str,
+    work_dir: &Path,
     pb: Option<&ProgressBar>,
     verbose: bool,
     pgp_identifiers: Option<&[String]>
-) -> Result<bool> {
-    let Ok(target_version) = semver::Version::parse(&node.version) else {
-        return Ok(false);
-    };
-
-    // Find the newest cached archive of the same package on the same
-    // platform that is older than the target version. Archive names follow
-    // `{name}-{version}-{platform}.zpa`.
-    let platform = zoi_core::utils::get_platform().unwrap_or_default();
-    let prefix = format!("{}-", node.pkg.name);
-    let suffix = format!("-{platform}.zpa");
-    let mut best: Option<(semver::Version, PathBuf)> = None;
-    let entries = std::fs::read_dir(archive_cache_root).ok();
-    let Some(entries) = entries else {
-        return Ok(false);
-    };
-    for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().to_string();
-        if !name.starts_with(&prefix) || !name.ends_with(&suffix) {
-            continue;
-        }
-        let middle = &name[prefix.len()..name.len() - suffix.len()];
-        let version_str = middle.trim_start_matches('v');
-        let Ok(version) = semver::Version::parse(version_str) else {
-            continue;
-        };
-        if version >= target_version {
-            continue;
-        }
-        if best.as_ref().is_none_or(|(v, _)| version > *v) {
-            best = Some((version, entry.path()));
-        }
-    }
-    let Some((base_version, base_path)) = best else {
-        return Ok(false);
-    };
-
+) -> Result<PathBuf> {
     // Look up explicit delta info from repo.yaml
-    let Some(delta_info) =
-        crate::util::find_delta_info_for_node(node, &base_version.to_string())?
+    let Some(delta_info) = crate::util::find_delta_info(
+        &node.pkg,
+        &node.registry_handle,
+        base_version,
+        to_version
+    )?
     else {
-        if verbose {
-            println!(
-                "No delta configuration found; falling back to full download."
-            );
-        }
-        return Ok(false);
+        return Err(anyhow!(
+            "No delta configuration found for '{}' v{to_version}",
+            node.pkg.name
+        ));
     };
 
     if verbose {
-        println!("Attempting delta upgrade from v{base_version}...");
+        println!(
+            "Attempting delta upgrade from v{base_version} to v{to_version}..."
+        );
     }
 
-    let temp_dir = tempfile::Builder::new().prefix("zoi-delta-").tempdir()?;
-    let delta_path = temp_dir.path().join("upgrade.zdelta");
+    let delta_path = work_dir.join(format!("upgrade-{to_version}.zdelta"));
     let mut downloaded = false;
     for candidate_url in cache::mirror_candidate_urls(&delta_info.final_url) {
         if util::download_file_with_progress(
@@ -393,10 +370,10 @@ fn try_delta_upgrade(
         }
     }
     if !downloaded {
-        if verbose {
-            println!("No delta available; falling back to full download.");
-        }
-        return Ok(false);
+        return Err(anyhow!(
+            "No delta available for '{}' v{base_version} -> v{to_version}",
+            node.pkg.name
+        ));
     }
 
     // Verify delta patch hash - this is mandatory for integrity.
@@ -410,14 +387,10 @@ fn try_delta_upgrade(
         })?;
     let expected = util::get_expected_hash(expected_delta_hash, None)?;
     if !util::verify_file_hash(&delta_path, &expected, pb)? {
-        if verbose {
-            println!(
-                "{} Delta hash verification failed; falling back to full \
-                 download.",
-                "Warning:".yellow()
-            );
-        }
-        return Ok(false);
+        return Err(anyhow!(
+            "Delta hash verification failed for '{}' v{to_version}",
+            node.pkg.name
+        ));
     }
 
     // Verify delta patch signature if PGP URL and trusted keys available.
@@ -425,10 +398,7 @@ fn try_delta_upgrade(
         && let Some(identifiers) = pgp_identifiers
         && !identifiers.is_empty()
     {
-        let temp_dir = tempfile::Builder::new()
-            .prefix("zoi-delta-sig-")
-            .tempdir()?;
-        let temp_sig_path = temp_dir.path().join("delta.sig");
+        let temp_sig_path = work_dir.join(format!("upgrade-{to_version}.sig"));
         let mut downloaded = false;
         for candidate_url in cache::mirror_candidate_urls(pgp_url) {
             if util::download_file_with_progress(
@@ -471,32 +441,157 @@ fn try_delta_upgrade(
         );
     }
 
-    let rebuilt_path = temp_dir.path().join("rebuilt.zpa");
-    if let Err(e) = zoi_package::delta::apply_zpa_delta(
-        &base_path,
-        &delta_path,
-        &rebuilt_path
+    let rebuilt_path = work_dir.join(format!("rebuilt-{to_version}.zpa"));
+    zoi_package::delta::apply_zpa_delta(base_path, &delta_path, &rebuilt_path)?;
+    if verbose {
+        println!("{}", "Delta applied successfully.".green());
+    }
+    Ok(rebuilt_path)
+}
+
+/// Attempts to upgrade a package archive via a sequence of `.zdelta` patches
+/// from a cached older version up to the target version.
+///
+/// When the cached version is more than one release behind the target (e.g.
+/// cached `149`, target `151`), each intermediate delta is tried in order:
+/// `149 -> 150`, then `150 -> 151`, rebuilding the archive step by step on
+/// top of the previously rebuilt output. Intermediate versions are read
+/// from the package database. The number of steps is limited by
+/// `max_delta_steps` from the user config (default `3`, since Zoidberg only
+/// keeps the last three versions as `.zpa`/`.zsa` and `.zdelta`); anything
+/// beyond that falls back to a full download.
+///
+/// Returns `Ok(false)` whenever a delta is unavailable or cannot be applied
+/// so the caller can fall back to a full download.
+fn try_delta_upgrade_sequence(
+    node: &InstallNode,
+    archive_cache_root: &Path,
+    target_path: &Path,
+    pb: Option<&ProgressBar>,
+    verbose: bool,
+    pgp_identifiers: Option<&[String]>,
+    max_delta_steps: u32
+) -> Result<bool> {
+    let Ok(target_version) = semver::Version::parse(&node.version) else {
+        return Ok(false);
+    };
+
+    // Find the newest cached archive of the same package on the same
+    // platform that is older than the target version. Archive names follow
+    // `{name}-{version}-{platform}.zpa`.
+    let platform = zoi_core::utils::get_platform().unwrap_or_default();
+    let prefix = format!("{}-", node.pkg.name);
+    let suffix = format!("-{platform}.zpa");
+    let mut best: Option<(semver::Version, PathBuf)> = None;
+    let entries = std::fs::read_dir(archive_cache_root).ok();
+    let Some(entries) = entries else {
+        return Ok(false);
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !name.starts_with(&prefix) || !name.ends_with(&suffix) {
+            continue;
+        }
+        let middle = &name[prefix.len()..name.len() - suffix.len()];
+        let version_str = middle.trim_start_matches('v');
+        let Ok(version) = semver::Version::parse(version_str) else {
+            continue;
+        };
+        if version >= target_version {
+            continue;
+        }
+        if best.as_ref().is_none_or(|(v, _)| version > *v) {
+            best = Some((version, entry.path()));
+        }
+    }
+    let Some((base_version, base_path)) = best else {
+        return Ok(false);
+    };
+
+    // Determine the intermediate versions between the cached base and the
+    // target from the package database, e.g. base `149` and target `151`
+    // give steps [`150`, `151`].
+    let mut steps: Vec<(semver::Version, String)> = Vec::new();
+    if let Ok(db_versions) = db::get_all_versions(
+        &node.registry_handle,
+        &node.pkg.name,
+        &node.pkg.repo
     ) {
+        for version_string in db_versions {
+            let parsed =
+                semver::Version::parse(&version_string).or_else(|_| {
+                    semver::Version::parse(
+                        version_string.trim_start_matches('v')
+                    )
+                });
+            let Ok(version) = parsed else {
+                continue;
+            };
+            if version > base_version && version <= target_version {
+                steps.push((version, version_string));
+            }
+        }
+        steps.sort_by(|a, b| a.0.cmp(&b.0));
+        steps.dedup_by(|a, b| a.0 == b.0);
+    }
+    // If the database knows nothing about the versions in between, fall
+    // back to a single direct delta attempt from the base to the target.
+    if steps.is_empty() {
+        steps.push((target_version.clone(), node.version.clone()));
+    }
+
+    if steps.len() as u32 > max_delta_steps {
         if verbose {
             println!(
-                "{} Delta application failed ({e}); falling back to full \
-                 download.",
-                "Warning:".yellow()
+                "{} Upgrade spans {} versions but at most {max_delta_steps} \
+                 delta steps are configured; falling back to full download.",
+                "Warning:".yellow(),
+                steps.len()
             );
         }
         return Ok(false);
     }
 
-    // Delta patch verified and applied successfully. The rebuilt archive
+    let work_dir = tempfile::Builder::new().prefix("zoi-delta-").tempdir()?;
+    let mut current_base = base_path;
+    let mut current_version = base_version.to_string();
+    for (_, step_string) in &steps {
+        match fetch_and_apply_delta(
+            node,
+            &current_base,
+            &current_version,
+            step_string,
+            work_dir.path(),
+            pb,
+            verbose,
+            pgp_identifiers
+        ) {
+            Ok(rebuilt) => {
+                current_base = rebuilt;
+                current_version.clone_from(step_string);
+            }
+            Err(e) => {
+                if verbose {
+                    println!(
+                        "{} {e}; falling back to full download.",
+                        "Warning:".yellow()
+                    );
+                }
+                return Ok(false);
+            }
+        }
+    }
+
+    // Every delta step verified and applied successfully. The rebuilt archive
     // is trusted because:
     // - The base archive was already verified (full hash + sig on install)
-    // - The delta patch was verified (hash + optionally sig)
-    // - The delta application does per-pool-entry structural verification
+    // - Each delta patch was verified (hash + optionally sig)
+    // - Each delta application does per-pool-entry structural verification
     // We skip the whole-archive hash check since the tar+zstd stream differs
     // from the original but the content is verified.
-    fs::rename(&rebuilt_path, target_path)?;
+    fs::rename(&current_base, target_path)?;
     if verbose {
-        println!("{}", "Delta applied successfully.".green());
+        println!("{}", "All delta steps applied successfully.".green());
     }
     Ok(true)
 }

@@ -13,6 +13,35 @@ fn test_config_default_values() {
     assert!(!cfg.telemetry_enabled);
     assert_eq!(cfg.jobs, None);
     assert!(!cfg.policy.jobs_unoverridable);
+    assert_eq!(cfg.max_delta_steps, 3);
+    assert!(!cfg.policy.max_delta_steps_unoverridable);
+}
+
+#[test]
+fn test_max_delta_steps_default_when_missing() {
+    let cfg: Config = serde_yaml::from_str(
+        r"
+rollback_enabled: true
+"
+    )
+    .expect("config should deserialize");
+    assert_eq!(cfg.max_delta_steps, 3);
+
+    let cfg: Config = serde_yaml::from_str(
+        r"
+max_delta_steps: 5
+"
+    )
+    .expect("config should deserialize");
+    assert_eq!(cfg.max_delta_steps, 5);
+
+    let policy: Policy = serde_yaml::from_str(
+        r"
+max_delta_steps_unoverridable: true
+"
+    )
+    .expect("policy should deserialize");
+    assert!(policy.max_delta_steps_unoverridable);
 }
 
 #[test]

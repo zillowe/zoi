@@ -211,6 +211,15 @@ Defines the maximum number of ZoiOS system generations to keep in the store and 
 - **Note:** The current active generation is never pruned.
 - **Example:** `system_generations_limit: 10`
 
+### `max_delta_steps`
+
+Defines the maximum number of sequential `.zdelta` patches Zoi will download and apply when upgrading a package. When the cached version is more than one release behind the target, Zoi tries each intermediate delta in order (for example `149 -> 150`, then `150 -> 151`) instead of downloading the full archive. If the upgrade spans more versions than this limit, or any delta step fails, Zoi falls back to downloading the full archive.
+
+- **Type:** `integer`
+- **Default:** `3`
+- **Value of 0:** Disables delta upgrades (always downloads the full archive).
+- **Example:** `max_delta_steps: 5`
+
 ### `pkg_dirs`
 
 A list of additional directories to search for `.zpa` archives during installation.
@@ -285,6 +294,7 @@ When a policy field is set to `true`, the corresponding configuration from the s
 - `jobs_unoverridable`: If `true`, the `jobs` setting is locked.
 - `advisory_enforcement_unoverridable`: If `true`, advisory enforcement policy cannot be overridden by lower-precedence configs.
 - `system_generations_limit_unoverridable`: If `true`, the `system_generations_limit` setting is locked.
+- `max_delta_steps_unoverridable`: If `true`, the `max_delta_steps` setting is locked.
 - `max_resolution_depth_unoverridable`: If `true`, the `max_resolution_depth` setting is locked.
 - `offline_mode_unoverridable`: If `true`, the `offline_mode` setting is locked.
 - `pkg_dirs_unoverridable`: If `true`, the `pkg_dirs` list is locked.

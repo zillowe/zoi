@@ -1202,12 +1202,21 @@ pub struct Config {
     pub versions: HashMap<String, String>,
     /// The maximum number of system generations to keep for rollbacks.
     #[serde(default = "default_system_generations_limit")]
-    pub system_generations_limit: u32
+    pub system_generations_limit: u32,
+    /// The maximum number of sequential `.zdelta` patches to apply when
+    /// upgrading a package to a newer version.
+    #[serde(default = "default_max_delta_steps")]
+    pub max_delta_steps: u32
 }
 
 /// Default system generations limit.
 fn default_system_generations_limit() -> u32 {
     4
+}
+
+/// Default maximum delta steps.
+fn default_max_delta_steps() -> u32 {
+    3
 }
 
 /// Default rollback enabled status.
@@ -1237,7 +1246,8 @@ impl Default for Config {
             pkg_dirs: Vec::new(),
             cache_mirrors: Vec::new(),
             versions: HashMap::new(),
-            system_generations_limit: 4
+            system_generations_limit: 4,
+            max_delta_steps: default_max_delta_steps()
         }
     }
 }
@@ -1278,6 +1288,9 @@ pub struct Policy {
     /// Whether maximum resolution depth settings are unoverridable.
     #[serde(default, skip_serializing_if = "is_false")]
     pub max_resolution_depth_unoverridable: bool,
+    /// Whether maximum delta steps settings are unoverridable.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub max_delta_steps_unoverridable: bool,
     /// Whether offline mode settings are unoverridable.
     #[serde(default, skip_serializing_if = "is_false")]
     pub offline_mode_unoverridable: bool,
