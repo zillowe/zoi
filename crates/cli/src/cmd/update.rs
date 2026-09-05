@@ -17,6 +17,18 @@ use crate::pkg::{
     config, db, hooks, install, local, pin, resolve, transaction, types
 };
 
+/// Outcome of attempting to update a single package.
+///
+/// The targeted `update` loop aggregates these so it can print one summary
+/// for all requested packages instead of one per package.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum UpdateOutcome {
+    /// The package was upgraded to a newer version.
+    Updated,
+    /// Nothing changed (already up to date, pinned, dry run, or aborted).
+    Skipped
+}
+
 /// The primary high-level orchestration for the `zoi update` command.
 ///
 /// This function handles:
@@ -27,9 +39,12 @@ use crate::pkg::{
 /// - Cleanup: Automatically removes old versions after a successful upgrade (if
 ///   rollbacks are not required).
 ///
+/// Per-package failures are printed inline as they happen; a single summary
+/// with the aggregated counts is printed at the end.
+///
 /// # Errors
 ///
-/// Returns an error if the update process fails for any package.
+/// Returns an error if the package names cannot be expanded.
 pub fn run(
     all: bool,
     package_names: &[String],
@@ -58,13 +73,15 @@ pub fn run(
     let expanded_package_names =
         cmd_utils::expand_split_packages(package_names, "Updating")?;
 
-    let mut failed_packages = Vec::new();
+    let mut succeeded = 0usize;
+    let mut skipped = 0usize;
+    let mut failed = 0usize;
 
     for (i, package_name) in expanded_package_names.iter().enumerate() {
         if i > 0 {
             println!();
         }
-        if let Err(e) = run_update_single_logic(
+        match run_update_single_logic(
             package_name,
             yes,
             dry_run,
@@ -72,28 +89,35 @@ pub fn run(
             plan_json,
             verbose
         ) {
-            eprintln!(
-                "{}: Failed to update '{}': {}",
-                "Error".red().bold(),
-                package_name,
-                e
-            );
-            failed_packages.push(package_name.clone());
+            Ok(UpdateOutcome::Updated) => succeeded += 1,
+            Ok(UpdateOutcome::Skipped) => skipped += 1,
+            Err(e) => {
+                eprintln!(
+                    "{}: Failed to update '{}': {}",
+                    "Error".red().bold(),
+                    package_name,
+                    e
+                );
+                failed += 1;
+            }
         }
     }
 
-    if !failed_packages.is_empty() {
-        return Err(anyhow!(
-            "The following packages failed to update: {}",
-            failed_packages.join(", ")
-        ));
-    } else if !package_names.is_empty() && !dry_run {
-        println!("\n{}", "Success:".green());
+    if !package_names.is_empty() && !dry_run && !plan_json {
+        ux::print_transaction_summary(&ux::TransactionSummary {
+            command: "update".to_string(),
+            success: succeeded,
+            failed,
+            skipped
+        });
     }
     Ok(())
 }
 
 /// Logic for updating a single package.
+///
+/// Returns whether the package was upgraded or skipped (already up to date,
+/// pinned, dry run, or aborted by the user).
 fn run_update_single_logic(
     package_name: &str,
     yes: bool,
@@ -101,9 +125,13 @@ fn run_update_single_logic(
     explain: bool,
     plan_json: bool,
     verbose: bool
-) -> Result<()> {
+) -> Result<UpdateOutcome> {
     if !plan_json {
-        println!("{} Resolving dependencies...", "::".bold().blue());
+        println!(
+            "{} Resolving dependencies for '{}'...",
+            "::".bold().blue(),
+            package_name.cyan()
+        );
     }
 
     let (new_pkg, new_version, _, _, registry_handle, _, _) =
@@ -116,7 +144,7 @@ fn run_update_single_logic(
                 package_name.yellow()
             );
         }
-        return Ok(());
+        return Ok(UpdateOutcome::Skipped);
     }
 
     let installed_source = if let Some(sub) = &new_pkg.sub_package {
@@ -166,15 +194,9 @@ fn run_update_single_logic(
         && old_manifest.revision == new_pkg.revision
     {
         if !plan_json {
-            println!("\nPackage is already up to date.");
-            ux::print_transaction_summary(&ux::TransactionSummary {
-                command: "update".to_string(),
-                success: 0,
-                failed: 0,
-                skipped: 1
-            });
+            println!("\nPackage '{package_name}' is already up to date.");
         }
-        return Ok(());
+        return Ok(UpdateOutcome::Skipped);
     }
 
     if !plan_json {
@@ -426,7 +448,7 @@ fn run_update_single_logic(
             }
         });
         ux::emit_plan_json_v1("update", plan)?;
-        return Ok(());
+        return Ok(UpdateOutcome::Skipped);
     }
 
     if dry_run {
@@ -434,7 +456,7 @@ fn run_update_single_logic(
             "\n{} Dry-run: update plan above would be executed.",
             "::".bold().yellow()
         );
-        return Ok(());
+        return Ok(UpdateOutcome::Skipped);
     }
 
     println!();
@@ -445,13 +467,7 @@ fn run_update_single_logic(
     };
 
     if !crate::utils::ask_for_confirmation(&prompt, yes) {
-        ux::print_transaction_summary(&ux::TransactionSummary {
-            command: "update".to_string(),
-            success: 0,
-            failed: 0,
-            skipped: packages_to_upgrade.len()
-        });
-        return Ok(());
+        return Ok(UpdateOutcome::Skipped);
     }
 
     perform_transaction(
@@ -465,7 +481,8 @@ fn run_update_single_logic(
         &old_manifest,
         &new_pkg,
         plan_json
-    )
+    )?;
+    Ok(UpdateOutcome::Updated)
 }
 
 /// Executes the transactional part of the update process.
@@ -621,10 +638,6 @@ fn perform_transaction(
                 crate::pkg::hooks::HookType::PostUpgrade,
                 new_manifest.scope
             )?;
-        }
-
-        if !plan_json {
-            println!("\n{}", "Success:".green());
         }
     }
 
