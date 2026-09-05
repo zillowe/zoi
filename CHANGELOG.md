@@ -4,6 +4,37 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod. Release 1.27.0] - 2026-09-05
+
+### ⏩ Merged
+
+- [`7e7839c2`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/7e7839c275081c44e07a0c01f7322e1b7057659e) Branch 'new-release' into 'main'
+
+### ♻️ Refactor
+
+- [`ff64beba`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/ff64bebab5256550140c1e25dd901fc2bdafe269) *(core)* Migrate delta module to use zbsdiff library
+- [`08740b5f`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/08740b5fe5ab114587e5de8f713847b99cd6b554) *(deps)* Replace self_update and sevenz-rust with alternatives
+- [`16d79d8c`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/16d79d8cbe9c539d2a323239fe86c42ef7c63598) *(docs)* Migrate man page generation to AsciiDoc and asciidoctor
+
+### ✨ Features
+
+- [`e3441cd5`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/e3441cd51e849b86e1fd4e389d28502ded6a4f43) *(purl)* Support list-form build dependencies and local DB resolution
+- [`c1601488`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/c160148875d0dbdc650afd0446140108b88ff5ba) Support sequential multi-step delta package upgrades
+- [`8e88341c`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/8e88341ce6fb907e43f7ae5db8194ef585ba483d) *(core)* Implement embedded built-in registries and handle resolution
+- [`45f50550`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/45f505503d0920367ab1e8c9898ccd869baa9a76) *(lua)* Support external license URLs in license validation
+- [`16f5aaea`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/16f5aaea72afcc7619fea62001080fca52bbd980) Add package verification, embedded signatures, delta upgrades, and transaction undo
+
+### 🛡️ Dependencies
+
+- [`601ad612`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/601ad612c97708dcef88368771cf1f7b68593378) Update
+- [`5ddf3fe5`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/5ddf3fe5d3d122290cc0ed9477eca6f143d7e688) Upgrade argon2 dependency to version 0.6.0
+
+### 🩹 Bug Fixes
+
+- [`fead7502`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/fead75026a76bb2eb5a360830748b79fb1f0feb5) Preserve built-in trust authorities when selecting the official registry via handle
+- [`956757da`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/956757da8c451ed5cb00a690f349a5086b591a09) *(resolver, pkg)* Improve package management, resolution, and policy compliance
+- [`81a3fd1e`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/81a3fd1e2d1a78ffcef31879f9a6cf443e3d2bf9) Correct semver parsing for version requirements
+
 ## [Prod. Release 1.26.1] - 2026-08-26
 
 ### ♻️ Refactor
