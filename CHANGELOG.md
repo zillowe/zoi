@@ -4,6 +4,12 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod. Release 1.27.1] - 2026-09-05
+
+### ♻️ Refactor
+
+- [`58b74538`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/58b7453850dd872c374a1d7ba04e743348b0f539) *(cli)* Replace custom TUI manual viewer with system man/info viewer
+
 ## [Prod. Release 1.27.0] - 2026-09-05
 
 ### ⏩ Merged
