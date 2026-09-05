@@ -18,7 +18,7 @@ const BRANCH: &str = "Production";
 /// The release status of the current build.
 const STATUS: &str = "Release";
 /// The version number of the current build.
-const NUMBER: &str = "1.27.0";
+const NUMBER: &str = "1.27.1";
 /// Help text for package source identifiers.
 const PKG_SOURCE_HELP: &str =
     "Package identifier (e.g. @repo/name, #git@repo/name, path, or URL)";

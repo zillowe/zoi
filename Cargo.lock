@@ -4192,7 +4192,7 @@ checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
 
 [[package]]
 name = "zoi-audit"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4205,7 +4205,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-cli"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4261,7 +4261,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-common"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "serde",
@@ -4271,7 +4271,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-core"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4306,7 +4306,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-daemon"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -4321,7 +4321,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-db"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "rusqlite",
@@ -4333,7 +4333,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-deps"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "colored",
@@ -4347,7 +4347,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-hooks"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "colored",
@@ -4363,7 +4363,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-install"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "colored",
@@ -4399,7 +4399,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-lua"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "ar",
@@ -4427,7 +4427,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-mini"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -4439,7 +4439,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-package"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4469,7 +4469,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-plugins"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "colored",
@@ -4496,7 +4496,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-project"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "clap_complete",
@@ -4516,7 +4516,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-purl"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "purl",
@@ -4527,7 +4527,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-resolver"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "colored",
@@ -4551,7 +4551,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-rs"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "colored",
@@ -4567,7 +4567,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-sandbox"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "zoi-core",
@@ -4575,7 +4575,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-sync"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "colored",
@@ -4594,7 +4594,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-system"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -4614,7 +4614,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-telemetry"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "chrono",
  "reqwest",
@@ -4625,7 +4625,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-tests"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4676,7 +4676,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-transaction"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4694,7 +4694,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-uninstall"
-version = "1.27.0"
+version = "1.27.1"
 dependencies = [
  "anyhow",
  "colored",
