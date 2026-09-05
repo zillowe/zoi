@@ -853,6 +853,10 @@ impl<'a> Orchestrator<'a> {
 
         let build_type = options.build_type;
         let verbose = options.verbose;
+        // `--force` re-installs and also re-downloads archives instead of
+        // trusting the cache, so a re-published upstream archive replaces
+        // stale cached bytes.
+        let force_redownload = options.force;
 
         stages
             .par_iter()
@@ -876,7 +880,8 @@ impl<'a> Orchestrator<'a> {
                     action,
                     Some(&m_prep),
                     build_type,
-                    verbose
+                    verbose,
+                    force_redownload
                 )?;
 
                 let mut lock = prepared_nodes.lock().map_err(|e| {

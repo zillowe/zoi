@@ -526,7 +526,8 @@ fn perform_transaction(
                     yes,
                     true,
                     true,
-                    verbose
+                    verbose,
+                    false
                 ) {
                     Ok(m) => {
                         if m.name == target_pkg_name {
@@ -1115,6 +1116,7 @@ fn run_update_all_logic(
                             yes,
                             true,
                             true,
+                            false,
                             false
                         ) {
                             Ok(m) => {

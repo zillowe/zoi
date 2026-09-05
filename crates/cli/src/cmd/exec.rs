@@ -96,7 +96,8 @@ pub fn run(
                     action,
                     Some(&m_prep),
                     None,
-                    verbose
+                    verbose,
+                    false
                 )?;
 
                 let mut lock = prepared_nodes.lock().map_err(|e| {

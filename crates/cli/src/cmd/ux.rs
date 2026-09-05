@@ -184,7 +184,9 @@ fn failure_hint(message: &str, command: &str) -> Option<&'static str> {
     }
     if m.contains("hash verification failed") || m.contains("checksum") {
         return Some(
-            "Resync metadata and retry; verify upstream archive integrity."
+            "Resync metadata (`zoi sync --force`) and retry with `zoi install \
+             --force` to re-download the archive; verify upstream archive \
+             integrity."
         );
     }
     if command == "uninstall" && m.contains("ambiguous package name") {

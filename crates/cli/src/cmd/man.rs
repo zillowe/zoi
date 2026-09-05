@@ -435,7 +435,7 @@ fn gather_manual_pages_from_upstream(
 
     // Prepare the node (download/build)
     let prepared = crate::pkg::install::installer::prepare_node(
-        &node, action, None, None, false
+        &node, action, None, None, false, false
     )?;
 
     // Extract to a temp directory

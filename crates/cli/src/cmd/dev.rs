@@ -130,6 +130,7 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
                     action,
                     Some(&m_prep),
                     None,
+                    false,
                     false
                 )?;
 

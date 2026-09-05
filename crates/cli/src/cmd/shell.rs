@@ -502,7 +502,8 @@ pub fn enter_ephemeral_shell(
                     true,
                     false,
                     false,
-                    verbose
+                    verbose,
+                    false
                 )?;
 
                 let mut session_lock = session_installed_mutex

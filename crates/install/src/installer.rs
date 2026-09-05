@@ -22,6 +22,10 @@ use crate::{manifest, plan, prebuilt, util};
 /// - Downloading from mirrors if not found locally.
 /// - Verifying hashes and PGP signatures.
 ///
+/// When `force_redownload` is set, any cached archive, signature, or
+/// partial download for this package is discarded and the archive is
+/// fetched fresh, skipping the delta-upgrade fast-path as well.
+///
 /// # Errors
 ///
 /// Returns an error if:
@@ -35,7 +39,8 @@ pub fn download_and_cache_archive(
     node: &InstallNode,
     details: &plan::PrebuiltDetails,
     pb: Option<&ProgressBar>,
-    verbose: bool
+    verbose: bool,
+    force_redownload: bool
 ) -> Result<PathBuf> {
     let config = config::read_config()?;
     let signature_policy =
@@ -80,6 +85,23 @@ pub fn download_and_cache_archive(
     // verified during delta application).
     let mut delta_applied = false;
 
+    if force_redownload {
+        // Discard anything cached so the archive below is fetched fresh.
+        // A stale cached archive is exactly what `--force` must not reuse.
+        fs::remove_file(&cached_archive_path).ok();
+        fs::remove_file(&cached_sig_path).ok();
+        fs::remove_file(
+            archive_cache_root.join(format!("{archive_filename}.part"))
+        )
+        .ok();
+        if pb.is_none() {
+            println!(
+                "Re-downloading archive (--force): {}",
+                archive_filename.cyan()
+            );
+        }
+    }
+
     let archive_path = if let Some(path) =
         pkgdir::find_in_pkg_dirs(archive_filename)
     {
@@ -87,7 +109,7 @@ pub fn download_and_cache_archive(
             println!("Found archive in pkg-dir: {}", path.display());
         }
         path
-    } else if cached_archive_path.exists() {
+    } else if !force_redownload && cached_archive_path.exists() {
         if pb.is_none() {
             println!("Using cached archive: {}", cached_archive_path.display());
         }
@@ -108,17 +130,22 @@ pub fn download_and_cache_archive(
         // whole-archive checksum is skipped for delta-rebuilt archives
         // because the tar+zstd byte stream differs from the original while
         // per-pool-entry integrity is already verified during delta
-        // application.
-        delta_applied = try_delta_upgrade_sequence(
-            node,
-            &archive_cache_root,
-            &cached_archive_path,
-            pb,
-            verbose,
-            pgp_identifiers.as_deref(),
-            config.max_delta_steps
-        )
-        .unwrap_or(false);
+        // application. Skipped entirely on forced re-downloads, which must
+        // fetch fresh bytes.
+        delta_applied = if force_redownload {
+            false
+        } else {
+            try_delta_upgrade_sequence(
+                node,
+                &archive_cache_root,
+                &cached_archive_path,
+                pb,
+                verbose,
+                pgp_identifiers.as_deref(),
+                config.max_delta_steps
+            )
+            .unwrap_or(false)
+        };
 
         // If the delta succeeded, `cached_archive_path` now exists and
         // the normal flow will pick it up. Otherwise continue to download.
@@ -723,6 +750,9 @@ pub struct PreparedNode {
 /// This phase always runs in user-space and does not modify the system state
 /// or the package store.
 ///
+/// When `force_redownload` is set, cached archives are discarded and
+/// fetched fresh instead of being reused.
+///
 /// # Errors
 ///
 /// Returns an error if:
@@ -733,7 +763,8 @@ pub fn prepare_node(
     action: &plan::InstallAction,
     m: Option<&MultiProgress>,
     build_type: Option<&str>,
-    verbose: bool
+    verbose: bool,
+    force_redownload: bool
 ) -> Result<PreparedNode> {
     let pkg = &node.pkg;
     let version = &node.version;
@@ -778,7 +809,8 @@ pub fn prepare_node(
                 node,
                 details,
                 pb.as_ref(),
-                verbose
+                verbose,
+                force_redownload
             )?;
             (archive_path, "pre-compiled".to_string(), false)
         }
@@ -1097,6 +1129,9 @@ pub fn install_prepared_node(
 
 /// Performs both preparation and execution phases for an install node.
 ///
+/// When `force_redownload` is set, cached archives are discarded and
+/// fetched fresh instead of being reused.
+///
 /// # Errors
 ///
 /// Returns an error if preparation or execution fails.
@@ -1108,8 +1143,10 @@ pub fn install_node(
     yes: bool,
     record: bool,
     link_bins: bool,
-    verbose: bool
+    verbose: bool,
+    force_redownload: bool
 ) -> Result<types::InstallManifest> {
-    let prepared = prepare_node(node, action, m, build_type, verbose)?;
+    let prepared =
+        prepare_node(node, action, m, build_type, verbose, force_redownload)?;
     install_prepared_node(node, &prepared, m, yes, record, link_bins, verbose)
 }

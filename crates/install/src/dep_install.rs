@@ -366,7 +366,7 @@ fn install_zoi_dependency<S: std::hash::BuildHasher>(
                 anyhow!("Could not find install action for {id}")
             })?;
             crate::installer::install_node(
-                node, action, m, None, yes, true, true, false
+                node, action, m, None, yes, true, true, false, false
             )?;
         }
     }

@@ -20,7 +20,8 @@ pub struct InstallArgs {
     #[arg(long, value_name = "REPO", conflicts_with = "sources")]
     pub repo: Option<String>,
 
-    /// Force re-installation even if the package is already installed
+    /// Force re-installation even if the package is already installed.
+    /// Cached archives are discarded and re-downloaded.
     #[arg(long)]
     pub force: bool,
 
