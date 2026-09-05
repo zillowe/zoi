@@ -43,7 +43,6 @@ serde_json.workspace = true
 serde_yaml.workspace = true
 sha2.workspace = true
 spdx.workspace = true
-syntect.workspace = true
 tempfile.workspace = true
 walkdir.workspace = true
 json5.workspace = true
@@ -71,7 +70,6 @@ diffy.workspace = true
 ratatui.workspace = true
 rayon.workspace = true
 nix.workspace = true
-pulldown-cmark.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 zoi-sandbox.workspace = true

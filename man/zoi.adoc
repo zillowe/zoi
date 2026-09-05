@@ -221,10 +221,13 @@ using the PURL specification.
   Explain why a package is installed (direct request or dependency chain).
 
 *man* _PACKAGE_ [_OPTIONS_]::
-  Show a package's manual pages in a pager or TUI.
+  Show a package's manual page with the system *man* viewer (falling back
+  to *info*). Without *--page*, the page matching the package name in
+  section 1 is shown.
 +
-*--upstream*:: Prefer upstream manuals. *--raw*:: Print without
-formatting. *--no-tui*:: Use the system pager instead of the TUI.
+*--upstream*:: Prefer upstream manuals. *--raw*:: Print the raw page
+without formatting (pipeable into *man*). *--page*=_PAGE_:: Show a
+specific page, e.g. *zbsdiff.3*.
 
 *history* [_OPTIONS_]::
   Show the history of package operations.

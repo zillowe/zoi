@@ -1,5 +1,6 @@
 //! Integration tests for man page generation and management.
 
+use std::collections::BTreeMap;
 use std::fs;
 
 use tempfile::tempdir;
@@ -9,26 +10,62 @@ use zoi::pkg::{config, db, local, types};
 mod common;
 
 #[test]
-fn test_parse_roff_basic() {
-    let roff = r"
-.TH MYTOOL 1
-.SH NAME
-mytool \- a test tool
-.SH SYNOPSIS
-.B mytool
-[\fIOPTIONS\fR]
-.SH DESCRIPTION
-.PP
-This is a test tool.
-.B \-\-help
-show help.
-";
-    let md = man::parse_roff(roff);
-    assert!(md.contains("# MYTOOL"));
-    assert!(md.contains("## NAME"));
-    assert!(md.contains("## SYNOPSIS"));
-    assert!(md.contains("**mytool**"));
-    assert!(md.contains("## DESCRIPTION"));
+fn test_select_page_defaults_to_name_dot_one() {
+    let pages = BTreeMap::from([
+        ("zbsdiff.1".to_string(), "cmd page".to_string()),
+        ("zbspatch.1".to_string(), "patch page".to_string()),
+        ("zbsdiff.3".to_string(), "lib page".to_string())
+    ]);
+
+    let (name, content) =
+        man::select_page(&pages, "zbsdiff", None).expect("unwrap failed");
+    assert_eq!(name, "zbsdiff.1");
+    assert_eq!(content, "cmd page");
+}
+
+#[test]
+fn test_select_page_explicit_section() {
+    let pages = BTreeMap::from([
+        ("zbsdiff.1".to_string(), "cmd page".to_string()),
+        ("zbsdiff.3".to_string(), "lib page".to_string())
+    ]);
+
+    let (name, content) =
+        man::select_page(&pages, "zbsdiff", Some("zbsdiff.3"))
+            .expect("unwrap failed");
+    assert_eq!(name, "zbsdiff.3");
+    assert_eq!(content, "lib page");
+}
+
+#[test]
+fn test_select_page_matches_suffixed_upstream_keys() {
+    let pages = BTreeMap::from([(
+        "zbsdiff.3[main:User]".to_string(),
+        "lib page".to_string()
+    )]);
+
+    let (name, _) = man::select_page(&pages, "zbsdiff", Some("zbsdiff.3"))
+        .expect("unwrap failed");
+    assert_eq!(name, "zbsdiff.3[main:User]");
+}
+
+#[test]
+fn test_select_page_unknown_lists_available() {
+    let pages =
+        BTreeMap::from([("zbsdiff.1".to_string(), "cmd page".to_string())]);
+
+    let err = man::select_page(&pages, "zbsdiff", Some("zbsdiff.9"))
+        .expect_err("unknown page should fail");
+    assert!(err.to_string().contains("zbsdiff.1"));
+}
+
+#[test]
+fn test_select_page_single_page_fallback() {
+    let pages = BTreeMap::from([("guide.5".to_string(), "guide".to_string())]);
+
+    let (name, _) =
+        man::select_page(&pages, "guide", None).expect("unwrap failed");
+    assert_eq!(name, "guide.5");
 }
 
 #[test]
@@ -146,16 +183,17 @@ fn test_gather_local_manual_pages() {
     zoi::utils::symlink_file(&version_dir, &latest_path)
         .expect("unwrap failed");
 
-    let pages = man::gather_manual_pages(&pkg, Some(handle), false, true)
+    let pages = man::gather_manual_pages(&pkg, Some(handle), false)
         .expect("unwrap failed");
     assert_eq!(pages.len(), 2);
     assert!(pages.contains_key("tool.1"));
     assert!(pages.contains_key("extra.md"));
+    // Pages stay raw so they remain pipeable into `man`.
     assert!(
         pages
             .get("tool.1")
             .expect("unwrap failed")
-            .contains("# TOOL")
+            .contains(".TH TOOL 1")
     );
     assert!(
         pages
@@ -226,6 +264,6 @@ fn test_man_run_raw() {
     zoi::utils::symlink_file(&version_dir, &latest_path)
         .expect("unwrap failed");
 
-    let res = man::run(pkg_name, false, true, false);
+    let res = man::run(pkg_name, false, true, None);
     assert!(res.is_ok(), "man run raw should succeed: {:?}", res.err());
 }

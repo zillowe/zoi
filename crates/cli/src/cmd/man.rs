@@ -1,99 +1,42 @@
 //! Command for displaying manual pages for packages.
 //!
-//! This module provides a TUI (Terminal User Interface) and a pager-based
-//! way to view manual pages, supporting both locally installed pages
-//! and fetching pages from upstream registries.
+//! Manual pages staged with `zman()` are opened with the system's `man`
+//! viewer, falling back to `info` and finally to plain stdout. `--page`
+//! selects which page to show when a package ships several, and `--raw`
+//! prints the raw page source so it can be piped elsewhere.
 
 use std::collections::{BTreeMap, HashMap};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::{fs, io};
 
 use anyhow::{Result, anyhow};
-use crossterm::event::{
-    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode,
-    KeyEventKind, MouseEventKind
-};
-use crossterm::execute;
-use crossterm::terminal::{
-    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode,
-    enable_raw_mode
-};
-use pulldown_cmark::{
-    Event as CmarkEvent, HeadingLevel, Options, Parser, Tag, TagEnd
-};
-use ratatui::prelude::*;
-use ratatui::widgets::{
-    Block, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation,
-    ScrollbarState, Wrap
-};
-use syntect::easy::HighlightLines;
-use syntect::highlighting::{Style as SyntectStyle, ThemeSet};
-use syntect::parsing::SyntaxSet;
-use syntect::util::LinesWithEndings;
 use walkdir::WalkDir;
 
 use crate::pkg::types::{self};
 use crate::pkg::{db, local, resolve};
 
-/// State for the manual page viewer TUI.
-struct App<'a> {
-    /// The manual pages to display, parsed as TUI lines.
-    pages: Vec<(String, Vec<Line<'a>>)>,
-    /// Index of the currently displayed page.
-    current_page: usize,
-    /// Vertical scroll position.
-    scroll: u16,
-    /// Total height of the current page's content.
-    content_height: u16
-}
-
-impl App<'_> {
-    /// Tries to create a new TUI app from a map of page names to content.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if parsing any page fails or if no pages are provided.
-    fn try_new(pages: BTreeMap<String, String>) -> Result<Self> {
-        let mut parsed_pages = Vec::new();
-        for (name, content) in pages {
-            let lines = parse_markdown(&content)?;
-            parsed_pages.push((name, lines));
-        }
-
-        if parsed_pages.is_empty() {
-            return Err(anyhow!("No manual pages found."));
-        }
-
-        let content_height =
-            u16::try_from(parsed_pages.first().map_or(0, |p| p.1.len()))
-                .unwrap_or(u16::MAX);
-        Ok(Self {
-            pages: parsed_pages,
-            current_page: 0,
-            scroll: 0,
-            content_height
-        })
-    }
-}
-
 /// Runs the manual page viewer for the specified package.
+///
+/// Without `--page`, the page matching the package name in section 1
+/// (`<name>.1`) is shown. Pass `--raw` to print the raw page source to
+/// stdout instead of opening a viewer.
 ///
 /// # Errors
 ///
 /// Returns an error if:
 /// - The package cannot be resolved.
-/// - Manual pages cannot be gathered.
-/// - The terminal cannot be initialized.
+/// - No manual pages can be found, or the requested `--page` does not exist.
+/// - The selected viewer fails.
 pub fn run(
     package_name: &str,
     upstream: bool,
     raw: bool,
-    no_tui: bool
+    page: Option<&str>
 ) -> Result<()> {
     let (pkg, registry_handle) = resolve_package_for_man(package_name)?;
 
     let pages =
-        gather_manual_pages(&pkg, registry_handle.as_deref(), upstream, raw)?;
+        gather_manual_pages(&pkg, registry_handle.as_deref(), upstream)?;
 
     if pages.is_empty() {
         return Err(anyhow!(
@@ -102,98 +45,193 @@ pub fn run(
         ));
     }
 
+    let (name, content) = select_page(&pages, &pkg.name, page)?;
+
     if raw {
-        let multi = pages.len() > 1;
-        for (name, content) in pages {
-            if multi {
-                println!("--- {name} ---");
-            }
-            println!("{content}");
-        }
+        write_stdout_lossless(content)?;
         return Ok(());
     }
 
-    if no_tui {
-        use std::fmt::Write;
-        let mut full_content = String::new();
-        let multi = pages.len() > 1;
-        for (name, content) in pages {
-            if multi {
-                let _ = writeln!(full_content, "--- {name} ---\n");
-            }
-            full_content.push_str(&content);
-            full_content.push('\n');
-        }
-        run_pager(&full_content);
-        return Ok(());
-    }
-
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    let app = App::try_new(pages)?;
-    let res = run_app(&mut terminal, app);
-
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    if let Err(err) = res {
-        eprintln!("{err:?}");
-    }
-
+    show_with_viewer(name, content)?;
     Ok(())
 }
 
-/// Runs a pager to display the given content.
-fn run_pager(content: &str) {
-    let pager = std::env::var("PAGER").ok();
-
-    if let Some(p) = pager
-        && spawn_pager(&p, content).is_ok()
-    {
-        return;
-    }
-
-    if spawn_pager("less", content).is_ok() {
-        return;
-    }
-
-    if spawn_pager("more", content).is_ok() {
-        return;
-    }
-
-    println!("{content}");
-}
-
-/// Spawns a specific pager process and writes content to its stdin.
+/// Picks which manual page to display.
+///
+/// An explicit `--page` value matches a page file name exactly
+/// (e.g. `zbsdiff.3`). Without it, the `<package>.1` page is preferred;
+/// a lone page is used directly regardless of its name.
 ///
 /// # Errors
 ///
-/// Returns an error if the pager fails to spawn or if writing to its stdin
-/// fails.
-fn spawn_pager(pager: &str, content: &str) -> Result<()> {
-    let mut child = std::process::Command::new(pager)
-        .stdin(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|e| anyhow!("Failed to spawn pager '{pager}': {e}"))?;
+/// Returns an error if the requested page does not exist, or if no page
+/// can be chosen by default. The error lists the available pages.
+pub fn select_page<'a>(
+    pages: &'a BTreeMap<String, String>,
+    pkg_name: &str,
+    requested: Option<&str>
+) -> Result<(&'a String, &'a String)> {
+    let available = || {
+        let mut names: Vec<&str> = pages.keys().map(String::as_str).collect();
+        names.sort_unstable();
+        names.join(", ")
+    };
 
-    let mut stdin = child
-        .stdin
-        .take()
-        .ok_or_else(|| anyhow!("Failed to open stdin for pager"))?;
+    if let Some(want) = requested {
+        if let Some((key, content)) =
+            pages.iter().find(|(key, _)| page_key_matches(key, want))
+        {
+            return Ok((key, content));
+        }
+        return Err(anyhow!(
+            "Package '{pkg_name}' has no manual page '{want}'. Available: {}",
+            available()
+        ));
+    }
 
-    io::Write::write_all(&mut stdin, content.as_bytes())?;
-    drop(stdin);
+    let default = format!("{pkg_name}.1");
+    if let Some((key, content)) = pages
+        .iter()
+        .find(|(key, _)| page_key_matches(key, &default))
+    {
+        return Ok((key, content));
+    }
 
-    child.wait()?;
+    if let Some((key, content)) = pages.iter().next() {
+        return Ok((key, content));
+    }
+
+    Err(anyhow!(
+        "Package '{pkg_name}' has no '{default}' page. Pick one with --page. \
+         Available: {}",
+        available()
+    ))
+}
+
+/// Checks whether a stored page key refers to the requested page name.
+///
+/// Upstream pages may carry a `[sub:Scope]` suffix on their key, so both
+/// the full key and the suffix-stripped form are accepted.
+fn page_key_matches(key: &str, want: &str) -> bool {
+    key == want || strip_page_suffix(key) == want
+}
+
+/// Removes a trailing `[sub:Scope]` display suffix from a page key.
+fn strip_page_suffix(key: &str) -> &str {
+    if let Some(idx) = key.find('[') {
+        key[..idx].trim_end()
+    } else {
+        key
+    }
+}
+
+/// Displays a page with the system's `man` viewer, falling back to `info`
+/// and finally to plain stdout when neither viewer is installed.
+///
+/// The viewer runs in the foreground so it must finish before the
+/// temporary file holding the page is cleaned up.
+///
+/// # Errors
+///
+/// Returns an error if the temporary file cannot be written or a viewer
+/// fails after starting successfully.
+fn show_with_viewer(name: &str, content: &str) -> Result<()> {
+    let dir = tempfile::Builder::new().prefix("zoi-man-").tempdir()?;
+    let path = dir.path().join(sanitize_filename(name));
+    fs::write(&path, content)?;
+
+    match try_viewer("man", &path)? {
+        ViewerOutcome::Shown => return Ok(()),
+        ViewerOutcome::Missing => {}
+    }
+    match try_viewer("info", &path)? {
+        ViewerOutcome::Shown => return Ok(()),
+        ViewerOutcome::Missing => {}
+    }
+
+    eprintln!(
+        "Neither 'man' nor 'info' is installed; printing the raw page instead."
+    );
+    write_stdout_lossless(content)?;
+    Ok(())
+}
+
+/// Outcome of attempting to display a page with an external viewer.
+enum ViewerOutcome {
+    /// The viewer displayed the page.
+    Shown,
+    /// The viewer program is not installed.
+    Missing
+}
+
+/// Runs an external viewer (`man`, `info`) on a page file and waits for it.
+///
+/// # Errors
+///
+/// Returns an error if the viewer starts but exits unsuccessfully.
+fn try_viewer(program: &str, path: &Path) -> Result<ViewerOutcome> {
+    let mut child = match std::process::Command::new(program).arg(path).spawn()
+    {
+        Ok(child) => child,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            return Ok(ViewerOutcome::Missing);
+        }
+        Err(e) => {
+            return Err(anyhow!("Failed to spawn '{program}': {e}"));
+        }
+    };
+    let status = child.wait()?;
+    if status.success() {
+        Ok(ViewerOutcome::Shown)
+    } else {
+        Err(anyhow!("'{program}' exited with status {status}"))
+    }
+}
+
+/// Makes a page key safe to use as a temporary file name while keeping its
+/// man section extension (e.g. `zbsdiff.1[main:User]` becomes
+/// `zbsdiff.1_main_User`).
+fn sanitize_filename(name: &str) -> PathBuf {
+    let mut sanitized: String = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    while sanitized.ends_with(['_', '.']) {
+        sanitized.pop();
+    }
+    if sanitized.is_empty() {
+        sanitized.push_str("manpage");
+    }
+    PathBuf::from(sanitized)
+}
+
+/// Writes to stdout without panicking on a closed pipe, so invocations like
+/// `zoi man <pkg> --raw | man` or `... | head` exit quietly instead of
+/// panicking with a broken pipe error.
+///
+/// # Errors
+///
+/// Returns an error for any I/O failure other than a broken pipe.
+fn write_stdout_lossless(content: &str) -> Result<()> {
+    use std::io::Write;
+    let stdout = io::stdout();
+    let mut out = stdout.lock();
+    match out.write_all(content.as_bytes()) {
+        Ok(()) => {}
+        Err(e) if e.kind() == io::ErrorKind::BrokenPipe => return Ok(()),
+        Err(e) => return Err(e.into())
+    }
+    match out.flush() {
+        Ok(()) => {}
+        Err(e) if e.kind() == io::ErrorKind::BrokenPipe => {}
+        Err(e) => return Err(e.into())
+    }
     Ok(())
 }
 
@@ -233,7 +271,12 @@ pub fn resolve_package_for_man(
     Err(anyhow!("Could not find package or binary named '{term}'."))
 }
 
-/// Gathers manual pages for a package, checking locally and then upstream.
+/// Gathers raw manual page sources for a package, checking locally first
+/// and then upstream.
+///
+/// Pages are returned as `file name -> raw content` with no reformatting,
+/// so they stay pipeable into `man` and render natively in viewers.
+/// Informational notes go to stderr to keep stdout clean for `--raw`.
 ///
 /// # Errors
 ///
@@ -243,8 +286,7 @@ pub fn resolve_package_for_man(
 pub fn gather_manual_pages(
     pkg: &types::Package,
     registry_handle: Option<&str>,
-    upstream: bool,
-    raw: bool
+    upstream: bool
 ) -> Result<BTreeMap<String, String>> {
     let mut pages = BTreeMap::new();
 
@@ -264,12 +306,10 @@ pub fn gather_manual_pages(
                 if latest_dir.exists() {
                     let local_pages = find_local_man_pages(&latest_dir)?;
                     if !local_pages.is_empty() {
-                        if !raw {
-                            println!(
-                                "Displaying locally installed manual from \
-                                 {scope:?} scope..."
-                            );
-                        }
+                        eprintln!(
+                            "Displaying locally installed manual from \
+                             {scope:?} scope..."
+                        );
                         pages.extend(local_pages);
                         break;
                     }
@@ -283,12 +323,9 @@ pub fn gather_manual_pages(
                     let system_pages =
                         find_man_pages_in_hierarchy(system_man, &pkg.name)?;
                     if !system_pages.is_empty() {
-                        if !raw {
-                            println!(
-                                "Displaying manual from system \
-                                 /usr/share/man..."
-                            );
-                        }
+                        eprintln!(
+                            "Displaying manual from system /usr/share/man..."
+                        );
                         pages.extend(system_pages);
                         break;
                     }
@@ -298,12 +335,10 @@ pub fn gather_manual_pages(
     }
 
     if pages.is_empty() {
-        if !raw {
-            println!(
-                "Package not installed or local manual not found. Fetching \
-                 from upstream..."
-            );
-        }
+        eprintln!(
+            "Package not installed or local manual not found. Fetching from \
+             upstream..."
+        );
         let upstream_pages =
             gather_manual_pages_from_upstream(pkg, registry_handle)?;
         pages.extend(upstream_pages);
@@ -332,14 +367,7 @@ fn find_man_pages_in_hierarchy(
             let name = entry.file_name().to_string_lossy();
             if name.starts_with(term) {
                 let content = fs::read_to_string(entry.path())?;
-                pages.insert(
-                    name.to_string(),
-                    if content.starts_with('.') {
-                        parse_roff(&content)
-                    } else {
-                        content
-                    }
-                );
+                pages.insert(name.to_string(), content);
             }
         }
     }
@@ -365,7 +393,7 @@ fn gather_manual_pages_from_upstream(
     // Resolve the package to get its archive source
     let source = registry_handle.map_or_else(
         || pkg.name.clone(),
-        |handle| format!("#{}@{}", handle, pkg.name)
+        |handle| format!("#{handle}@{}", pkg.name)
     );
 
     let (mut graph, _) =
@@ -455,14 +483,7 @@ fn gather_manual_pages_from_upstream(
                                 .to_string_lossy();
                             let display_name =
                                 format!("{file_name}[{sub_name}:{scope:?}]");
-                            pages.insert(
-                                display_name,
-                                if content.starts_with('.') {
-                                    parse_roff(&content)
-                                } else {
-                                    content
-                                }
-                            );
+                            pages.insert(display_name, content);
                         }
                     }
                 }
@@ -511,445 +532,11 @@ fn find_local_man_pages(latest_dir: &Path) -> Result<BTreeMap<String, String>> {
                         .to_string_lossy()
                         .to_string();
                     let content = fs::read_to_string(path)?;
-                    if name.to_lowercase().ends_with(".md") {
-                        pages.insert(name, content);
-                    } else if content.starts_with('.') {
-                        pages.insert(name, parse_roff(&content));
-                    } else {
-                        pages.insert(name, content);
-                    }
+                    pages.insert(name, content);
                 }
             }
         }
     }
 
     Ok(pages)
-}
-
-/// Parses a ROFF-formatted string (traditional man page) into a simplified
-/// Markdown string.
-#[must_use]
-pub fn parse_roff(content: &str) -> String {
-    use std::fmt::Write;
-    let mut md = String::new();
-    for line in content.lines() {
-        let line = line.trim();
-        if line.starts_with(".TH") {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if let Some(part) = parts.get(1) {
-                let _ = writeln!(md, "# {part}\n");
-            }
-        } else if line.starts_with(".SH") {
-            let title = line.trim_start_matches(".SH").trim();
-            let _ = writeln!(md, "## {title}\n");
-        } else if line.starts_with(".SS") {
-            let title = line.trim_start_matches(".SS").trim();
-            let _ = writeln!(md, "### {title}\n");
-        } else if line.starts_with(".PP")
-            || line.starts_with(".P")
-            || line.starts_with(".LP")
-        {
-            md.push_str("\n\n");
-        } else if line.starts_with(".B ") {
-            let _ = write!(md, "**{}**", line.trim_start_matches(".B ").trim());
-        } else if line.starts_with(".I ") {
-            let _ = write!(md, "*{}*", line.trim_start_matches(".I ").trim());
-        } else if line.starts_with(".BR ") {
-            let parts: Vec<&str> = line.split_whitespace().skip(1).collect();
-            if let Some(first) = parts.first() {
-                let _ = write!(md, "**{first}**");
-                for p in parts.iter().skip(1) {
-                    md.push_str(p);
-                }
-            }
-        } else if line.starts_with('.') {
-        } else {
-            md.push_str(line);
-            md.push('\n');
-        }
-    }
-    md
-}
-
-/// Main loop for the TUI application.
-fn run_app(
-    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    mut app: App
-) -> io::Result<()> {
-    loop {
-        terminal.draw(|f| ui(f, &mut app))?;
-
-        match event::read()? {
-            Event::Key(key) if key.kind == KeyEventKind::Press => {
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        app.scroll = app.scroll.saturating_add(1);
-                    }
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        app.scroll = app.scroll.saturating_sub(1);
-                    }
-                    KeyCode::PageDown => {
-                        app.scroll =
-                            app.scroll.saturating_add(terminal.size()?.height);
-                    }
-                    KeyCode::PageUp => {
-                        app.scroll =
-                            app.scroll.saturating_sub(terminal.size()?.height);
-                    }
-                    KeyCode::Home => app.scroll = 0,
-                    KeyCode::End => app.scroll = app.content_height,
-                    KeyCode::Tab => {
-                        app.current_page =
-                            (app.current_page + 1) % app.pages.len();
-                        app.scroll = 0;
-                        app.content_height = u16::try_from(
-                            app.pages
-                                .get(app.current_page)
-                                .map_or(0, |p| p.1.len())
-                        )
-                        .unwrap_or(u16::MAX);
-                    }
-                    KeyCode::BackTab => {
-                        app.current_page = if app.current_page == 0 {
-                            app.pages.len() - 1
-                        } else {
-                            app.current_page - 1
-                        };
-                        app.scroll = 0;
-                        app.content_height = u16::try_from(
-                            app.pages
-                                .get(app.current_page)
-                                .map_or(0, |p| p.1.len())
-                        )
-                        .unwrap_or(u16::MAX);
-                    }
-                    _ => {}
-                }
-            }
-            Event::Mouse(mouse) => match mouse.kind {
-                MouseEventKind::ScrollUp => {
-                    app.scroll = app.scroll.saturating_sub(3);
-                }
-                MouseEventKind::ScrollDown => {
-                    app.scroll = app.scroll.saturating_add(3);
-                }
-                _ => {}
-            },
-            _ => {}
-        }
-    }
-}
-
-/// Renders the TUI.
-fn ui(f: &mut Frame, app: &mut App) {
-    let size = f.area();
-
-    let has_sidebar = app.pages.len() > 1;
-    let main_area = if has_sidebar {
-        let chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Percentage(20),
-                Constraint::Percentage(80)
-            ])
-            .split(size);
-
-        let items: Vec<ListItem> = app
-            .pages
-            .iter()
-            .enumerate()
-            .map(|(i, (name, _))| {
-                let style = if i == app.current_page {
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD)
-                } else {
-                    Style::default()
-                };
-                ListItem::new(name.as_str()).style(style)
-            })
-            .collect();
-
-        let list = List::new(items)
-            .block(Block::default().borders(Borders::ALL).title("Pages"))
-            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-            .highlight_symbol("> ");
-
-        if let Some(sidebar_chunk) = chunks.first() {
-            f.render_widget(list, *sidebar_chunk);
-        }
-        chunks.get(1).copied().unwrap_or(size)
-    } else {
-        size
-    };
-
-    let Some((name, lines)) = app.pages.get(app.current_page) else {
-        return;
-    };
-    let text = Text::from(lines.clone());
-
-    let paragraph = Paragraph::new(text)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!("Manual: {name}"))
-        )
-        .wrap(Wrap { trim: true })
-        .scroll((app.scroll, 0));
-
-    f.render_widget(paragraph, main_area);
-
-    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
-        .begin_symbol(Some("↑"))
-        .end_symbol(Some("↓"));
-
-    let mut scrollbar_state = ScrollbarState::new(app.content_height as usize)
-        .position(app.scroll as usize);
-
-    f.render_stateful_widget(
-        scrollbar,
-        main_area.inner(Margin {
-            vertical: 1,
-            horizontal: 0
-        }),
-        &mut scrollbar_state
-    );
-}
-
-/// Parses Markdown content into TUI lines.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - A style stack underflow occurs.
-/// - Syntax highlighting fails.
-///
-/// # Panics
-///
-/// Panics if a style stack invariant is violated.
-fn parse_markdown(content: &str) -> Result<Vec<Line<'static>>> {
-    let mut options = Options::empty();
-    options.insert(Options::ENABLE_STRIKETHROUGH);
-    let parser = Parser::new_ext(content, options);
-
-    let mut lines = Vec::new();
-    let mut current_line = Vec::new();
-    let mut style_stack = vec![Style::default()];
-    let mut list_stack: Vec<(u64, char)> = Vec::new();
-
-    let ss = SyntaxSet::load_defaults_newlines();
-    let ts = ThemeSet::load_defaults();
-    let mut highlighter: Option<(HighlightLines, String)> = None;
-    let mut link_url = String::new();
-
-    for event in parser {
-        match event {
-            CmarkEvent::Start(tag) => match tag {
-                Tag::Heading { level, .. } => {
-                    style_stack.push(
-                        Style::default()
-                            .add_modifier(Modifier::BOLD)
-                            .fg(Color::Yellow)
-                    );
-                    let level_num = match level {
-                        HeadingLevel::H1 => 1,
-                        HeadingLevel::H2 => 2,
-                        HeadingLevel::H3 => 3,
-                        HeadingLevel::H4 => 4,
-                        HeadingLevel::H5 => 5,
-                        HeadingLevel::H6 => 6
-                    };
-                    current_line.push(Span::raw("#".repeat(level_num) + " "));
-                }
-                Tag::BlockQuote(_) => {
-                    style_stack.push(Style::default().fg(Color::Gray));
-                    current_line.push(Span::styled(
-                        "> ",
-                        *style_stack.last().ok_or_else(|| {
-                            anyhow!("Style stack should never be empty")
-                        })?
-                    ));
-                }
-                Tag::CodeBlock(kind) => {
-                    let lang =
-                        if let pulldown_cmark::CodeBlockKind::Fenced(lang) =
-                            kind
-                        {
-                            lang.into_string()
-                        } else {
-                            "text".to_string()
-                        };
-                    if let Some(syntax) = ss.find_syntax_by_extension(&lang) {
-                        if let Some(theme) = ts.themes.get("base16-ocean.dark")
-                        {
-                            highlighter = Some((
-                                HighlightLines::new(syntax, theme),
-                                String::new()
-                            ));
-                        } else {
-                            highlighter = None;
-                        }
-                    } else {
-                        highlighter = None;
-                    }
-                }
-                Tag::List(start_index) => {
-                    list_stack.push((start_index.unwrap_or(1), '*'));
-                }
-                Tag::Item => {
-                    let list_len = list_stack.len();
-                    if let Some((index, _)) = list_stack.last_mut() {
-                        let marker = if *index > 0 {
-                            format!("{index}. ")
-                        } else {
-                            "* ".to_string()
-                        };
-                        current_line.push(Span::raw("  ".repeat(list_len - 1)));
-                        current_line.push(Span::raw(marker));
-                        *index += 1;
-                    }
-                }
-                Tag::Emphasis => {
-                    style_stack.push(
-                        (*style_stack.last().ok_or_else(|| {
-                            anyhow!("Style stack should never be empty")
-                        })?)
-                        .add_modifier(Modifier::ITALIC)
-                    );
-                }
-                Tag::Strong => {
-                    style_stack.push(
-                        (*style_stack.last().ok_or_else(|| {
-                            anyhow!("Style stack should never be empty")
-                        })?)
-                        .add_modifier(Modifier::BOLD)
-                    );
-                }
-                Tag::Strikethrough => {
-                    style_stack.push(
-                        (*style_stack.last().ok_or_else(|| {
-                            anyhow!("Style stack should never be empty")
-                        })?)
-                        .add_modifier(Modifier::CROSSED_OUT)
-                    );
-                }
-                Tag::Link { dest_url, .. } => {
-                    link_url = dest_url.to_string();
-                    current_line.push(Span::styled(
-                        "[",
-                        Style::default().fg(Color::DarkGray)
-                    ));
-                    style_stack.push(
-                        Style::default()
-                            .fg(Color::Cyan)
-                            .add_modifier(Modifier::UNDERLINED)
-                    );
-                }
-                _ => {}
-            },
-            CmarkEvent::End(tag) => {
-                match tag {
-                    TagEnd::Paragraph
-                    | TagEnd::Heading { .. }
-                    | TagEnd::BlockQuote(_)
-                    | TagEnd::Item => {
-                        lines.push(Line::from(std::mem::take(
-                            &mut current_line
-                        )));
-                    }
-                    TagEnd::CodeBlock => {
-                        if let Some((mut h, code)) = highlighter.take() {
-                            for line in LinesWithEndings::from(&code) {
-                                let ranges: Vec<(SyntectStyle, &str)> = h
-                                    .highlight_line(line, &ss)
-                                    .map_err(|e| {
-                                        anyhow!(
-                                            "Syntax highlighting failed: {e}"
-                                        )
-                                    })?;
-                                let spans: Vec<Span<'static>> = ranges
-                                    .into_iter()
-                                    .map(|(style, text)| {
-                                        Span::styled(
-                                            text.to_string(),
-                                            Style::default()
-                                                .fg(Color::Rgb(
-                                                    style.foreground.r,
-                                                    style.foreground.g,
-                                                    style.foreground.b
-                                                ))
-                                                .bg(Color::Rgb(
-                                                    style.background.r,
-                                                    style.background.g,
-                                                    style.background.b
-                                                ))
-                                        )
-                                    })
-                                    .collect();
-                                lines.push(Line::from(spans));
-                            }
-                        }
-                        lines.push(Line::from(vec![]));
-                    }
-                    TagEnd::Emphasis
-                    | TagEnd::Strong
-                    | TagEnd::Strikethrough => {
-                        style_stack.pop();
-                    }
-                    TagEnd::Link => {
-                        style_stack.pop();
-                        current_line.push(Span::styled(
-                            format!("]({link_url})"),
-                            Style::default().fg(Color::DarkGray)
-                        ));
-                        link_url.clear();
-                    }
-                    TagEnd::List(_) => {
-                        list_stack.pop();
-                        if list_stack.is_empty() {
-                            lines.push(Line::from(vec![]));
-                        }
-                    }
-                    _ => {}
-                }
-                if let TagEnd::Heading { .. } | TagEnd::BlockQuote(_) = tag {
-                    style_stack.pop();
-                }
-            }
-            CmarkEvent::Text(text) => {
-                if let Some((_, code)) = &mut highlighter {
-                    code.push_str(&text);
-                } else {
-                    current_line.push(Span::styled(
-                        text.to_string(),
-                        *style_stack.last().ok_or_else(|| {
-                            anyhow!("Style stack should never be empty")
-                        })?
-                    ));
-                }
-            }
-            CmarkEvent::Code(text) => {
-                current_line.push(Span::styled(
-                    text.to_string(),
-                    Style::default().fg(Color::Green).bg(Color::DarkGray)
-                ));
-            }
-            CmarkEvent::HardBreak => {
-                lines.push(Line::from(std::mem::take(&mut current_line)));
-            }
-            CmarkEvent::SoftBreak => {
-                current_line.push(Span::raw(" "));
-            }
-            CmarkEvent::Rule => {
-                lines.push(Line::from("---"));
-            }
-            _ => {}
-        }
-    }
-    if !current_line.is_empty() {
-        lines.push(Line::from(std::mem::take(&mut current_line)));
-    }
-
-    Ok(lines)
 }

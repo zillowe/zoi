@@ -426,7 +426,7 @@ Lists installed or all available packages.
 
 ### `zoi man <package_name>`
 
-Shows a package's manual.
+Shows a package's manual in your system's `man` viewer (falling back to `info`).
 
 **Arguments:**
 
@@ -436,7 +436,7 @@ Shows a package's manual.
 
 - `--upstream`: Always look at the upstream manual even if it's downloaded.
 - `--raw`: Print the manual to the terminal raw.
-- `--no-tui`: Do not use the TUI, use the system pager instead.
+- `--page <PAGE>`: Show a specific manual page (e.g. `zbsdiff.3`). Defaults to the page matching the package name in section 1.
 
 ---
 

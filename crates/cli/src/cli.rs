@@ -667,9 +667,10 @@ enum Commands {
         /// Print the manual to the terminal raw
         #[arg(long)]
         raw: bool,
-        /// Do not use the TUI, use the system pager instead
+        /// Show a specific manual page (e.g. 'zbsdiff.1' or 'zbsdiff.3').
+        /// Defaults to the page matching the package name in section 1.
         #[arg(long)]
-        no_tui: bool
+        page: Option<String>
     },
 
     /// Build, create, and manage Zoi packages
@@ -1213,8 +1214,8 @@ pub fn run() -> anyhow::Result<()> {
                 package_name,
                 upstream,
                 raw,
-                no_tui
-            } => cmd::man::run(&package_name, upstream, raw, no_tui),
+                page
+            } => cmd::man::run(&package_name, upstream, raw, page.as_deref()),
             Commands::Package(args) => cmd::package::run(args),
             Commands::Pgp(args) => cmd::pgp::run(args),
             Commands::Helper(args) => cmd::helper::run(args),

@@ -15,23 +15,18 @@ zoi man <package_or_binary>
 
 Zoi will automatically resolve the binary name to its providing package and display the relevant manual pages.
 
-### TUI Navigation
+### Viewing Pages
 
-By default, `zoi man` opens an interactive TUI (Terminal User Interface). If a package provides multiple manual pages (e.g. for different binaries or sections), you can navigate between them using the sidebar.
+By default, `zoi man` opens the manual in your system's `man` viewer (falling back to `info`, then plain output when neither is installed). If a package provides multiple manual pages, the one matching the package name in section 1 (e.g. `zbsdiff.1`) is shown.
 
-- **Up/Down / j/k**: Scroll content
-- **Tab / Shift+Tab**: Switch between manual pages
-- **q / Esc**: Exit the manual viewer
+### Selecting a Page
 
-### Using a Pager
-
-If you prefer to use your system's default pager (like `less` or `more`) instead of the TUI, use the `--no-tui` flag:
+Use the `--page` flag to open a specific page by file name, e.g. a library page in another section:
 
 ```sh
-zoi man <package_name> --no-tui
+zoi man zbsdiff --page zbsdiff.3
+zoi man zbsdiff --page zbspatch.1
 ```
-
-This will concatenate all manual pages and pipe them to your `$PAGER`.
 
 ### Raw Output
 
@@ -39,6 +34,12 @@ To print the manual content directly to your terminal without any paging or inte
 
 ```sh
 zoi man <package_name> --raw
+```
+
+The output stays in its original format (e.g. raw ROFF), so it can be piped into other tools:
+
+```sh
+zoi man @zillowe/zbsdiff --raw | man
 ```
 
 ---
@@ -100,14 +101,8 @@ This allows you to research a tool's capabilities and configuration before decid
 
 ---
 
-## ROFF Parsing
-
-Zoi includes a cross-platform ROFF-to-Markdown parser. This allows traditional man pages to be rendered with syntax highlighting and styling in Zoi's TUI, even on systems without `man-db` or `groff` installed (like Windows).
-
----
-
 ## Troubleshooting
 
 - **"No manual pages found"**: Ensure the package maintainer has used `zman()` to stage files in the package.
 - **Upstream Manuals**: If the local manual is missing or you want the latest version from the registry (including uninstalled ones), use `zoi man <pkg> --upstream`.
-- **Formatting Issues**: While Zoi's ROFF parser handles common macros, complex man pages might display better with `--raw` if you have a local `man` command.
+- **"has no manual page"**: The package ships several pages but none matches the default `<name>.1` pick. List them via the error message and open one with `--page`.

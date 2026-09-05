@@ -9,10 +9,6 @@ feature-depth = 1
 [advisories]
 db-urls = ["https://github.com/rustsec/advisory-db"]
 ignore = [
-    "RUSTSEC-2025-0141", # bincode: unmaintained, transitive via syntect
-    # team considers it complete
-    "RUSTSEC-2024-0320", # yaml-rust: unmaintained, transitive via syntect
-    # see yaml-rust2 fork
     "RUSTSEC-2026-0249", # smartstring: unmaintained
 ]
 
