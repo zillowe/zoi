@@ -58,7 +58,19 @@ zoi pgp add https://zillowez.rf.gd/assets/zillowez.asc
 
 We welcome contributions to Zoidberg! To maintain high quality and consistency, all submissions must follow the official **[Zoidberg Packaging Guidelines](/docs/zds/zoi/zoidberg-guidelines)**.
 
-These guidelines cover naming standards, versioning, and license requirements.
+These guidelines cover naming standards, versioning, and license requirements. Manual pages must be staged with `zman()` so they are available via `zoi man` (see the [Lua API reference](/docs/zds/zoi/lua-api#zman-source-section)).
+
+## Build pipeline, deltas & retention
+
+Each merged change to a `.pkg.lua` file is built per platform by the registry pipeline. For every platform build the pipeline publishes:
+
+- the `.zpa` archive plus `.hash`, `.size`, `.files` and `.sig` sidecars,
+- the `.zsa` source bundle plus its sidecars,
+- a `.zdelta` patch against the previous published version plus `.hash`, `.size` and `.sig` sidecars (skipped when no previous version exists).
+
+Deltas follow the `{name}-{version}-{platform}.zdelta` naming from `repo.yaml` and power bandwidth-efficient upgrades as described in [Repositories](/docs/zds/zoi/repositories#delta-patches).
+
+Only the last three versions of each package are kept (plus the `latest` pointer). Older generic-package versions are pruned automatically on every platform.
 
 ## Repository Tiers
 
