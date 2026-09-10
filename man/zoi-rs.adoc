@@ -43,7 +43,7 @@ https://zillowe.qzz.io/zds/zoi.
 
 Add the crate to a Rust project with Cargo:
 
-  *cargo add zoi-rs*
+  cargo add zoi-rs
 
 or declare the dependency manually in Cargo.toml:
 
