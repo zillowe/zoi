@@ -110,13 +110,13 @@ fi
 cd ..
 
 echo "--- Fedora COPR ---"
-git clone "ssh://git@github.com/zillowe/copr.git" copr
+git clone "https://oauth2:${GITLAB_TOKEK_COPR}@gitlab.com/zillowe/packaging/copr.git" copr
 mkdir -p copr/zoi
 cp "$TMP_PACKAGES/rpm/zoi.spec" copr/zoi/
 cd copr/
 if [[ -n $(git status --porcelain) ]]; then
   git add .
   git commit -m "Release(Zoi): $VERSION"
-  git push origin main
+  git push "https://oauth2:${GITLAB_TOKEN_COPR}@gitlab.com/zillowe/packaging/copr.git" HEAD:main
 fi
 cd ..
