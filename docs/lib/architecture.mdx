@@ -50,7 +50,7 @@ Inside the store, each package has its own directory containing versioned instal
 {hash}-{name}/
 ├── {version}/              # Actual package files
 │   ├── bin/                # Binaries (linked to PATH)
-│   ├── manifest.yaml       # Installation manifest for this version
+│   ├── manifest.json       # Installation manifest for this version
 │   └── ...                 # Staged package contents (libs, share, etc.)
 ├── latest                  # Symlink to the current active version directory
 └── dependents/             # Directory containing files named by hex-encoded IDs

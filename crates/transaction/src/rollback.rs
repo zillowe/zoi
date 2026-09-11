@@ -62,11 +62,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
     )?;
 
     let current_version = current_manifest.version.clone();
-    let manifest_filename = if let Some(sub) = &sub_package {
-        format!("manifest-{sub}.yaml")
-    } else {
-        "manifest.yaml".to_string()
-    };
+    let manifest_filename = local::manifest_filename(sub_package.as_deref());
 
     let mut versions: Vec<String> = Vec::new();
     if let Ok(entries) = fs::read_dir(&package_dir) {
@@ -103,18 +99,22 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
         previous_version.green()
     );
 
+    let prev_version_dir = package_dir.join(previous_version);
     let prev_manifest_path =
-        package_dir.join(previous_version).join(&manifest_filename);
-    if !prev_manifest_path.exists() {
+        local::find_store_manifest(&prev_version_dir, sub_package.as_deref())
+            .or_else(|| {
+                // Fall back to the precomputed name for a precise error below.
+                let candidate = prev_version_dir.join(&manifest_filename);
+                candidate.exists().then_some(candidate)
+            });
+    let Some(prev_manifest_path) = prev_manifest_path else {
         return Err(anyhow!(
-            "Previous manifest not found at: {}",
-            prev_manifest_path.display()
+            "Previous manifest not found in: {}",
+            prev_version_dir.display()
         ));
-    }
+    };
 
-    let prev_manifest_content = fs::read_to_string(&prev_manifest_path)?;
-    let prev_manifest: types::InstallManifest =
-        serde_yaml::from_str(&prev_manifest_content)?;
+    let prev_manifest = local::read_store_manifest(&prev_manifest_path)?;
 
     if !yes
         && !core_utils::ask_for_confirmation("Do you want to proceed?", false)
@@ -151,9 +151,10 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
             if name.starts_with("manifest")
-                && std::path::Path::new(&name)
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("yaml"))
+                && std::path::Path::new(&name).extension().is_some_and(|ext| {
+                    ext.eq_ignore_ascii_case("json")
+                        || ext.eq_ignore_ascii_case("yaml")
+                })
                 && name != manifest_filename
             {
                 has_other_manifests = true;

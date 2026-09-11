@@ -808,15 +808,21 @@ pub fn run(
             }
         }
 
-        let manifest_filename = if let Some(sub) = &sub_package_to_uninstall {
-            format!("manifest-{sub}.yaml")
-        } else {
-            "manifest.yaml".to_string()
-        };
-
-        let manifest_path = version_dir.join(manifest_filename);
+        let manifest_path = version_dir.join(local::manifest_filename(
+            sub_package_to_uninstall.as_deref()
+        ));
         if manifest_path.exists() {
-            fs::remove_file(manifest_path)?;
+            fs::remove_file(&manifest_path)?;
+        }
+        // Remove the legacy YAML twin if an old install left one behind.
+        let legacy_path = version_dir.join(format!(
+            "manifest{}.yaml",
+            sub_package_to_uninstall
+                .as_deref()
+                .map_or_else(String::new, |sub| format!("-{sub}"))
+        ));
+        if legacy_path != manifest_path && legacy_path.exists() {
+            fs::remove_file(legacy_path)?;
         }
 
         if version_dir.exists() {
@@ -825,9 +831,12 @@ pub fn run(
                 for entry in entries.flatten() {
                     let name = entry.file_name().to_string_lossy().to_string();
                     if name.starts_with("manifest")
-                        && std::path::Path::new(&name)
-                            .extension()
-                            .is_some_and(|ext| ext.eq_ignore_ascii_case("yaml"))
+                        && std::path::Path::new(&name).extension().is_some_and(
+                            |ext| {
+                                ext.eq_ignore_ascii_case("json")
+                                    || ext.eq_ignore_ascii_case("yaml")
+                            }
+                        )
                     {
                         has_other_manifests = true;
                         break;

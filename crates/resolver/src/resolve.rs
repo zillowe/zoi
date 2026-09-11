@@ -86,6 +86,7 @@ fn split_explicit_file_source(
             let base_path = if let Some((path, sub)) = base.rsplit_once(':') {
                 if (path.ends_with(".pkg.lua")
                     || path.ends_with(".manifest.yaml")
+                    || path.ends_with(".manifest.json")
                     || std::path::Path::new(path)
                         .extension()
                         .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
@@ -104,6 +105,7 @@ fn split_explicit_file_source(
 
             if base_path.ends_with(".pkg.lua")
                 || base_path.ends_with(".manifest.yaml")
+                || base_path.ends_with(".manifest.json")
                 || std::path::Path::new(base_path)
                     .extension()
                     .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
@@ -123,6 +125,7 @@ fn split_explicit_file_source(
         if let Some((base, sub)) = main_part.rsplit_once(':') {
             if (base.ends_with(".pkg.lua")
                 || base.ends_with(".manifest.yaml")
+                || base.ends_with(".manifest.json")
                 || std::path::Path::new(base)
                     .extension()
                     .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
@@ -141,6 +144,7 @@ fn split_explicit_file_source(
 
     if path_part.ends_with(".pkg.lua")
         || path_part.ends_with(".manifest.yaml")
+        || path_part.ends_with(".manifest.json")
         || std::path::Path::new(path_part)
             .extension()
             .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
@@ -1412,7 +1416,8 @@ fn resolve_source_recursive(
         }
     }
 
-    if source.ends_with(".manifest.yaml") {
+    if source.ends_with(".manifest.json") || source.ends_with(".manifest.yaml")
+    {
         let path = PathBuf::from(source);
         if !path.exists() {
             return Err(anyhow!("Local file not found at '{source}'"));
@@ -1420,7 +1425,11 @@ fn resolve_source_recursive(
         println!("Using local sharable manifest file: {}", path.display());
         let content = fs::read_to_string(&path)?;
         let sharable_manifest: types::SharableInstallManifest =
-            serde_yaml::from_str(&content)?;
+            if source.ends_with(".manifest.json") {
+                serde_json::from_str(&content)?
+            } else {
+                serde_yaml::from_str(&content)?
+            };
         let new_source = format!(
             "#{}@{}/{}@{}",
             sharable_manifest.registry_handle,

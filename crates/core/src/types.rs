@@ -964,7 +964,7 @@ pub struct CiConfig {
 /// The record of an actual package installation on disk.
 ///
 /// Unlike the `Package` blueprint, the `InstallManifest` is the "Source of
-/// Truth" for what is currently installed. It is stored in `manifest.yaml`
+/// Truth" for what is currently installed. It is stored in `manifest.json`
 /// inside the package's version directory in the Zoi store.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InstallManifest {

@@ -5,7 +5,6 @@ use std::os::unix::fs::PermissionsExt;
 use tempfile::tempdir;
 use zoi::cmd::shell;
 use zoi::pkg::{config, db, local, plugin, resolve, types};
-use zoi::utils;
 
 mod common;
 
@@ -87,12 +86,14 @@ repos:
     let pkg_lua_path = pkg_db_dir.join(format!("{pkg_name}.pkg.lua"));
     fs::write(&pkg_lua_path, &pkg_lua_content).expect("unwrap failed");
 
-    let store_base =
-        local::get_store_base_dir(types::Scope::User).expect("unwrap failed");
-    let pkg_id = zoi::pkg::utils::generate_package_id(handle, "core", pkg_name);
-    let pkg_dir_name = zoi::pkg::utils::get_package_dir_name(&pkg_id, pkg_name);
-    let pkg_path = store_base.join(&pkg_dir_name);
-    let version_dir = pkg_path.join(version);
+    let version_dir = local::get_package_version_dir(
+        types::Scope::User,
+        handle,
+        "core",
+        pkg_name,
+        version
+    )
+    .expect("unwrap failed");
     let bin_dir = version_dir.join("bin");
     fs::create_dir_all(&bin_dir).expect("unwrap failed");
 
@@ -144,14 +145,7 @@ repos:
         sandbox: None,
         completions: None
     };
-    fs::write(
-        version_dir.join("manifest.yaml"),
-        serde_yaml::to_string(&manifest).expect("unwrap failed")
-    )
-    .expect("unwrap failed");
-
-    let latest_path = pkg_path.join("latest");
-    utils::symlink_file(&version_dir, &latest_path).expect("unwrap failed");
+    local::write_manifest(&manifest).expect("unwrap failed");
 
     let conn = db::open_connection(handle).expect("unwrap failed");
     let pkg_meta = types::Package {

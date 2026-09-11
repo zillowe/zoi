@@ -221,14 +221,21 @@ pub fn elevate_uninstall(
         }
     }
 
-    let manifest_filename = if let Some(sub) = &manifest.sub_package {
-        format!("manifest-{sub}.yaml")
-    } else {
-        "manifest.yaml".to_string()
-    };
-    let manifest_path = version_dir.join(manifest_filename);
+    let manifest_path = version_dir
+        .join(local::manifest_filename(manifest.sub_package.as_deref()));
     if manifest_path.exists() {
-        std::fs::remove_file(manifest_path)?;
+        std::fs::remove_file(&manifest_path)?;
+    }
+    // Remove the legacy YAML twin if an old install left one behind.
+    let legacy_path = version_dir.join(format!(
+        "manifest{}.yaml",
+        manifest
+            .sub_package
+            .as_deref()
+            .map_or_else(String::new, |sub| format!("-{sub}"))
+    ));
+    if legacy_path != manifest_path && legacy_path.exists() {
+        std::fs::remove_file(legacy_path)?;
     }
 
     if version_dir.exists() && std::fs::read_dir(&version_dir)?.next().is_none()

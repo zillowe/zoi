@@ -6,7 +6,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use walkdir::WalkDir;
 use zoi_core::types::{self, InstallManifest, Scope};
 use zoi_core::{config, utils};
@@ -61,6 +61,101 @@ pub fn get_package_version_dir(
 
 use rayon::prelude::*;
 
+/// Returns the store manifest filename for a (sub-)package.
+///
+/// Store manifests are machine-generated install records, so they use JSON:
+/// `manifest.json` (or `manifest-{sub}.json` for split packages).
+#[must_use]
+pub fn manifest_filename(sub_package: Option<&str>) -> String {
+    if let Some(sub) = sub_package {
+        format!("manifest-{sub}.json")
+    } else {
+        "manifest.json".to_string()
+    }
+}
+
+/// Returns the legacy YAML manifest filename, kept for reading stores
+/// written before the JSON migration.
+fn legacy_manifest_filename(sub_package: Option<&str>) -> String {
+    if let Some(sub) = sub_package {
+        format!("manifest-{sub}.yaml")
+    } else {
+        "manifest.yaml".to_string()
+    }
+}
+
+/// Reads a store manifest, accepting the current JSON format as well as
+/// legacy YAML files so existing stores keep working.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read or is neither valid JSON
+/// nor valid YAML.
+pub fn read_store_manifest(path: &Path) -> Result<InstallManifest> {
+    let content = fs::read_to_string(path)?;
+    serde_json::from_str(&content)
+        .or_else(|_| serde_yaml::from_str(&content))
+        .map_err(|e| {
+            anyhow!("Failed to parse store manifest '{}': {e}", path.display())
+        })
+}
+
+/// Locates a store manifest inside a version directory, preferring JSON
+/// over legacy YAML.
+#[must_use]
+pub fn find_store_manifest(
+    version_dir: &Path,
+    sub_package: Option<&str>
+) -> Option<PathBuf> {
+    let json = version_dir.join(manifest_filename(sub_package));
+    if json.exists() {
+        return Some(json);
+    }
+    let legacy = version_dir.join(legacy_manifest_filename(sub_package));
+    legacy.exists().then_some(legacy)
+}
+
+/// Lists store manifest paths inside a `latest/` directory, preferring JSON
+/// when both formats exist for the same manifest.
+fn manifest_paths_in_latest(latest: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(latest) else {
+        return Vec::new();
+    };
+    let mut json_paths = Vec::new();
+    let mut yaml_paths = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if !name.starts_with("manifest") {
+            continue;
+        }
+        let ext = path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or_default()
+            .to_lowercase();
+        if ext == "json" {
+            json_paths.push(path);
+        } else if ext == "yaml" || ext == "yml" {
+            yaml_paths.push(path);
+        }
+    }
+    for yaml_path in yaml_paths {
+        let dominated = yaml_path.file_stem().is_some_and(|stem| {
+            json_paths.iter().any(|json_path| {
+                json_path.file_stem().is_some_and(|js| js == stem)
+            })
+        });
+        if !dominated {
+            json_paths.push(yaml_path);
+        }
+    }
+    json_paths.sort();
+    json_paths
+}
+
 /// Returns a list of all installed packages across all scopes.
 ///
 /// # Errors
@@ -84,32 +179,14 @@ pub fn get_installed_packages() -> Result<Vec<InstallManifest>> {
                         continue;
                     }
                     let latest_path = path.join("latest");
-                    if (latest_path.is_symlink() || latest_path.is_dir())
-                        && let Ok(sub_entries) = fs::read_dir(&latest_path)
-                    {
-                        for sub_entry in sub_entries.flatten() {
-                            let file_name = sub_entry
-                                .file_name()
-                                .to_string_lossy()
-                                .to_string();
-                            if file_name.starts_with("manifest")
-                                && std::path::Path::new(&file_name)
-                                    .extension()
-                                    .is_some_and(|ext| {
-                                        ext.eq_ignore_ascii_case("yaml")
-                                    })
+                    if latest_path.is_symlink() || latest_path.is_dir() {
+                        for manifest_path in
+                            manifest_paths_in_latest(&latest_path)
+                        {
+                            if let Ok(manifest) =
+                                read_store_manifest(&manifest_path)
                             {
-                                let manifest_path = sub_entry.path();
-                                if manifest_path.exists()
-                                    && let Ok(content) =
-                                        fs::read_to_string(manifest_path)
-                                    && let Ok(manifest) =
-                                        serde_yaml::from_str::<InstallManifest>(
-                                            &content
-                                        )
-                                {
-                                    manifests.push(manifest);
-                                }
+                                manifests.push(manifest);
                             }
                         }
                     }
@@ -190,32 +267,18 @@ pub fn is_package_installed(
                 && parts.first().is_some_and(|p| p.len() == 32)
             {
                 let latest_path = path.join("latest");
-                if (latest_path.is_symlink() || latest_path.is_dir())
-                    && let Ok(entries) = fs::read_dir(&latest_path)
-                {
-                    for entry in entries.filter_map(Result::ok) {
-                        let file_name =
-                            entry.file_name().to_string_lossy().to_string();
-                        if file_name.starts_with("manifest")
-                            && std::path::Path::new(&file_name)
-                                .extension()
-                                .is_some_and(|ext| {
-                                    ext.eq_ignore_ascii_case("yaml")
-                                })
+                if latest_path.is_symlink() || latest_path.is_dir() {
+                    for manifest_path in manifest_paths_in_latest(&latest_path)
+                    {
+                        let Ok(manifest) = read_store_manifest(&manifest_path)
+                        else {
+                            continue;
+                        };
+                        if manifest.name == package_name
+                            && manifest.sub_package.as_deref()
+                                == sub_package_name
                         {
-                            let manifest_path = entry.path();
-                            if manifest_path.exists() {
-                                let content =
-                                    fs::read_to_string(manifest_path)?;
-                                let manifest: InstallManifest =
-                                    serde_yaml::from_str(&content)?;
-                                if manifest.name == package_name
-                                    && manifest.sub_package.as_deref()
-                                        == sub_package_name
-                                {
-                                    return Ok(Some(manifest));
-                                }
-                            }
+                            return Ok(Some(manifest));
                         }
                     }
                 }
@@ -253,27 +316,8 @@ pub fn get_installed_manifests_in_scope(
             continue;
         }
 
-        let Ok(entries) = fs::read_dir(&latest_path) else {
-            continue;
-        };
-
-        for entry in entries.filter_map(Result::ok) {
-            let file_name = entry.file_name().to_string_lossy().to_string();
-            if !file_name.starts_with("manifest")
-                || !std::path::Path::new(&file_name)
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("yaml"))
-            {
-                continue;
-            }
-
-            let manifest_path = entry.path();
-            if !manifest_path.exists() {
-                continue;
-            }
-
-            let content = fs::read_to_string(manifest_path)?;
-            let manifest: InstallManifest = serde_yaml::from_str(&content)?;
+        for manifest_path in manifest_paths_in_latest(&latest_path) {
+            let manifest = read_store_manifest(&manifest_path)?;
             manifests.push(manifest);
         }
     }
@@ -528,15 +572,18 @@ pub fn write_manifest(manifest: &InstallManifest) -> Result<()> {
     )?;
     fs::create_dir_all(&version_dir)?;
 
-    let manifest_filename = if let Some(sub) = &manifest.sub_package {
-        format!("manifest-{sub}.yaml")
-    } else {
-        "manifest.yaml".to_string()
-    };
-    let manifest_path = version_dir.join(manifest_filename);
+    let manifest_path =
+        version_dir.join(manifest_filename(manifest.sub_package.as_deref()));
 
-    let content = serde_yaml::to_string(&manifest)?;
-    fs::write(manifest_path, content)?;
+    let content = serde_json::to_string_pretty(&manifest)?;
+    fs::write(&manifest_path, content)?;
+
+    // Clean up the legacy YAML twin so readers never see both formats.
+    let legacy_path = version_dir
+        .join(legacy_manifest_filename(manifest.sub_package.as_deref()));
+    if legacy_path != manifest_path {
+        let _ = fs::remove_file(legacy_path);
+    }
 
     let package_dir = get_package_dir(
         manifest.scope,

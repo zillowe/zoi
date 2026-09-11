@@ -25,15 +25,6 @@ fn test_linux_service_lifecycle() {
     let handle = "local";
     let repo = "core";
 
-    let store_base = local::get_store_base_dir(types::Scope::User)
-        .expect("Failed to get store base");
-    let pkg_id = zoi::pkg::utils::generate_package_id(handle, repo, pkg_name);
-    let pkg_dir_name = zoi::pkg::utils::get_package_dir_name(&pkg_id, pkg_name);
-
-    let pkg_path = store_base.join(&pkg_dir_name);
-    let version_path = pkg_path.join(version);
-    fs::create_dir_all(&version_path).expect("Failed to create version path");
-
     let service_config = types::Service {
         run: "/usr/bin/test-pkg".to_string(),
         working_dir: Some("/tmp".to_string()),
@@ -80,19 +71,7 @@ fn test_linux_service_lifecycle() {
         completions: None
     };
 
-    let manifest_path = version_path.join("manifest.yaml");
-    fs::write(
-        &manifest_path,
-        serde_yaml::to_string(&manifest).expect("unwrap failed")
-    )
-    .expect("Failed to write manifest");
-
-    #[cfg(unix)]
-    {
-        let latest_path = pkg_path.join("latest");
-        std::os::unix::fs::symlink(version, latest_path)
-            .expect("Failed to create latest symlink");
-    }
+    local::write_manifest(&manifest).expect("Failed to write manifest");
 
     let conn =
         db::open_connection(handle).expect("Failed to open db connection");
@@ -141,12 +120,8 @@ fn test_linux_service_lifecycle() {
             error_log_path: Some("/tmp/test-err.log".to_string()),
             run_at_load: true
         });
-        fs::write(
-            &manifest_path,
-            serde_yaml::to_string(&updated_manifest)
-                .expect("updated manifest should serialize")
-        )
-        .expect("updated manifest should be written");
+        local::write_manifest(&updated_manifest)
+            .expect("updated manifest should be written");
 
         service::manage_service(pkg_name, service::ServiceAction::Start)
             .expect("updated service configuration should be applied");

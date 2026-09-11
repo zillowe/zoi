@@ -99,7 +99,9 @@ pub fn classify_source_origin(
     }) {
         return InstallOrigin::LocalArchive;
     }
-    if (source.ends_with(".pkg.lua") || source.ends_with(".manifest.yaml"))
+    if (source.ends_with(".pkg.lua")
+        || source.ends_with(".manifest.yaml")
+        || source.ends_with(".manifest.json"))
         && path.exists()
     {
         return InstallOrigin::LocalPackage;

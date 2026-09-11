@@ -44,9 +44,14 @@ pub fn process_lockfile(
             chosen_optionals: Vec::new()
         };
 
-        let mut temp_file = NamedTempFile::new()?;
-        let yaml_content = serde_yaml::to_string(&manifest)?;
-        temp_file.write_all(yaml_content.as_bytes())?;
+        // Machine-generated sharable manifests use JSON. The
+        // `.manifest.json` suffix routes the temp file through the
+        // sharable-manifest source handling during resolution.
+        let mut temp_file = tempfile::Builder::new()
+            .suffix(".manifest.json")
+            .tempfile()?;
+        let json_content = serde_json::to_string(&manifest)?;
+        temp_file.write_all(json_content.as_bytes())?;
 
         sources_to_process.push(
             temp_file

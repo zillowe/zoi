@@ -63,12 +63,7 @@ fn test_transaction_rollback_uninstall() {
         completions: None
     };
 
-    let manifest_path = version_dir.join("manifest.yaml");
-    fs::write(
-        &manifest_path,
-        serde_yaml::to_string(&manifest).expect("unwrap failed")
-    )
-    .expect("unwrap failed");
+    local::write_manifest(&manifest).expect("unwrap failed");
 
     let mut trans = transaction::begin().expect("unwrap failed");
     let id = trans.id.clone();
@@ -141,4 +136,80 @@ fn test_package_rollback_requires_explicit_source_for_ambiguous_name_matches() {
         err.to_string().to_lowercase().contains("ambiguous"),
         "expected an ambiguous-name error, got: {err}"
     );
+}
+
+#[test]
+fn test_store_manifest_json_roundtrip_with_yaml_fallback() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("Failed to create temp dir");
+    let root = tmp.path().to_path_buf();
+
+    ctx.set_env_var("HOME", root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
+
+    let manifest = types::InstallManifest {
+        name: "json-pkg".to_string(),
+        version: "1.0.0".to_string(),
+        epoch: 0,
+        revision: "1".to_string(),
+        sub_package: None,
+        repo: "core".to_string(),
+        repo_type: "official".to_string(),
+        registry_handle: "local".to_string(),
+        package_type: types::PackageType::Package,
+        description: String::new(),
+        reason: types::InstallReason::Direct,
+        scope: types::Scope::User,
+        bins: None,
+        conflicts: None,
+        replaces: None,
+        provides: None,
+        backup: None,
+        installed_dependencies: vec![],
+        dependencies_v2: None,
+        chosen_options: vec![],
+        chosen_optionals: vec![],
+        install_method: Some("test".to_string()),
+        platform: zoi_core::utils::get_platform().unwrap_or_default(),
+        service: None,
+        installed_files: vec![],
+        file_digests: None,
+        installed_size: None,
+        sandbox: None,
+        completions: None
+    };
+
+    let version_dir = local::get_package_version_dir(
+        types::Scope::User,
+        "local",
+        "core",
+        "json-pkg",
+        "1.0.0"
+    )
+    .expect("unwrap failed");
+    fs::create_dir_all(&version_dir).expect("unwrap failed");
+
+    // Legacy YAML stores stay readable.
+    fs::write(
+        version_dir.join("manifest.yaml"),
+        serde_yaml::to_string(&manifest).expect("unwrap failed")
+    )
+    .expect("unwrap failed");
+    let found = local::find_store_manifest(&version_dir, None)
+        .expect("legacy manifest should be found");
+    assert!(found.ends_with("manifest.yaml"));
+    let read_back = local::read_store_manifest(&found).expect("unwrap failed");
+    assert_eq!(read_back.name, "json-pkg");
+
+    // New writes use JSON and clean up the legacy twin.
+    local::write_manifest(&manifest).expect("unwrap failed");
+    assert!(version_dir.join("manifest.json").exists());
+    assert!(!version_dir.join("manifest.yaml").exists());
+    let found = local::find_store_manifest(&version_dir, None)
+        .expect("json manifest should be found");
+    assert!(found.ends_with("manifest.json"));
+
+    // Sub-package manifests use the suffixed JSON name.
+    assert_eq!(local::manifest_filename(Some("dev")), "manifest-dev.json");
+    assert_eq!(local::manifest_filename(None), "manifest.json");
 }

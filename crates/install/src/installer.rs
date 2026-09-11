@@ -1009,17 +1009,17 @@ pub fn install_prepared_node(
             &pkg.name,
             &node.version
         )?;
-        let manifest_filename = if let Some(sub) = &node.sub_package {
-            format!("manifest-{sub}.yaml")
-        } else {
-            "manifest.yaml".to_string()
-        };
-        let manifest_path = version_dir.join(manifest_filename);
-        let content = std::fs::read_to_string(&manifest_path)?;
-        let install_manifest: types::InstallManifest =
-            serde_yaml::from_str(&content)?;
-
-        install_manifest
+        let manifest_path = local::find_store_manifest(
+            &version_dir,
+            node.sub_package.as_deref()
+        )
+        .ok_or_else(|| {
+            anyhow!(
+                "Escalated install did not leave a manifest in '{}'",
+                version_dir.display()
+            )
+        })?;
+        local::read_store_manifest(&manifest_path)?
     } else {
         if let Some(pb) = step_pb.as_ref().or(main_pb.as_ref()) {
             pb.set_message(format!("Installing {}...", pkg.name.cyan()));

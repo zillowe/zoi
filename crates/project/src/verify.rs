@@ -16,7 +16,7 @@ use zoi_resolver::local;
 /// This is a critical security and reproducibility check in Specification v2.
 /// It performs a three-way cross-reference between:
 /// - `zoi.lock`: The record of what SHOULD be installed and its SHA-512 hash.
-/// - `manifest.yaml`: The record of what IS recorded as installed in the store.
+/// - `manifest.json`: The record of what IS recorded as installed in the store.
 /// - Filesystem: The actual presence and content of files on disk.
 ///
 /// If any file in the store has been tampered with or if a manual change was
@@ -91,13 +91,9 @@ pub fn run() -> Result<()> {
                 .strip_prefix("sha512-")
                 .unwrap_or(&lock_detail.hash);
             if integrity != lock_hash_only {
-                let manifest_filename =
-                    if let Some(sub) = &lock_detail.sub_package {
-                        format!("manifest-{sub}.yaml")
-                    } else {
-                        "manifest.yaml".to_string()
-                    };
-                let manifest_path = version_dir.join(manifest_filename);
+                let manifest_path = version_dir.join(local::manifest_filename(
+                    lock_detail.sub_package.as_deref()
+                ));
 
                 return Err(anyhow!(
                         "Integrity check failed for '{}'. The installed files \

@@ -93,15 +93,7 @@ fn test_verify_installed_detects_modification() {
     assert!(installed_files.iter().any(|f| f.contains("test.txt")));
 
     // pkg_install::run only extracts files; the orchestrator normally writes
-    // the manifest.yaml. Write one manually so verify_installed can find it.
-    let version_dir = local::get_package_version_dir(
-        types::Scope::User,
-        "local",
-        "core",
-        "verify-test",
-        "1.0.0"
-    )
-    .expect("unwrap failed");
+    // the manifest.json. Write one manually so verify_installed can find it.
     let manifest = types::InstallManifest {
         name: "verify-test".to_string(),
         version: "1.0.0".to_string(),
@@ -139,12 +131,7 @@ fn test_verify_installed_detects_modification() {
         sandbox: None,
         completions: None
     };
-    let manifest_path = version_dir.join("manifest.yaml");
-    fs::write(
-        &manifest_path,
-        serde_yaml::to_string(&manifest).expect("yaml")
-    )
-    .expect("write manifest");
+    local::write_manifest(&manifest).expect("write manifest");
     assert!(
         manifest.file_digests.is_some(),
         "manifest should carry file digests"

@@ -456,16 +456,13 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     }
                 };
 
-                let manifest_filename = if let Some(sub) = &manifest.sub_package
-                {
-                    format!("manifest-{sub}.yaml")
-                } else {
-                    "manifest.yaml".to_string()
-                };
-                let manifest_path = version_dir.join(&manifest_filename);
+                let manifest_path = local::find_store_manifest(
+                    &version_dir,
+                    manifest.sub_package.as_deref()
+                );
 
                 if version_dir.exists()
-                    && manifest_path.exists()
+                    && manifest_path.is_some()
                     && !has_files_outside_store(manifest)
                 {
                     println!(
@@ -629,16 +626,13 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     }
                 };
 
-                let manifest_filename =
-                    if let Some(sub) = &old_manifest.sub_package {
-                        format!("manifest-{sub}.yaml")
-                    } else {
-                        "manifest.yaml".to_string()
-                    };
-                let manifest_path = version_dir.join(&manifest_filename);
+                let manifest_path = local::find_store_manifest(
+                    &version_dir,
+                    old_manifest.sub_package.as_deref()
+                );
 
                 if version_dir.exists()
-                    && manifest_path.exists()
+                    && manifest_path.is_some()
                     && !has_files_outside_store(old_manifest)
                 {
                     println!(
