@@ -30,7 +30,7 @@ engine is available as a Rust library (see *zoi-rs*(3)).
 
 This page documents every built-in command and its options. For the full
 online documentation, including guides and the registry specification, see
-https://zillowe.qzz.io/zds/zoi. Run *zoi COMMAND --help* for the
+https://zillowe.qzz.io/docs/zds/zoi. Run *zoi COMMAND --help* for the
 authoritative per-command help.
 
 == Concepts
@@ -560,31 +560,31 @@ a setting. See the online configuration reference for every key.
 
 Install a package from the default registry, answering yes to prompts:
 
-  *zoi -y install @core/ripgrep*
+  zoi -y install @core/ripgrep
 
 Preview an upgrade plan without changing anything:
 
-  *zoi update --all --dry-run*
+  zoi update --all --dry-run
 
 Update everything and explain the decisions:
 
-  *zoi update --all --explain*
+  zoi update --all --explain
 
 Build a package for the current platform and sign it:
 
-  *zoi package build ./mypkg.pkg.lua --sign mykey*
+  zoi package build ./mypkg.pkg.lua --sign mykey
 
 Generate a delta patch between two archives:
 
-  *zoi package delta old.zpa new.zpa -o new.zdelta*
+  zoi package delta old.zpa new.zpa -o new.zdelta
 
 Enter a development shell for the current project:
 
-  *zoi dev*
+  zoi dev
 
 Execute a binary without installing it:
 
-  *zoi exec @core/ripgrep -- --version*
+  zoi exec @core/ripgrep -- --version
 
 == Bugs
 
@@ -595,7 +595,7 @@ https://gitlab.com/zillowe/zillwen/zusty/zoi.
 
 *zoi-rs*(3), *zoi-lua*(5)
 
-Full online documentation: https://zillowe.qzz.io/zds/zoi
+Full online documentation: https://zillowe.qzz.io/docs/zds/zoi
 
 Project repository and issue tracker:
 https://gitlab.com/zillowe/zillwen/zusty/zoi

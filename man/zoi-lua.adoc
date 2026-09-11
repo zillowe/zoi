@@ -49,7 +49,7 @@ become the package archive.
 
 Build a definition with *zoi package build* (see *zoi*(1)), and use
 *zoi package init-lsp* to get Lua language-server support while authoring.
-Longer guides live at https://zillowe.qzz.io/zds/zoi.
+Longer guides live at https://zillowe.qzz.io/docs/zds/zoi.
 
 == Global variables
 
@@ -318,7 +318,7 @@ dependencies { runtime = runtime }
 
 *zoi*(1), *zoi-rs*(3)
 
-Online documentation: https://zillowe.qzz.io/zds/zoi
+Online documentation: https://zillowe.qzz.io/docs/zds/zoi
 
 Project repository and issue tracker:
 https://gitlab.com/zillowe/zillwen/zusty/zoi

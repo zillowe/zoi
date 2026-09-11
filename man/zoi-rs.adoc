@@ -37,7 +37,7 @@ cryptographically verified registry state. The same code powers the
 The authoritative API reference with runnable examples is published at
 https://docs.rs/zoi-rs. The crate is distributed through crates.io at
 https://crates.io/crates/zoi-rs. Conceptual guides live at
-https://zillowe.qzz.io/zds/zoi.
+https://zillowe.qzz.io/docs/zds/zoi.
 
 == Installation
 
@@ -242,9 +242,9 @@ fn main() -> Result<()> {
 
 Full API reference: https://docs.rs/zoi-rs
 
-Crate downloads: https://crates.io/crates/zoi-rs
+Crate.io: https://crates.io/crates/zoi-rs
 
-Online documentation: https://zillowe.qzz.io/zds/zoi
+Online documentation: https://zillowe.qzz.io/docs/zds/zoi
 
 Project repository and issue tracker:
 https://gitlab.com/zillowe/zillwen/zusty/zoi
