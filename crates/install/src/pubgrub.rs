@@ -206,8 +206,7 @@ pub struct ZoiDependencyProvider {
     /// An in-memory cache of the registry used in 'mini' mode to avoid disk
     /// I/O.
     pub mini_index: Option<zoi_resolver::mini_resolve::MiniRegistryIndex>,
-    /// The loaded `zoi.lua` or `zoi.yaml` project configuration, if
-    /// applicable.
+    /// The loaded `zoi.lua` project configuration, if applicable.
     pub project_config: Option<zoi_project::config::ProjectConfig>,
     /// Hard version constraints enforced by a project's lockfile or
     /// configuration.

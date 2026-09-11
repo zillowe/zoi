@@ -100,7 +100,7 @@ fn extension_state_requires_persistence(
 fn get_project_file_path(saved_state: Option<&ExtensionState>) -> PathBuf {
     saved_state
         .and_then(|state| state.project_file_path.clone())
-        .unwrap_or_else(|| PathBuf::from("zoi.yaml"))
+        .unwrap_or_else(|| PathBuf::from("zoi.lua"))
 }
 
 /// Extracts the repository name from a git URL.
@@ -217,7 +217,7 @@ pub fn add(
         None
     };
     let project_file_path = if has_project_change {
-        Some(std::env::current_dir()?.join("zoi.yaml"))
+        Some(std::env::current_dir()?.join("zoi.lua"))
     } else {
         None
     };
@@ -293,7 +293,7 @@ pub fn add(
                     println!("Creating {}...", project_file_path.display());
                     if project_file_path.exists() {
                         return Err(anyhow!(
-                            "A 'zoi.yaml' file already exists at '{}'. Please \
+                            "A 'zoi.lua' file already exists at '{}'. Please \
                              remove it first.",
                             project_file_path.display()
                         ));

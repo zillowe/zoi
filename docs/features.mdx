@@ -62,7 +62,7 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Reverse Search (`zoi provides`):** Instantly find which package provides a specific binary or file path across the entire registry.
 
-- **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your current project (`zoi.yaml`), global configuration, or legacy files (like `.nvmrc` and `.python-version`) via its extensible Lua plugin system. Replaces static symlinks with intelligent shims that resolve the correct version at runtime.
+- **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your current project (`zoi.lua`), global configuration, or legacy files (like `.nvmrc` and `.python-version`) via its extensible Lua plugin system. Replaces static symlinks with intelligent shims that resolve the correct version at runtime.
 
 - **Shell Completions via `zshell()`**: Bundle shell completion scripts (Bash, Zsh, Fish, Elvish) with your packages using the `zshell()` lifecycle function. Zoi automatically symlinks completions into per-package directories under the user data directory and cleans them up on uninstall. Supports versioned completions since each package version's files are stored separately in the Zoi store.
 
@@ -91,7 +91,7 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Changing Install Reasons:** Use `zoi mark` to change whether a package is considered an explicit installation or a dependency, enabling granular control over `zoi autoremove`.
 
-- **Project-Level Environments:** Use a `zoi.yaml` file in your project root to define custom commands and development environments. Manage project-specific tasks, tools, packages, and environment variables with `zoi run`, `zoi env`, and `zoi dev`, [learn more](/docs/zds/zoi/project-config).
+- **Project-Level Environments:** Use a `zoi.lua` file in your project root to define custom commands and development environments. Manage project-specific tasks, tools, packages, and environment variables with `zoi run`, `zoi env`, and `zoi dev`, [learn more](/docs/zds/zoi/project-config).
 
 - **Repository-Based System:** Zoi uses Git-based repositories to store package definitions. Use the official Zoidberg registry, add community repositories, or create your own private or public repositories with `zoi repo add`.
 
@@ -252,7 +252,7 @@ Clones the git repository of a package to a local directory. If no location is s
 
 (alias: `develop`)
 
-Enter a development shell for the current project. This command reads `zoi.yaml`, ensures all packages in `pkgs` are installed, and sets up a subshell with `PATH`, `LD_LIBRARY_PATH`, `CPATH`, and `PKG_CONFIG_PATH` pointing to the project's dependencies.
+Enter a development shell for the current project. This command reads `zoi.lua`, ensures all packages in `pkgs` are installed, and sets up a subshell with `PATH`, `LD_LIBRARY_PATH`, `CPATH`, and `PKG_CONFIG_PATH` pointing to the project's dependencies.
 
 **Options:**
 
@@ -285,7 +285,7 @@ Create an application using a package template.
 
 ### `zoi env [env_alias]`
 
-Manage and set up project environments from a local `zoi.yaml` file.
+Manage and set up project environments from a local `zoi.lua` file.
 
 **Arguments:**
 
@@ -393,7 +393,7 @@ If the package is installed in a different scope than requested, Zoi notes that 
 - `--scope <user|system|project>`: The scope to install the package to.
 - `--local`: Install packages to the current project (alias for `--scope=project`).
 - `--global`: Install packages globally for the current user (alias for `--scope=user`).
-- `--save`: Save the package to the project's `zoi.yaml`.
+- `--save`: Save the package to the project's `zoi.lua`.
 - `--deps-only`: Install only the dependencies of the given packages, not the packages themselves.
 - `--build-deps-only`: Install only the build dependencies declared by the given packages. Works for any source type (local `.pkg.lua`, registry package, URL, or git).
 - `--type <TYPE>`: The type of package to build if building from source. Specifying a type other than `pre-compiled` or `pre-built` will force a local build.
@@ -614,7 +614,7 @@ To revert an entire transaction, use `zoi transaction undo` instead.
 
 ### `zoi run [cmd_alias] [args]...`
 
-Execute a command defined in a local `zoi.yaml` file.
+Execute a command defined in a local `zoi.lua` file.
 
 **Arguments:**
 
@@ -756,7 +756,7 @@ If multiple installed packages match the same name, Zoi will prompt you to choos
 - `--scope <user|system|project>`: The scope to uninstall the package from.
 - `--local`: Uninstall packages from the current project.
 - `--global`: Uninstall packages globally for the current user.
-- `--save`: Remove the package from the project's `zoi.yaml`.
+- `--save`: Remove the package from the project's `zoi.lua`.
 - `-s`, `--recursive`: Recursively remove dependencies that are no longer needed.
 - `--explain`: Show uninstall reasoning and reverse-dependency impact.
 - `--plan-json`: Emit machine-readable uninstall plan JSON.
@@ -806,7 +806,7 @@ Adds a tool to the current project or global configuration and installs it in on
 
 **Options:**
 
-- `-g`, `--global`: Add to global configuration (user `versions` map) instead of the local project (`zoi.yaml`).
+- `-g`, `--global`: Add to global configuration (user `versions` map) instead of the local project (`zoi.lua`).
 - `-y`, `--yes`: Automatically answer yes to prompts (including JIT installation prompts).
 
 ---

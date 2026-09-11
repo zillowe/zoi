@@ -181,16 +181,16 @@ Publish this extension (e.g. in a separate git repository that users can add). U
 
 ## Making a Git Repository Directly Installable
 
-You can make a Git repository directly installable via `zoi install --repo <repo-spec>` by placing a `zoi.yaml` file in its root. This file tells Zoi what package to install from your repository.
+You can make a Git repository directly installable via `zoi install --repo <repo-spec>` by placing a `zoi.lua` file in its root. This file tells Zoi what package to install from your repository.
 
-**Example `zoi.yaml`:**
+**Example `zoi.lua`:**
 
-```yaml
-# zoi.yaml in the root of your repository
-package: "my-awesome-package"
+```lua
+-- zoi.lua in the root of your repository
+package("my-awesome-package")
 ```
 
-The `package` field can be:
+The `package` declaration takes one source string, which can be:
 
 - A package name (e.g. `my-package` or `@my-repo/my-package`). Zoi will resolve this from the official repositories.
 - A relative path to a `.pkg.lua` file in the repository.

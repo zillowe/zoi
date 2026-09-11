@@ -28,7 +28,7 @@ pub struct UninstallArgs {
     #[arg(long)]
     pub global: bool,
 
-    /// Remove the package from the project's zoi.yaml
+    /// Remove the package from the project's zoi.lua
     #[arg(long)]
     pub save: bool,
 

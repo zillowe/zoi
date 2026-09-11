@@ -280,7 +280,7 @@ pub enum ExtensionChange {
         /// The name of the repository to add.
         add: String
     },
-    /// Creates a `zoi.yaml` project file in the current directory.
+    /// Creates a `zoi.lua` project file in the current directory.
     Project {
         /// The content or configuration for the project.
         add: String

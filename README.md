@@ -91,7 +91,7 @@ its extensible Lua plugin system.
 - **Rich Dependencies:** Define runtime and build dependencies with required,
 optional, and selectable options.
 - **Project Environments:** Manage project-specific commands and environments
-using a local `zoi.yaml` or a `zoi.lua` file.
+using a local `zoi.lua` file.
 - **Repository-Based:** Use official, community, or your own private/public
 Git-based repositories.
 - **Secure & Verifiable:** Verifies package integrity with checksums and
@@ -297,7 +297,7 @@ Here are some common commands to get you started.
 - **Run a project command:**
 
   ```sh
-  # Run a command defined in zoi.yaml
+  # Run a command defined in zoi.lua
   zoi run <command_alias>
   ```
 

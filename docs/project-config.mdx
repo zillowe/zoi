@@ -1,12 +1,9 @@
 ---
 title: Project Configuration
-description: Define project environments and tasks with zoi.lua and zoi.yaml.
+description: Define project environments and tasks with zoi.lua.
 ---
 
-Zoi v1.20+ (Specification v2) uses a split configuration model to separate environment definitions from task automation.
-
-- **`zoi.lua`**: The primary, scriptable configuration for defining project metadata, package dependencies, and registries.
-- **`zoi.yaml`**: A restricted configuration file dedicated to task automation (`run` and `env`).
+A Zoi project is defined by a single scriptable `zoi.lua` file covering project metadata, package dependencies, registries, task automation, environment setups, shell configuration, and package checks.
 
 ## 1. Project Configuration (`zoi.lua`)
 
@@ -82,6 +79,18 @@ environments({
         },
     },
 })
+
+-- Ephemeral shell environment variables (merged by `zoi dev`)
+shell({
+    env = {
+        RUST_BACKTRACE = "1",
+    },
+})
+
+-- Declarative system checks (verified by `zoi env`)
+checks({
+    { name = "Git", check = "git --version" },
+})
 ```
 
 ### Field Reference
@@ -97,49 +106,22 @@ environments({
   - `options`: (list of string) List of dependencies to select for interactive choices (e.g. `zoi:@core/sudo`).
   - `optionals`: (list of string) List of optional dependencies to enable.
   - `dependencies`: (object) Overrides for package dependencies.
-- **`tasks`**: An array of `CommandSpec` objects (same schema as `commands` in `zoi.yaml`).
-  - `cmd`: (string) Task alias for `zoi run <cmd>`.
+- **`tasks`**: An array of task objects (runnable via `zoi run <cmd>`).
+  - `cmd`: (string) Task alias.
   - `run`: (string or platform map) Command to execute.
   - `depends_on`: (list of string) Task aliases that must run first.
   - `cache_files`: (list of string) Glob patterns for cache invalidation.
   - `env`: (object or platform map) Environment variables for the task.
-- **`environments`**: An array of `EnvironmentSpec` objects (same schema as `environments` in `zoi.yaml`).
+- **`environments`**: An array of environment setup objects (runnable via `zoi env <alias>`).
   - `name`: (string) Display name.
   - `cmd`: (string) Alias for `zoi env <cmd>`.
   - `run`: (list of string or platform map) Commands to execute.
   - `env`: (object or platform map) Environment variables.
-
----
-
-## 2. Task Configuration (`zoi.yaml`)
-
-The `zoi.yaml` file is used to define named tasks and environments. It no longer supports package or registry definitions.
-
-### Schema
-
-```yaml
-# zoi.yaml
-
-# Short, named commands runnable via `zoi run <cmd>`
-commands:
-  - cmd: test
-    run: cargo test
-    depends_on: ["build"]
-
-  - cmd: build
-    run: cargo build --release
-    cache_files: ["src/**", "Cargo.toml"]
-
-# Full environment setups runnable via `zoi env <alias>`
-environments:
-  - name: Prepare Workspace
-    cmd: prep
-    run:
-      - zoi run build
-      - cargo clippy
-    env:
-      RUST_BACKTRACE: "1"
-```
+- **`shell`**: Ephemeral shell configuration merged by `zoi dev`.
+  - `env`: (object or platform map) Environment variables for the dev shell.
+- **`checks`**: An array of declarative system checks verified by `zoi env`.
+  - `name`: (string) Display name (e.g. `"Git"`).
+  - `check`: (string) Command that must exit successfully (e.g. `"git --version"`).
 
 ---
 

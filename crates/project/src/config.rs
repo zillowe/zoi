@@ -53,14 +53,13 @@ pub struct PackageSpec {
     pub optionals: Option<Vec<String>>
 }
 
-/// Represents the combined evaluation of a project's `zoi.lua` and `zoi.yaml`
-/// configuration.
+/// Represents the evaluation of a project's `zoi.lua` configuration.
 ///
 /// This struct acts as the central definition for a project environment. It
-/// unifies:
-/// - The scriptable package and registry requirements defined in `zoi.lua`.
-/// - The declarative task (`commands`) and `environments` defined in
-///   `zoi.yaml`.
+/// unifies the scriptable package and registry requirements, task aliases
+/// (`tasks`), environment setups (`environments`), ephemeral shell
+/// configuration (`shell`), and declarative package checks (`checks`)
+/// defined in `zoi.lua`.
 #[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct ProjectConfig {
@@ -101,20 +100,18 @@ fn deserialize_pkgs<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
 where
     D: serde::Deserializer<'de>
 {
-    let entries = Vec::<serde_yaml::Value>::deserialize(deserializer)
+    let entries = Vec::<serde_json::Value>::deserialize(deserializer)
         .map_err(serde::de::Error::custom)?;
 
     let mut pkgs = Vec::new();
     for entry in entries {
         match entry {
-            serde_yaml::Value::String(name) => pkgs.push(name),
-            serde_yaml::Value::Mapping(map) => {
+            serde_json::Value::String(name) => pkgs.push(name),
+            serde_json::Value::Object(map) => {
                 for (name, version) in map {
-                    let name =
-                        name.as_str().map(str::to_string).unwrap_or_default();
                     if let Some(ver) = version.as_str() {
                         pkgs.push(format!("{name}@{ver}"));
-                    } else if let serde_yaml::Value::Number(num) = version {
+                    } else if let serde_json::Value::Number(num) = version {
                         pkgs.push(format!("{name}@{num}"));
                     } else {
                         pkgs.push(name);
@@ -228,113 +225,220 @@ pub fn load_with_env<S: ::std::hash::BuildHasher>(
     env: &HashMap<String, String, S>
 ) -> Result<ProjectConfig> {
     let lua_path = Path::new("zoi.lua");
-    if lua_path.exists() {
-        return crate::lua_config::load_zoi_lua(lua_path, env);
-    }
-
-    let config_path = Path::new("zoi.yaml");
-    if !config_path.exists() {
+    if !lua_path.exists() {
         return Err(anyhow!(
-            "No 'zoi.lua' or 'zoi.yaml' file found in the current directory."
+            "No 'zoi.lua' file found in the current directory."
         ));
     }
 
-    let content = fs::read_to_string(config_path)?;
-    let config: ProjectConfig = serde_yaml::from_str(&content)?;
-    Ok(config)
+    crate::lua_config::load_zoi_lua(lua_path, env)
 }
 
-/// Adds packages to the `zoi.yaml` configuration file.
+/// Finds the line index that opens the top-level `packages({...})` block.
+///
+/// Matches the opening line (e.g. `packages({`) as well as an empty
+/// single-line block (`packages({})`).
+fn find_packages_block_open(lines: &[&str]) -> Option<usize> {
+    lines.iter().position(|line| {
+        let trimmed = line.trim();
+        trimmed.starts_with("packages(")
+            && trimmed.contains('{')
+            && !trimmed.contains('=')
+    })
+}
+
+/// Extracts the plain package spec from a `packages({...})` entry line.
+///
+/// Only simple string entries (e.g. `"@core/eza",`) are considered; keyed
+/// entries like `["@core/fzf"] = {...}` span multiple lines and are left
+/// untouched, mirroring how versioned maps were preserved.
+fn plain_package_entry(line: &str) -> Option<String> {
+    let trimmed = line.trim().trim_end_matches(',').trim();
+    if !trimmed.starts_with('"') || trimmed.contains('=') {
+        return None;
+    }
+    let inner = trimmed.trim_matches('"');
+    if inner.is_empty() || inner.contains('"') {
+        return None;
+    }
+    Some(inner.to_string())
+}
+
+/// Adds packages to the `packages({...})` block of the `zoi.lua`
+/// configuration file, creating the block when missing.
 ///
 /// # Errors
 ///
-/// Returns an error if the project uses `zoi.lua`, the `zoi.yaml` file is
-/// missing, or if there is an error reading or writing the file.
+/// Returns an error if no `zoi.lua` file exists or if it cannot be read or
+/// written.
 pub fn add_packages_to_config(packages: &[String]) -> Result<()> {
-    if Path::new("zoi.lua").exists() {
-        return Err(anyhow!(
-            "Project uses zoi.lua. Automatic saving is not supported for Lua \
-             configurations."
-        ));
-    }
-    let config_path = Path::new("zoi.yaml");
+    let config_path = Path::new("zoi.lua");
     if !config_path.exists() {
         return Err(anyhow!(
-            "No 'zoi.yaml' file found in the current directory."
+            "No 'zoi.lua' file found in the current directory."
         ));
     }
 
     let content = fs::read_to_string(config_path)?;
-    let mut yaml_value: serde_yaml::Value = serde_yaml::from_str(&content)?;
+    let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
 
-    if let Some(mapping) = yaml_value.as_mapping_mut() {
-        let pkgs_key = serde_yaml::Value::String("pkgs".to_string());
-        let pkgs_list = mapping
-            .entry(pkgs_key)
-            .or_insert_with(|| serde_yaml::Value::Sequence(Vec::new()));
+    let mut missing: Vec<&String> = packages
+        .iter()
+        .filter(|package| {
+            !lines
+                .iter()
+                .any(|line| plain_package_entry(line).as_ref() == Some(package))
+        })
+        .collect();
 
-        if let Some(sequence) = pkgs_list.as_sequence_mut() {
-            for package in packages {
-                let new_pkg_value = serde_yaml::Value::String(package.clone());
-                if !sequence.contains(&new_pkg_value) {
-                    sequence.push(new_pkg_value);
-                }
-            }
-        }
+    if missing.is_empty() {
+        return Ok(());
     }
 
-    let new_content = serde_yaml::to_string(&yaml_value)?;
+    let new_entries: Vec<String> = missing
+        .drain(..)
+        .map(|package| format!("    \"{package}\","))
+        .collect();
+
+    if let Some(open_idx) = find_packages_block_open(
+        &lines.iter().map(String::as_str).collect::<Vec<_>>()
+    ) && let Some(open_line) =
+        lines.get(open_idx).map(|line| line.trim().to_string())
+    {
+        if open_line.contains('}') {
+            // Single-line block (e.g. `packages({"a"})`): expand it,
+            // preserving the existing entries verbatim.
+            let start = open_line.find('{').map_or(0, |i| i + 1);
+            let end = open_line.rfind('}').unwrap_or(open_line.len());
+            let mut inner = open_line
+                .get(start..end)
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+            if !inner.is_empty() && !inner.ends_with(',') {
+                inner.push(',');
+            }
+            let mut replacement = vec!["packages({".to_string()];
+            if !inner.is_empty() {
+                replacement.push(format!("    {inner}"));
+            }
+            replacement.extend(new_entries);
+            replacement.push("})".to_string());
+            lines.splice(open_idx..=open_idx, replacement);
+        } else {
+            for (insert_at, entry) in (open_idx + 1..).zip(new_entries) {
+                lines.insert(insert_at, entry);
+            }
+        }
+    } else {
+        if !lines.is_empty()
+            && !lines.last().is_none_or(std::string::String::is_empty)
+        {
+            lines.push(String::new());
+        }
+        lines.push("packages({".to_string());
+        lines.extend(new_entries);
+        lines.push("})".to_string());
+    }
+
+    let mut new_content = lines.join("\n");
+    if content.ends_with('\n') {
+        new_content.push('\n');
+    }
     fs::write(config_path, new_content)?;
 
     Ok(())
 }
 
-/// Removes packages from the `zoi.yaml` configuration file.
+/// Removes plain package entries from the `packages({...})` block of the
+/// `zoi.lua` configuration file.
 ///
 /// # Errors
 ///
-/// Returns an error if there is an issue reading or writing the `zoi.yaml`
-/// file.
+/// Returns an error if the `zoi.lua` file cannot be read or written. A
+/// missing file is a no-op so uninstalls outside of projects keep working.
 pub fn remove_packages_from_config(
     packages_to_remove: &[String]
 ) -> Result<()> {
-    if Path::new("zoi.lua").exists() {
-        return Ok(());
-    }
-    let config_path = Path::new("zoi.yaml");
+    let config_path = Path::new("zoi.lua");
     if !config_path.exists() {
         return Ok(());
     }
 
+    let packages_to_remove_names: Vec<_> = packages_to_remove
+        .iter()
+        .map(|p| {
+            zoi_resolver::resolve::parse_source_string(p)
+                .map_or_else(|_| p.clone(), |req| req.name)
+        })
+        .collect();
+
     let content = fs::read_to_string(config_path)?;
-    let mut yaml_value: serde_yaml::Value = serde_yaml::from_str(&content)?;
+    let lines: Vec<&str> = content.lines().collect();
+    let open_idx = find_packages_block_open(&lines);
 
-    if let Some(mapping) = yaml_value.as_mapping_mut()
-        && let Some(pkgs_list) = mapping.get_mut("pkgs")
-        && let Some(sequence) = pkgs_list.as_sequence_mut()
-    {
-        let packages_to_remove_names: Vec<_> = packages_to_remove
-            .iter()
-            .map(|p| {
-                zoi_resolver::resolve::parse_source_string(p)
-                    .map_or_else(|_| p.clone(), |req| req.name)
-            })
-            .collect();
+    // A line ends the packages block when it closes the call (`})`) or
+    // starts another top-level block call (`tasks({`, ...).
+    let is_block_end = |line: &str| {
+        let trimmed = line.trim();
+        trimmed == "})"
+            || (trimmed.starts_with(|c: char| c.is_ascii_alphabetic())
+                && trimmed.contains('('))
+    };
 
-        sequence.retain(|v| {
-            if let Some(s) = v.as_str() {
-                if let Ok(req) = zoi_resolver::resolve::parse_source_string(s) {
-                    !packages_to_remove_names.contains(&req.name)
-                } else {
-                    true
-                }
-            } else {
-                true
-            }
+    let mut kept = Vec::with_capacity(lines.len());
+    for (idx, line) in lines.iter().enumerate() {
+        if open_idx.is_some_and(|open| idx == open)
+            && line.trim().contains('}')
+            && !line.contains('=')
+        {
+            // Single-line block: drop matching entries inline.
+            let trimmed = line.trim().to_string();
+            let start = trimmed.find('{').map_or(0, |i| i + 1);
+            let end = trimmed.rfind('}').unwrap_or(trimmed.len());
+            let inner = trimmed.get(start..end).unwrap_or_default();
+            let remaining: Vec<&str> = inner
+                .split(',')
+                .map(str::trim)
+                .filter(|part| {
+                    let entry = part.trim_matches('"');
+                    part.starts_with('"')
+                        && !entry.contains('"')
+                        && zoi_resolver::resolve::parse_source_string(entry)
+                            .is_ok_and(|req| {
+                                !packages_to_remove_names.contains(&req.name)
+                            })
+                })
+                .collect();
+            let indent_len = line.len() - line.trim_start_matches(' ').len();
+            kept.push(format!(
+                "{}packages({{{}}})",
+                line.get(..indent_len).unwrap_or_default(),
+                remaining.join(", ")
+            ));
+            continue;
+        }
+
+        let in_block = open_idx.is_some_and(|open| {
+            idx > open
+                && !lines.get(open + 1..idx).is_some_and(|window| {
+                    window.iter().any(|l| is_block_end(l))
+                })
         });
+        if in_block
+            && let Some(entry) = plain_package_entry(line)
+            && let Ok(req) = zoi_resolver::resolve::parse_source_string(&entry)
+            && packages_to_remove_names.contains(&req.name)
+        {
+            continue;
+        }
+        kept.push((*line).to_string());
     }
 
-    let new_content = serde_yaml::to_string(&yaml_value)?;
+    let mut new_content = kept.join("\n");
+    if content.ends_with('\n') {
+        new_content.push('\n');
+    }
     fs::write(config_path, new_content)?;
 
     Ok(())

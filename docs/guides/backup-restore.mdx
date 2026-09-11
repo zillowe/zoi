@@ -42,7 +42,7 @@ Zoi will read the manifest, resolve all listed packages, and install them sequen
 
 For individual projects, backup and restore are handled automatically via version control.
 
-1. **`zoi.yaml`**: Defines your project's dependencies.
+1. **`zoi.lua`**: Defines your project's dependencies.
 2. **`zoi.lock`**: (Generated when `config.local` is true) Records the exact integrity hashes and versions of your project's local packages.
 
 ### Restoring a Project
@@ -55,7 +55,7 @@ cd my-project
 zoi install
 ```
 
-Zoi will detect the `zoi.yaml` and `zoi.lock` files and provision the project-local environment exactly as it was when the lockfile was created.
+Zoi will detect the `zoi.lua` and `zoi.lock` files and provision the project-local environment exactly as it was when the lockfile was created.
 
 ---
 

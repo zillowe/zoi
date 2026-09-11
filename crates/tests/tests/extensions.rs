@@ -158,8 +158,11 @@ fn test_extension_add_failure_restores_previous_default_registry() {
     })
     .expect("unwrap failed");
 
-    fs::write(root.join("zoi.yaml"), "name: existing-project\n")
-        .expect("unwrap failed");
+    fs::write(
+        root.join("zoi.lua"),
+        "project({ name = \"existing-project\" })\n"
+    )
+    .expect("unwrap failed");
 
     let pm = plugin::PluginManager::new().expect("unwrap failed");
     let pkg_lua_content = r#"
@@ -174,7 +177,7 @@ metadata({
         type = "zoi",
         changes = {
             { type = "registry-repo", add = "https://example.com/override.git" },
-            { type = "project", add = "name: should-not-overwrite\n" }
+            { type = "project", add = "project({ name = \"should-not-overwrite\" })\n" }
         }
     }
 })
@@ -220,8 +223,11 @@ fn test_extension_add_failure_rolls_back_created_plugin() {
     common::TestContextGuard::set_sysroot(root.clone());
     ctx.set_current_dir(&root);
 
-    fs::write(root.join("zoi.yaml"), "name: existing-project\n")
-        .expect("unwrap failed");
+    fs::write(
+        root.join("zoi.lua"),
+        "project({ name = \"existing-project\" })\n"
+    )
+    .expect("unwrap failed");
 
     let pm = plugin::PluginManager::new().expect("unwrap failed");
     let pkg_lua_content = r#"
@@ -236,7 +242,7 @@ metadata({
         type = "zoi",
         changes = {
             { type = "plugin", name = "rolled-back-plugin", script = "print('hello')" },
-            { type = "project", add = "name: should-not-overwrite\n" }
+            { type = "project", add = "project({ name = \"should-not-overwrite\" })\n" }
         }
     }
 })
@@ -285,7 +291,7 @@ metadata({
     extension = {
         type = "zoi",
         changes = {
-            { type = "project", add = "name: generated-project\n" }
+            { type = "project", add = "project({ name = \"generated-project\" })\n" }
         }
     }
 })
@@ -300,10 +306,13 @@ metadata({
         Some(&pm)
     )
     .expect("unwrap failed");
-    assert!(install_dir.join("zoi.yaml").exists());
+    assert!(install_dir.join("zoi.lua").exists());
 
-    fs::write(other_dir.join("zoi.yaml"), "name: keep-me\n")
-        .expect("unwrap failed");
+    fs::write(
+        other_dir.join("zoi.lua"),
+        "project({ name = \"keep-me\" })\n"
+    )
+    .expect("unwrap failed");
     ctx.set_current_dir(&other_dir);
 
     extension::remove(
@@ -314,14 +323,13 @@ metadata({
     .expect("unwrap failed");
 
     assert!(
-        !install_dir.join("zoi.yaml").exists(),
+        !install_dir.join("zoi.lua").exists(),
         "remove should delete the project file from the original install \
          directory"
     );
     assert!(
-        other_dir.join("zoi.yaml").exists(),
-        "remove should not touch an unrelated zoi.yaml in the current \
-         directory"
+        other_dir.join("zoi.lua").exists(),
+        "remove should not touch an unrelated zoi.lua in the current directory"
     );
 }
 

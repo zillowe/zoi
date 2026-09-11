@@ -164,7 +164,7 @@ pub struct SourceInstallOptions {
     pub yes: bool,
     /// Optional installation scope override.
     pub scope_override: Option<Scope>,
-    /// Save requested packages to the current project's `zoi.yaml`.
+    /// Save requested packages to the current project's `zoi.lua`.
     pub save: bool,
     /// Build type to use when building from source.
     pub build_type: Option<String>,

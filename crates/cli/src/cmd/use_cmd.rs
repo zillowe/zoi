@@ -59,25 +59,10 @@ fn run_global(packages: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// Installs project packages, persisting them to 'zoi.yaml' when the project
-/// uses a declarative config, or instructing the user for scriptable 'zoi.lua'
-/// configs whose automatic saving is not supported.
+/// Installs project packages, persisting them to the `packages({...})`
+/// block of the project's `zoi.lua` file.
 fn run_project(packages: &[String]) -> Result<()> {
-    if std::path::Path::new("zoi.lua").exists() {
-        println!(
-            "{} Project uses zoi.lua. Automatic saving is not supported for \
-             Lua configurations.",
-            "Note:".yellow().bold()
-        );
-        println!(
-            "   Please add the following to your packages() block in zoi.lua:"
-        );
-        for pkg in packages {
-            println!("   - \"{pkg}\"");
-        }
-    } else {
-        crate::project::config::add_packages_to_config(packages)?;
-    }
+    crate::project::config::add_packages_to_config(packages)?;
 
     println!("{} Installing project packages...", "::".bold().blue());
     let options = crate::SourceInstallOptions {

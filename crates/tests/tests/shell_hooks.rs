@@ -23,18 +23,13 @@ fn test_env_export_shell_logic() {
     let root = tmp.path().to_path_buf();
     ctx.set_current_dir(&root);
 
-    let yaml = r#"
-name: test-exports
-config:
-  local: true
-environments:
-  - name: test-env
-    cmd: test
-    run: ["echo"]
-    env:
-      FOO: BAR
+    let lua = r#"
+project({ name = "test-exports", config = { ["local"] = true } })
+environments({
+    { name = "test-env", cmd = "test", run = {"echo"}, env = { FOO = "BAR" } },
+})
 "#;
-    fs::write(root.join("zoi.yaml"), yaml).expect("unwrap failed");
+    fs::write(root.join("zoi.lua"), lua).expect("unwrap failed");
 
     let cfg = config::load().expect("unwrap failed");
 
@@ -51,12 +46,10 @@ fn test_env_export_shell_local_bin_path() {
     let bin_dir = root.join(".zoi/pkgs/bin");
     fs::create_dir_all(&bin_dir).expect("unwrap failed");
 
-    let yaml = r"
-name: test-local-bin
-config:
-  local: true
-";
-    fs::write(root.join("zoi.yaml"), yaml).expect("unwrap failed");
+    let lua = r#"
+project({ name = "test-local-bin", config = { ["local"] = true } })
+"#;
+    fs::write(root.join("zoi.lua"), lua).expect("unwrap failed");
 
     let cfg = config::load().expect("unwrap failed");
 

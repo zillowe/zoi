@@ -4509,7 +4509,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "yaml_serde",
  "zoi-core",
  "zoi-resolver",
 ]

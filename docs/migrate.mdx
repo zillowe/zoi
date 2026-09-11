@@ -18,20 +18,20 @@ Zoi Specification v2 is a major architectural overhaul that introduces breaking 
 
 | Feature            | Spec v1                     | Spec v2                                      |
 | :----------------- | :-------------------------- | :------------------------------------------- |
-| **Project Config** | `zoi.yaml`                  | `zoi.lua` (primary), `zoi.yaml` (tasks only) |
+| **Project Config** | `zoi.lua`                  | `zoi.lua` (all features, `zoi.lua` removed) |
 | **Lockfile**       | `zoi.lock` (v1)             | `zoi.lock` (v2, with directory hashes)       |
 | **Registry Sync**  | Global only                 | Global or Project-local (`.zoi/pkgs/db`)     |
 | **Package IDs**    | `package` or `repo/package` | Strictly `@repo/package`                     |
 | **Versioning**     | String-based                | Strict SemVer                                |
 
-### 1. Migrating `zoi.yaml` to `zoi.lua`
+### 1. Migrating `zoi.lua` to `zoi.lua`
 
-In Specification v2, `zoi.lua` is the primary scriptable configuration for your project. The `zoi.yaml` file is now restricted strictly to task definitions (`run` and `env`).
+`zoi.lua` support has been removed entirely. `zoi.lua` is now the only project configuration file and covers every feature the restricted task file used to provide (`tasks`, `environments`, plus `shell` and `checks`).
 
 **Action Required:**
-Move your `pkgs`, `registries`, and `config` fields from `zoi.yaml` to a new `zoi.lua` file.
+Move your `pkgs`, `registries`, and `config` fields from `zoi.lua` to a new `zoi.lua` file, then delete `zoi.lua`. Task definitions move into `tasks({...})` and environment setups into `environments({...})` in the same file.
 
-**Zoi v1 / Spec v1 (`zoi.yaml`):**
+**Zoi v1 / Spec v1 (`zoi.lua`, no longer supported):**
 
 ```yaml
 name: my-project

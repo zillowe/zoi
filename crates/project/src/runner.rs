@@ -30,7 +30,7 @@ pub fn run(
     config: &config::ProjectConfig
 ) -> Result<()> {
     if config.commands.is_empty() {
-        return Err(anyhow!("No commands defined in zoi.yaml"));
+        return Err(anyhow!("No commands defined in zoi.lua"));
     }
 
     let target_alias = if let Some(alias) = cmd_alias {
@@ -143,7 +143,7 @@ fn resolve_task_dependencies(
             .iter()
             .find(|c| c.cmd == alias)
             .ok_or_else(|| {
-                anyhow!("Command alias '{alias}' not found in zoi.yaml")
+                anyhow!("Command alias '{alias}' not found in zoi.lua")
             })?;
 
     if let Some(deps) = &cmd_spec.depends_on {

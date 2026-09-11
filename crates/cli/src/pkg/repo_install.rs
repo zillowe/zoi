@@ -2,33 +2,28 @@ use std::{env, fs};
 
 use anyhow::{Result, anyhow};
 use colored::Colorize;
-use serde::Deserialize;
 use zoi_core::types::SourceType;
 
 /// Implements "Direct Repository Installation" (`zoi install --repo`).
 ///
 /// This allows Zoi to install a package directly from a Git repository
-/// that contains a `zoi.yaml` or `zoi.lua` project file. It:
+/// that contains a `zoi.lua` project file declaring its installable
+/// package via `package("<source>")`. It:
 /// - Detects the Git provider (GitHub, GitLab, Codeberg).
 /// - Fetches the project configuration over HTTP (RAW URL).
 /// - Resolves and installs the specific package defined in the project.
 use crate::pkg::types;
 
-/// A file in a repository that contains information about a package.
-#[derive(Debug, Deserialize)]
-struct RepoFile {
-    /// The package source or name.
-    package: String
-}
-
-/// Installs a package directly from a Git repository using its `zoi.yaml` or
-/// `zoi.lua`.
+/// Installs a package directly from a Git repository using its `zoi.lua`.
+///
+/// The repository root must contain a `zoi.lua` file that declares the
+/// installable package source with a top-level `package("<source>")` call.
 ///
 /// # Errors
 ///
 /// This function will return an error if:
 /// - The repository specification is invalid.
-/// - The repository does not contain a supported project file (`zoi.yaml`).
+/// - The repository does not contain a supported project file (`zoi.lua`).
 /// - The package installation fails.
 /// - Network issues occur while fetching repository content.
 /// # Errors
@@ -54,7 +49,7 @@ pub fn run(
         yes
     )?;
 
-    let repo_file_names = ["zoi.yaml"];
+    let repo_file_names = ["zoi.lua"];
     let mut repo_file_content: Option<String> = None;
     let mut used_url = String::new();
 
@@ -75,15 +70,12 @@ pub fn run(
 
     let repo_file_content = repo_file_content.ok_or_else(|| {
         anyhow!(
-            "Could not find zoi.yaml in the repository on main/master \
-             branches."
+            "Could not find zoi.lua in the repository on main/master branches."
         )
     })?;
     println!("Using repo config from: {}", used_url.cyan());
 
-    let repo_file: RepoFile = serde_yaml::from_str(&repo_file_content)?;
-
-    let package_source = &repo_file.package;
+    let package_source = read_repo_package_source(&repo_file_content)?;
 
     let scope_override = scope.map(|s| match s {
         crate::cli::SetupScope::User => types::Scope::User,
@@ -112,7 +104,8 @@ pub fn run(
             "Package source is a path in the repo: {}",
             package_source.cyan()
         );
-        let pkg_url = get_repo_file_url(&provider, &repo_path, package_source)?;
+        let pkg_url =
+            get_repo_file_url(&provider, &repo_path, &package_source)?;
         let client = crate::pkg::utils::get_http_client()?;
         let pkg_content = client.get(&pkg_url).send()?.text()?;
         let temp_path = env::temp_dir().join(format!(
@@ -162,6 +155,43 @@ pub fn run(
     )?;
 
     Ok(())
+}
+
+/// Reads the installable package source declared by a repository's `zoi.lua`
+/// via a top-level `package("<source>")` call.
+///
+/// The script runs in a minimal Lua VM exposing only the `package`
+/// declaration; every other global behaves like vanilla Lua.
+///
+/// # Errors
+///
+/// Returns an error if the script cannot be executed or declares no package.
+fn read_repo_package_source(content: &str) -> Result<String> {
+    let lua = mlua::Lua::new();
+    let declared = std::sync::Arc::new(std::sync::Mutex::new(None::<String>));
+    let declared_clone = declared.clone();
+    let package_fn = lua
+        .create_function(move |_, source: String| {
+            *declared_clone.lock().expect("mutex poisoned") = Some(source);
+            Ok(())
+        })
+        .map_err(|e| anyhow!("Failed to set up repo config reader: {e}"))?;
+    lua.globals()
+        .set("package", package_fn)
+        .map_err(|e| anyhow!("Failed to set up repo config reader: {e}"))?;
+    lua.load(content)
+        .exec()
+        .map_err(|e| anyhow!("Failed to execute repo zoi.lua: {e}"))?;
+    declared
+        .lock()
+        .expect("mutex poisoned")
+        .clone()
+        .ok_or_else(|| {
+            anyhow!(
+                "Repository zoi.lua declares no package. Add a top-level \
+                 `package(\"<source>\")` call."
+            )
+        })
 }
 
 /// Parses a repository specification string into a provider and path.

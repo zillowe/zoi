@@ -13,13 +13,13 @@ fn test_project_run_command() {
     let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
 
-    let yaml = r#"
-name: test-workflow
-commands:
-  - cmd: build
-    run: echo "hello" > built.txt
+    let lua = r#"
+project({ name = "test-workflow" })
+tasks({
+    { cmd = "build", run = 'echo "hello" > built.txt' },
+})
 "#;
-    fs::write(root.join("zoi.yaml"), yaml).expect("unwrap failed");
+    fs::write(root.join("zoi.lua"), lua).expect("unwrap failed");
 
     ctx.set_current_dir(&root);
 

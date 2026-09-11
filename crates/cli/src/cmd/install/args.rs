@@ -41,7 +41,7 @@ pub struct InstallArgs {
     #[arg(long)]
     pub global: bool,
 
-    /// Save the package to the project's zoi.yaml
+    /// Save the package to the project's zoi.lua
     #[arg(long, conflicts_with = "deps_only")]
     pub save: bool,
 

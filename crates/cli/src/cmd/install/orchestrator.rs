@@ -132,8 +132,7 @@ impl<'a> Orchestrator<'a> {
         let lockfile_exists = sources.is_empty()
             && repo.is_none()
             && std::path::Path::new("zoi.lock").exists()
-            && (std::path::Path::new("zoi.lua").exists()
-                || std::path::Path::new("zoi.yaml").exists());
+            && std::path::Path::new("zoi.lua").exists();
 
         let mut sources_to_process: Vec<String> = sources.to_vec();
         let mut _is_project_install = false;
@@ -161,16 +160,9 @@ impl<'a> Orchestrator<'a> {
             }
             _is_project_install = true;
         } else if sources.is_empty() && repo.is_none() {
-            if std::path::Path::new("zoi.lua").exists()
-                || std::path::Path::new("zoi.yaml").exists()
-            {
+            if std::path::Path::new("zoi.lua").exists() {
                 if let Ok(config) = project::config::load() {
-                    let config_file =
-                        if std::path::Path::new("zoi.lua").exists() {
-                            "zoi.lua"
-                        } else {
-                            "zoi.yaml"
-                        };
+                    let config_file = "zoi.lua";
                     if !options.plan_json {
                         if lockfile_exists {
                             println!(

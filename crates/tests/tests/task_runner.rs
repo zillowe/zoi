@@ -14,16 +14,14 @@ fn test_task_runner_sequential_dependencies() {
     let root = tmp.path().to_path_buf();
     ctx.set_current_dir(&root);
 
-    let yaml = r#"
-name: test-task-deps
-commands:
-  - cmd: first
-    run: echo "1" > first.txt
-  - cmd: second
-    run: echo "2" > second.txt
-    depends_on: ["first"]
+    let lua = r#"
+project({ name = "test-task-deps" })
+tasks({
+    { cmd = "first", run = 'echo "1" > first.txt' },
+    { cmd = "second", run = 'echo "2" > second.txt', depends_on = {"first"} },
+})
 "#;
-    fs::write(root.join("zoi.yaml"), yaml).expect("unwrap failed");
+    fs::write(root.join("zoi.lua"), lua).expect("unwrap failed");
 
     let cfg = config::load().expect("unwrap failed");
     runner::run(Some("second"), &[], &cfg).expect("unwrap failed");
@@ -45,14 +43,13 @@ fn test_task_runner_caching() {
     let root = tmp.path().to_path_buf();
     ctx.set_current_dir(&root);
 
-    let yaml = r#"
-name: test-task-caching
-commands:
-  - cmd: cached-task
-    run: echo "running" >> output.txt
-    cache_files: ["input.txt"]
+    let lua = r#"
+project({ name = "test-task-caching" })
+tasks({
+    { cmd = "cached-task", run = 'echo "running" >> output.txt', cache_files = {"input.txt"} },
+})
 "#;
-    fs::write(root.join("zoi.yaml"), yaml).expect("unwrap failed");
+    fs::write(root.join("zoi.lua"), lua).expect("unwrap failed");
     fs::write(root.join("input.txt"), "input-v1").expect("unwrap failed");
 
     let cfg = config::load().expect("unwrap failed");
@@ -87,17 +84,14 @@ fn test_task_runner_circular_dependency_detection() {
     let root = tmp.path().to_path_buf();
     ctx.set_current_dir(&root);
 
-    let yaml = r#"
-name: test-circular
-commands:
-  - cmd: a
-    run: echo a
-    depends_on: ["b"]
-  - cmd: b
-    run: echo b
-    depends_on: ["a"]
+    let lua = r#"
+project({ name = "test-circular" })
+tasks({
+    { cmd = "a", run = "echo a", depends_on = {"b"} },
+    { cmd = "b", run = "echo b", depends_on = {"a"} },
+})
 "#;
-    fs::write(root.join("zoi.yaml"), yaml).expect("unwrap failed");
+    fs::write(root.join("zoi.lua"), lua).expect("unwrap failed");
 
     let cfg = config::load().expect("unwrap failed");
     let res = runner::run(Some("a"), &[], &cfg);

@@ -368,10 +368,10 @@ enum Commands {
     )]
     Uninstall(cmd::uninstall::args::UninstallArgs),
 
-    /// Execute a command defined in a local zoi.yaml file
-    #[command(long_about = "Execute a command from zoi.yaml. If no command \
-                            is specified, it will launch an interactive \
-                            prompt to choose one.")]
+    /// Execute a command defined in a local zoi.lua file
+    #[command(long_about = "Execute a command from zoi.lua. If no command is \
+                            specified, it will launch an interactive prompt \
+                            to choose one.")]
     Run {
         /// The alias of the command to execute
         cmd_alias: Option<String>,
@@ -379,7 +379,7 @@ enum Commands {
         args: Vec<String>
     },
 
-    /// Manage and set up project environments from a local zoi.yaml file
+    /// Manage and set up project environments from a local zoi.lua file
     #[command(long_about = "Checks for required packages and runs setup \
                             commands for a defined environment. If no \
                             environment is specified, it launches an \
@@ -396,7 +396,7 @@ enum Commands {
     /// Enter a development shell for the current project
     #[command(
         alias = "develop",
-        long_about = "Loads the project configuration from zoi.yaml, ensures \
+        long_about = "Loads the project configuration from zoi.lua, ensures \
                       all required packages are installed locally, sets up \
                       environment variables (PATH, LD_LIBRARY_PATH, etc.), \
                       and drops you into a subshell."

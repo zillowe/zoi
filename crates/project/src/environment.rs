@@ -26,7 +26,7 @@ pub fn setup(
     config: &config::ProjectConfig
 ) -> Result<()> {
     if config.environments.is_empty() {
-        return Err(anyhow!("No environments defined in zoi.yaml"));
+        return Err(anyhow!("No environments defined in zoi.lua"));
     }
 
     let env_to_setup = if let Some(alias) = env_alias {
@@ -35,7 +35,7 @@ pub fn setup(
             .iter()
             .find(|e| e.cmd == alias)
             .ok_or_else(|| {
-                anyhow!("Environment '{alias}' not found in zoi.yaml")
+                anyhow!("Environment '{alias}' not found in zoi.lua")
             })?
             .clone()
     } else {

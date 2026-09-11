@@ -125,7 +125,7 @@ zoi transaction undo
 
 ## 7. Create a Project Environment
 
-Zoi Spec v2 uses `zoi.lua` for tools and tasks (the previous `zoi.yaml` is only for tasks now).
+A Zoi project is a single `zoi.lua` file covering tools, tasks, and environments.
 
 Create `zoi.lua` in your project root:
 
@@ -139,16 +139,11 @@ packages({
     "@core/eza",
     "@community/bat"
 })
-```
 
-Create `zoi.yaml` for tasks:
-
-```yaml
-commands:
-  - cmd: build
-    run: make build
-  - cmd: test
-    run: make test
+tasks({
+    { cmd = "build", run = "make build" },
+    { cmd = "test", run = "make test" },
+})
 ```
 
 Install project-local packages:
@@ -170,7 +165,7 @@ zoi run build
 zoi run test
 ```
 
-Commit `zoi.lua`, `zoi.yaml`, and `zoi.lock` so other machines can reproduce the same environment.
+Commit `zoi.lua` and `zoi.lock` so other machines can reproduce the same environment.
 
 For strict reproducibility in CI:
 
@@ -285,5 +280,5 @@ Common fixes:
 ## Next Steps
 
 - Read [Features & Usage](/docs/zds/zoi/features) for the full command reference.
-- Read [Project Configuration](/docs/zds/zoi/project-config) for `zoi.yaml`.
+- Read [Project Configuration](/docs/zds/zoi/project-config) for `zoi.lua`.
 - Read [Creating Packages](/docs/zds/zoi/creating-packages) to write packages.

@@ -86,7 +86,7 @@ provision-env:
   image: registry.gitlab.com/zillowe/zillwen/zusty/zoi/zoi:latest
   script:
     - zoi sync
-    - zoi install --save # Installs everything listed in your project's zoi.yaml
+    - zoi install --save # Installs everything listed in your project's zoi.lua
   artifacts:
     paths:
       - .zoi/pkgs/store/
@@ -97,7 +97,7 @@ run-tests:
   dependencies:
     - provision-env
   script:
-    - zoi env test # Runs the 'test' environment defined in zoi.yaml
+    - zoi env test # Runs the 'test' environment defined in zoi.lua
 ```
 
 ---
@@ -146,7 +146,7 @@ To speed up your CI/CD pipelines, it is highly recommended to cache the Zoi stor
   uses: actions/cache@v4
   with:
     path: ~/.local/share/zoi/pkgs/store
-    key: ${{ runner.os }}-zoi-${{ hashFiles('zoi.yaml', 'zoi.lock') }}
+    key: ${{ runner.os }}-zoi-${{ hashFiles('zoi.lua', 'zoi.lock') }}
     restore-keys: |
       ${{ runner.os }}-zoi-
 ```

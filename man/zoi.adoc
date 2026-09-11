@@ -94,7 +94,7 @@ These options may appear before any command.
 *--scope*=_user|system|project_:: Installation scope.
 *--local*:: Alias for *--scope*=project. *--global*:: Alias for
 *--scope*=user.
-*--save*:: Save the package to zoi.yaml.
+*--save*:: Save the package to zoi.lua.
 *--deps-only*:: Install only dependencies, not the packages themselves.
 *--build-deps-only*:: Install only build dependencies.
 *--type*=_TYPE_:: Build type when building from source.
@@ -113,7 +113,7 @@ These options may appear before any command.
 +
 *--scope*=_user|system|project_:: Installation scope. *--local* and
 *--global* are aliases as in *install*.
-*--save*:: Also remove the package from zoi.yaml.
+*--save*:: Also remove the package from zoi.lua.
 *-r*, *--recursive*:: Recursively remove dependencies that are no longer
 needed.
 *--dry-run*:: Show what would be done. *--explain*:: Explain dependency
@@ -418,11 +418,11 @@ instead of writing.
 shell. *--repo*=_REPO_:: Use a temporary clone.
 
 *run* [_ALIAS_] [_ARGS_...]::
-  Execute a command defined in the local zoi.yaml task runner. With no
+  Execute a command defined in the local zoi.lua task runner. With no
   alias, offers interactive selection.
 
 *env* [_ALIAS_] [_OPTIONS_]::
-  Manage and set up project environments defined in zoi.yaml.
+  Manage and set up project environments defined in zoi.lua.
   *--export-shell* is internal.
 
 *shell* [_SHELL_] [_OPTIONS_]::
@@ -523,11 +523,9 @@ a setting. See the online configuration reference for every key.
   User data directory (database, store, and caches). Falls back to
   *~/.local/share/zoi/* on most systems.
 
-*./zoi.yaml*::
-  Project task runner and dependency declarations.
-
 *./zoi.lua*::
-  Per-project configuration and dependencies.
+  Project configuration: task runner, environments, shell setup,
+  package checks, and dependency declarations.
 
 *./zoi.lock*::
   Pinned project dependency lockfile (used with *--frozen*).

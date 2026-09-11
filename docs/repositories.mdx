@@ -135,7 +135,7 @@ zoi install --repo gl:zillowe/hello
 zoi install --repo cb:zillowe/hello
 ```
 
-This works if the target repository has a `zoi.yaml` file in its root. The `package` field in this file can specify a package name (e.g. `hello`), a path to a `.pkg.lua` file within the repository, or a URL to a `.pkg.lua` file. This provides a quick way to install packages from git repositories without permanently adding them to your configuration.
+This works if the target repository has a `zoi.lua` file in its root declaring `package("...")`. The declaration can specify a package name (e.g. `hello`), a path to a `.pkg.lua` file within the repository, or a URL to a `.pkg.lua` file. This provides a quick way to install packages from git repositories without permanently adding them to your configuration.
 
 **Provider Prefixes:**
 

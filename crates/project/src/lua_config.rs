@@ -12,8 +12,8 @@ use anyhow::{Result, anyhow};
 use mlua::{Lua, LuaSerdeExt, Table, Value};
 
 use crate::config::{
-    CommandSpec, EnvironmentSpec, PackageSpec, ProjectConfig,
-    ProjectLocalConfig, RegistrySpec
+    CommandSpec, EnvironmentSpec, PackageCheck, PackageSpec, ProjectConfig,
+    ProjectLocalConfig, RegistrySpec, ShellSpec
 };
 
 /// Parses and executes a `zoi.lua` file to load project-specific configuration.
@@ -50,6 +50,10 @@ pub fn load_zoi_lua<S: ::std::hash::BuildHasher>(
     let tasks_data = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let environments_data =
         std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let checks_data: std::sync::Arc<std::sync::Mutex<Vec<PackageCheck>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let shell_data: std::sync::Arc<std::sync::Mutex<Option<ShellSpec>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(None));
 
     let env_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
     for (k, v) in env {
@@ -160,6 +164,33 @@ pub fn load_zoi_lua<S: ::std::hash::BuildHasher>(
         .set("environments", environments_fn)
         .map_err(|e| anyhow!(e.to_string()))?;
 
+    let checks_clone = checks_data.clone();
+    let checks_fn = lua
+        .create_function(move |lua, table: Table| {
+            let mut data = checks_clone.lock().expect("mutex poisoned");
+            for val in table.sequence_values::<Value>() {
+                let spec = lua.from_value::<PackageCheck>(val?)?;
+                data.push(spec);
+            }
+            Ok(())
+        })
+        .map_err(|e| anyhow!(e.to_string()))?;
+    lua.globals()
+        .set("checks", checks_fn)
+        .map_err(|e| anyhow!(e.to_string()))?;
+
+    let shell_clone = shell_data.clone();
+    let shell_fn = lua
+        .create_function(move |lua, table: Table| {
+            let spec = lua.from_value::<ShellSpec>(Value::Table(table))?;
+            *shell_clone.lock().expect("mutex poisoned") = Some(spec);
+            Ok(())
+        })
+        .map_err(|e| anyhow!(e.to_string()))?;
+    lua.globals()
+        .set("shell", shell_fn)
+        .map_err(|e| anyhow!(e.to_string()))?;
+
     lua.load(&content)
         .exec()
         .map_err(|e| anyhow!("Failed to execute zoi.lua: {e}"))?;
@@ -196,12 +227,12 @@ pub fn load_zoi_lua<S: ::std::hash::BuildHasher>(
     Ok(ProjectConfig {
         name,
         registries: registries_data.lock().expect("mutex poisoned").clone(),
-        packages: Vec::new(),
+        packages: checks_data.lock().expect("mutex poisoned").clone(),
         pkgs,
         pkgs_v2,
         config: ProjectLocalConfig { local },
         commands: tasks_data.lock().expect("mutex poisoned").clone(),
         environments: environments_data.lock().expect("mutex poisoned").clone(),
-        shell: None
+        shell: shell_data.lock().expect("mutex poisoned").clone()
     })
 }

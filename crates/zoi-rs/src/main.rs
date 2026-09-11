@@ -54,7 +54,7 @@ fn main() {
         // - Seamlessly continue the original execution.
         let auto_install = |name: &str, version: &str| -> anyhow::Result<()> {
             let spec = format!("{name}@{version}");
-            let scope = if std::path::Path::new("zoi.yaml").exists() {
+            let scope = if std::path::Path::new("zoi.lua").exists() {
                 zoi_cli::pkg::types::Scope::Project
             } else {
                 zoi_cli::pkg::types::Scope::User

@@ -117,7 +117,7 @@ _build_type_)::
 
 *SourceInstallOptions*::
   Configure source installation: *repo* (git spec), *force*,
-  *all_optional*, *yes*, *scope_override*, *save* (write to zoi.yaml),
+  *all_optional*, *yes*, *scope_override*, *save* (write to zoi.lua),
   *build_type*, *dry_run* (plan only), *build* (force a source build),
   and *frozen* (enforce zoi.lock).
 
@@ -175,7 +175,7 @@ _build_type_)::
 
 *zoi::project*::
   Project support: configuration, environments, task execution,
-  lockfiles, and verification for zoi.yaml-based projects.
+  lockfiles, and verification for zoi.lua-based projects.
 
 == Errors
 

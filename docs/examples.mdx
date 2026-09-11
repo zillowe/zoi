@@ -190,46 +190,9 @@ zoi.register_command({
 })
 ```
 
-## 6. Project Environment (`zoi.yaml` and `zoi.lua`)
+## 6. Project Environment (`zoi.lua`)
 
-Zoi supports two formats for project configuration: `zoi.yaml` (declarative) and `zoi.lua` (scriptable).
-
-### `zoi.yaml` (Declarative)
-
-```yaml
-# zoi.yaml
-name: my-backend-api
-
-# System package checks
-packages:
-  - name: Git
-    check: git --version
-
-# Short aliases for common tasks
-commands:
-  - cmd: build
-    run: go build -o api main.go
-    depends_on: ["test"]
-    cache_files: ["src/**", "go.mod", "go.sum"]
-  - cmd: test
-    run: go test ./...
-  - cmd: db:up
-    run: zoi service start postgresql
-
-# Full environment setups
-environments:
-  - name: CI Pipeline
-    cmd: ci
-    run:
-      - go mod download
-      - zoi run build
-      - zoi run test
-    env:
-      NODE_ENV: "test"
-      CGO_ENABLED: "0"
-```
-
-### `zoi.lua` (Scriptable Equivalent)
+Zoi projects are configured with a single scriptable `zoi.lua` file.
 
 ```lua
 -- zoi.lua
@@ -238,6 +201,11 @@ project({
     config = {
         ["local"] = true,
     },
+})
+
+-- System package checks (verified by `zoi env`)
+checks({
+    { name = "Git", check = "git --version" },
 })
 
 registries({

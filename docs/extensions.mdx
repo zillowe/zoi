@@ -3,7 +3,7 @@ title: Extensions
 description: A guide to creating and using Zoi extensions to manage Zoi's configuration.
 ---
 
-Zoi extensions are a special type of package that, instead of installing software, modify Zoi's own configuration or project setup. They provide a powerful way to distribute and manage collections of settings, such as custom package repositories, or even entire project starter templates (`zoi.yaml`) as a single, versionable package.
+Zoi extensions are a special type of package that, instead of installing software, modify Zoi's own configuration or project setup. They provide a powerful way to distribute and manage collections of settings, such as custom package repositories, or even entire project starter templates (`zoi.lua`) as a single, versionable package.
 
 Extensions are not "installed" in the traditional sense; they are "added" and "removed" using the `zoi extension` subcommand. When an extension is added, its defined changes are applied. When it's removed, those changes are automatically reverted.
 
@@ -13,7 +13,7 @@ Extensions are ideal for:
 
 - **Distributing Repository Sets:** Package a list of official and git-based repositories for a team or project, so everyone can get access with a single command.
 - **Corporate Mirrors:** Point Zoi to a company's internal mirror of the official package database.
-- **Project Starters:** Distribute a standard `zoi.yaml` file for a specific type of project (e.g. Rust library, web service) to bootstrap development environments quickly.
+- **Project Starters:** Distribute a standard `zoi.lua` file for a specific type of project (e.g. Rust library, web service) to bootstrap development environments quickly.
 - **Easy Configuration Sharing:** Simplify the process of setting up a new machine with a standard Zoi configuration.
 - **Distributing PGP Keys:** Share PGP keys for trusted package maintainers to enable signature verification.
 
@@ -99,12 +99,12 @@ Adds an additional package database (registry) for Zoi to sync with.
 
 #### `project`
 
-Creates a `zoi.yaml` file in the current directory, allowing for sharable project configurations.
+Creates a `zoi.lua` file in the current directory, allowing for sharable project configurations.
 
-- **Purpose:** To distribute a standard `zoi.yaml` project file that can be used to set up a development environment.
-- **`add` Value:** The raw, multi-line string content of the `zoi.yaml` file.
-- **Effect:** A new `zoi.yaml` file is created in the current directory where `zoi extension add` is run. The command will fail if a `zoi.yaml` file already exists there.
-- **On Removal:** The `zoi.yaml` file created during installation is deleted from that original target directory.
+- **Purpose:** To distribute a standard `zoi.lua` project file that can be used to set up a development environment.
+- **`add` Value:** The raw, multi-line string content of the `zoi.lua` file.
+- **Effect:** A new `zoi.lua` file is created in the current directory where `zoi extension add` is run. The command will fail if a `zoi.lua` file already exists there.
+- **On Removal:** The `zoi.lua` file created during installation is deleted from that original target directory.
 
 #### `pgp`
 
@@ -196,7 +196,7 @@ metadata({
 
 ### Project Starter Extension
 
-This example shows how to create a "project starter" that provides a ready-to-use `zoi.yaml` for a new Rust project.
+This example shows how to create a "project starter" that provides a ready-to-use `zoi.lua` for a new Rust project.
 
 ```lua
 -- my-rust-starter.pkg.lua
@@ -205,7 +205,7 @@ metadata({
   repo = "community",
   type = "extension",
   version = "1.0",
-  description = "A starter zoi.yaml for a Rust project.",
+  description = "A starter zoi.lua for a Rust project.",
   maintainer = {
     name = "Your Name",
     email = "your.email@example.com"
@@ -216,19 +216,20 @@ metadata({
       {
         type = "project",
         add = [[
-name: my-rust-project
-packages:
-  - name: rust
-    check: "rustc --version"
-  - name: cargo-watch
-    check: "cargo watch --version"
-commands:
-  - cmd: run
-    run: cargo run
-  - cmd: test
-    run: cargo test
-  - cmd: watch
-    run: cargo watch -x run
+project({ name = "my-rust-project" })
+packages({
+    "@core/rust",
+    "@community/cargo-watch",
+})
+checks({
+    { name = "rust", check = "rustc --version" },
+    { name = "cargo-watch", check = "cargo watch --version" },
+})
+tasks({
+    { cmd = "run", run = "cargo run" },
+    { cmd = "test", run = "cargo test" },
+    { cmd = "watch", run = "cargo watch -x run" },
+})
 ]]
       }
     }
@@ -236,7 +237,7 @@ commands:
 })
 ```
 
-A user can now navigate to an empty project directory, run `zoi extension add my-rust-starter`, and immediately have a working `zoi.yaml` to start developing.
+A user can now navigate to an empty project directory, run `zoi extension add my-rust-starter`, and immediately have a working `zoi.lua` to start developing.
 
 ### Custom Subcommand Plugin
 

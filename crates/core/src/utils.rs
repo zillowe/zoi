@@ -629,9 +629,7 @@ pub fn is_zoios() -> bool {
 
 /// Resolves the default installation scope based on the current environment.
 pub fn resolve_fallback_scope() -> crate::types::Scope {
-    if std::path::Path::new("zoi.lua").exists()
-        || std::path::Path::new("zoi.yaml").exists()
-    {
+    if std::path::Path::new("zoi.lua").exists() {
         crate::types::Scope::Project
     } else if is_zoios() {
         crate::types::Scope::System
