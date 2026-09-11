@@ -3,7 +3,7 @@ description: Updates the desktop entry database.
 platforms: ["linux"]
 trigger:
   paths:
-    - "usr/share/applications/*.desktop"
+    - "${usrroot}/usr/share/applications/*.desktop"
   operation: ["install", "upgrade", "remove"]
 action:
   when: PostTransaction

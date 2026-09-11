@@ -205,16 +205,32 @@ pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
 
 /// Normalizes a file path to be relative to the sysroot and uses forward
 /// slashes.
+///
+/// Placeholder stripping uses the canonical
+/// [`zoi_core::utils::strip_staging_placeholder`] helper so hook matching
+/// agrees with `expand_placeholders` in `zoi-core`, `expand_pooled_path` in
+/// `zoi-install`, and the staging mapping in `zoi-package`.
 fn normalized_relative_path(file: &str, sysroot: Option<&Path>) -> String {
-    let file_path = Path::new(file);
+    let without_placeholder = utils::strip_staging_placeholder(file);
+    let mut owned = PathBuf::from(&without_placeholder);
+    // Map old expanded-absolute home records back to home-relative form so
+    // placeholder triggers keep matching them (e.g.
+    // `/home/user/.local/...` -> `.local/...`).
+    if owned.is_absolute()
+        && let Some(home) = utils::get_user_home()
+        && let Ok(stripped) = owned.strip_prefix(&home)
+    {
+        owned = stripped.to_path_buf();
+    }
+    let file_path = owned;
     let relative_file = if let Some(root) = sysroot {
-        file_path.strip_prefix(root).unwrap_or(file_path)
+        file_path.strip_prefix(root).unwrap_or(&file_path)
     } else if file_path.is_absolute() {
         let mut components = file_path.components();
         components.next();
         components.as_path()
     } else {
-        file_path
+        &file_path
     };
 
     relative_file
@@ -236,7 +252,7 @@ fn normalized_hook_path(path: &str) -> String {
 
 /// Checks if a modified file matches a trigger directory.
 fn matches_trigger_dir(dir: &str, modified_file: &str) -> bool {
-    let dir = normalized_hook_path(dir);
+    let dir = normalized_hook_path(&utils::strip_staging_placeholder(dir));
     !dir.is_empty()
         && (modified_file == dir
             || modified_file
@@ -287,15 +303,51 @@ pub fn trigger_matches_modified_files(
                 }
             }
 
-            let Ok(pattern) = Pattern::new(path_pattern) else {
-                continue;
-            };
+            // Hook authors may write absolute globs (e.g.
+            // `/usr/share/fonts/**`) while modified files normalize to
+            // sysroot-relative form (e.g. `usr/share/fonts/...`). Normalize
+            // the pattern the same way so both styles match. Triggers use
+            // the same `${usrroot}`/`${usrhome}` placeholders as `zcp`
+            // destinations; installed files are recorded with those
+            // placeholders, while older manifests may hold expanded
+            // absolute paths - so try stripped, normalized, and
+            // location-expanded forms.
+            let normalized_pattern = normalized_hook_path(path_pattern);
+            let placeholder_stripped =
+                utils::strip_staging_placeholder(path_pattern);
+            let placeholder_normalized =
+                normalized_hook_path(&placeholder_stripped);
+            // Expanded against the canonical locations (sysroot, home) so
+            // placeholder triggers also match old expanded-absolute
+            // manifests and vice versa.
+            let location_expanded =
+                utils::expand_staging_root_placeholders(path_pattern);
+            let location_expanded_normalized =
+                normalized_hook_path(&location_expanded);
 
-            if pattern.matches_path(Path::new(&relative_file))
-                || pattern.matches(&relative_file)
-                || pattern.matches(file)
-            {
-                return true;
+            let mut candidates = vec![path_pattern.as_str()];
+            for extra in [
+                &normalized_pattern,
+                &placeholder_normalized,
+                &location_expanded,
+                &location_expanded_normalized
+            ] {
+                if !candidates.contains(&extra.as_str()) {
+                    candidates.push(extra);
+                }
+            }
+
+            for candidate in candidates {
+                let Ok(pattern) = Pattern::new(candidate) else {
+                    continue;
+                };
+
+                if pattern.matches_path(Path::new(&relative_file))
+                    || pattern.matches(&relative_file)
+                    || pattern.matches(file)
+                {
+                    return true;
+                }
             }
         }
     }
@@ -422,23 +474,14 @@ pub fn run_global_hooks(
                         "/usr/bin:/bin:/usr/sbin:/sbin".to_string()
                     );
 
+                    // Run through a shell inside the root so multi-line
+                    // scripts (e.g. the icon-cache hook with `if`/`for`) and
+                    // quoted commands (e.g. ldconfig's absolute path) work
+                    // exactly like they do on the host path below.
                     zoi_sandbox::wrap_command_in_root(
                         &root,
-                        Path::new(
-                            &hook
-                                .action
-                                .exec
-                                .split_whitespace()
-                                .next()
-                                .unwrap_or("")
-                        ),
-                        &hook
-                            .action
-                            .exec
-                            .split_whitespace()
-                            .skip(1)
-                            .map(std::string::ToString::to_string)
-                            .collect::<Vec<_>>(),
+                        Path::new("/bin/bash"),
+                        &["-c".to_string(), hook.action.exec.clone()],
                         &envs,
                         &[], // No extra binds for standard hooks
                         false

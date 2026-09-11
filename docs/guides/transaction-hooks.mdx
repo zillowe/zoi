@@ -30,10 +30,12 @@ name: update-icon-cache
 description: Rebuilds GTK icon caches when icon themes are installed or removed.
 platforms: ["linux"]
 trigger:
-  # Trigger if any package touches files below these directories
+  # Trigger if any package touches files below these directories.
+  # Paths use the same `${usrroot}`, `${usrhome}`, `${pkgstore}` placeholders
+  # as `zcp` destinations, so they match installed files exactly.
   dirs:
-    - "usr/share/icons"
-    - "usr/local/share/icons"
+    - "${usrroot}/usr/share/icons"
+    - "${usrroot}/usr/local/share/icons"
   # Only trigger for these operations
   operation: ["install", "upgrade", "remove"]
 action:
@@ -53,14 +55,16 @@ action:
 | `name`              | `string` | A unique name for the hook.                                                                            |
 | `description`       | `string` | A short summary of what the hook does.                                                                 |
 | `platforms`         | `list`   | (Optional) List of supported platforms (e.g. `["linux"]`).                                             |
-| `trigger.dirs`      | `list`   | A list of directory paths. If any modified file is inside one of these directories, the hook triggers. |
-| `trigger.paths`     | `list`   | A list of glob patterns. If any modified file matches, the hook triggers. Also supports Arch-style directory paths ending in `/`. |
+| `trigger.dirs`      | `list`   | A list of directory paths. If any modified file is inside one of these directories, the hook triggers. Accepts `${usrroot}`, `${usrhome}`, `${pkgstore}`, `${applications}` placeholders as well as absolute (`/usr/...`) and relative (`usr/...`) forms. |
+| `trigger.paths`     | `list`   | A list of glob patterns. If any modified file matches, the hook triggers. Also supports Arch-style directory paths ending in `/`. Accepts the same placeholders and path forms as `trigger.dirs` (e.g. `${usrroot}/usr/share/fonts/**`). |
 | `trigger.packages`  | `list`   | A list of package names. If any of these packages are installed, upgraded, or removed, the hook triggers. |
 | `trigger.operation` | `list`   | (Optional) Restrict to specific operations: `install`, `upgrade`, `remove`.                            |
 | `action.when`       | `enum`   | When to run: `PostTransaction` (currently supported).                                                  |
 | `action.exec`       | `string` | The shell command to execute.                                                                          |
 
-`trigger.dirs` is preferred for directory-wide maintenance triggers such as icon themes. `trigger.paths` remains useful when a hook should only match specific filenames or extensions, such as `usr/share/applications/*.desktop`. `trigger.packages` is the most reliable way to trigger a hook based on the presence of a specific package in the transaction.
+`trigger.dirs` is preferred for directory-wide maintenance triggers such as icon themes. `trigger.paths` remains useful when a hook should only match specific filenames or extensions, such as `${usrroot}/usr/share/applications/*.desktop`. `trigger.packages` is the most reliable way to trigger a hook based on the presence of a specific package in the transaction.
+
+Installed files are recorded with staging placeholders (e.g. `${usrroot}/usr/share/fonts/foo.ttf`). Both sides are normalized before matching, so `${usrroot}/usr/share/fonts/**`, `/usr/share/fonts/**`, and `usr/share/fonts/**` all match the same files. `${pkgstore}/...` files are store-internal and never match system triggers. `zoi install`, `zoi update`, and `zoi uninstall` all run `PostTransaction` hooks once per transaction.
 
 ---
 

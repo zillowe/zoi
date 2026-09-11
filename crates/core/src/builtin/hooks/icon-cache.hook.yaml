@@ -3,8 +3,8 @@ description: Rebuilds GTK icon caches when icon themes are installed or removed.
 platforms: ["linux"]
 trigger:
   dirs:
-    - "usr/share/icons"
-    - "usr/local/share/icons"
+    - "${usrroot}/usr/share/icons"
+    - "${usrroot}/usr/local/share/icons"
   operation: ["install", "upgrade", "remove"]
 action:
   when: PostTransaction

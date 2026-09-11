@@ -3,8 +3,8 @@ description: Rebuilds system font cache when fonts are installed or removed.
 platforms: ["linux"]
 trigger:
   paths:
-    - "usr/share/fonts/**"
-    - "usr/local/share/fonts/**"
+    - "${usrroot}/usr/share/fonts/**"
+    - "${usrroot}/usr/local/share/fonts/**"
   operation: ["install", "upgrade", "remove"]
 action:
   when: PostTransaction

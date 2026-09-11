@@ -1375,6 +1375,85 @@ pub fn expand_placeholders(
     Ok(expanded)
 }
 
+/// Strips Zoi staging placeholders to sysroot-relative form for matching.
+///
+/// Install manifests record system files with placeholders (e.g.
+/// `${usrroot}/usr/share/fonts/foo.ttf`), while hook triggers, file
+/// databases, and other matchers work with sysroot-relative paths (e.g.
+/// `usr/share/fonts/foo.ttf`). This is the canonical stripping logic shared
+/// by all crates, it mirrors the placeholder roots used by
+/// [`expand_placeholders`], `expand_pooled_path` in `zoi-install`, and the
+/// staging-directory mapping in `zoi-package`, but stays scope- and
+/// version-independent so it can be used transaction-wide:
+///
+/// - `${usrroot}/...` -> `...` (matches `apply_sysroot("/")` expansion,
+///   relativized).
+/// - `${usrhome}/...` -> `...` (stable across machines, unlike expanding to the
+///   current home directory).
+/// - `${pkgstore}/...` -> `pkgstore/...` (namespaced so store-internal files
+///   never match system triggers).
+/// - `${applications}/...` -> `...`.
+/// - Bare staging forms (`usrroot/...`, `usrhome/...`, `pkgstore/...`) are
+///   handled the same way for robustness.
+/// - Everything else (including already-absolute `${createpkgdir}` records) is
+///   returned unchanged.
+#[must_use]
+pub fn strip_staging_placeholder(path: &str) -> String {
+    if let Some(rest) = path.strip_prefix("${usrroot}/") {
+        return rest.to_string();
+    }
+    if let Some(rest) = path.strip_prefix("${usrroot}") {
+        return rest.trim_start_matches('/').to_string();
+    }
+    if let Some(rest) = path.strip_prefix("${usrhome}/") {
+        return rest.to_string();
+    }
+    if let Some(rest) = path.strip_prefix("${usrhome}") {
+        return rest.trim_start_matches('/').to_string();
+    }
+    if let Some(rest) = path.strip_prefix("${pkgstore}/") {
+        return format!("pkgstore/{rest}");
+    }
+    if let Some(rest) = path.strip_prefix("${pkgstore}") {
+        return format!("pkgstore/{}", rest.trim_start_matches('/'));
+    }
+    if let Some(rest) = path.strip_prefix("${applications}/") {
+        return rest.to_string();
+    }
+    if let Some(rest) = path.strip_prefix("${applications}") {
+        return rest.trim_start_matches('/').to_string();
+    }
+    if let Some(rest) = path.strip_prefix("usrroot/") {
+        return rest.to_string();
+    }
+    if let Some(rest) = path.strip_prefix("usrhome/") {
+        return rest.to_string();
+    }
+    path.to_string()
+}
+
+/// Expands only the location-roots (`${usrroot}`, `${usrhome}`) using the
+/// same locations as [`expand_placeholders`].
+///
+/// Unlike [`expand_placeholders`], this needs neither a version directory
+/// nor a scope, so it can be used transaction-wide when matching hook
+/// triggers against installed files. `${pkgstore}`, `${applications}`,
+/// `${createpkgdir}`, and `${pkgluadir}` are left untouched: the store needs
+/// a per-package version directory to resolve, and the others are
+/// scope-dependent.
+#[must_use]
+pub fn expand_staging_root_placeholders(path: &str) -> String {
+    let mut expanded = path.to_string();
+    expanded = expanded.replace(
+        "${usrroot}",
+        &crate::sysroot::apply_sysroot(PathBuf::from("/")).to_string_lossy()
+    );
+    if let Some(home_dir) = get_user_home() {
+        expanded = expanded.replace("${usrhome}", &home_dir.to_string_lossy());
+    }
+    expanded
+}
+
 /// Expands the `~` character to the user's home directory.
 pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
     let path = path.as_ref();
@@ -1437,6 +1516,45 @@ mod tests {
         assert!(is_external_license_link("https://example.com/LICENSE"));
         assert!(
             spdx::Expression::parse("https://example.com/LICENSE").is_err()
+        );
+    }
+
+    #[test]
+    fn staging_placeholder_strips_to_sysroot_relative_form() {
+        assert_eq!(
+            strip_staging_placeholder("${usrroot}/usr/share/fonts/foo.ttf"),
+            "usr/share/fonts/foo.ttf"
+        );
+        assert_eq!(
+            strip_staging_placeholder("${usrhome}/.local/share/fonts/foo.ttf"),
+            ".local/share/fonts/foo.ttf"
+        );
+        assert_eq!(
+            strip_staging_placeholder("${pkgstore}/bin/foo"),
+            "pkgstore/bin/foo"
+        );
+        assert_eq!(
+            strip_staging_placeholder("${applications}/MyApp.app"),
+            "MyApp.app"
+        );
+        assert_eq!(
+            strip_staging_placeholder("/usr/share/fonts/foo.ttf"),
+            "/usr/share/fonts/foo.ttf"
+        );
+    }
+
+    #[test]
+    fn staging_root_expansion_uses_canonical_locations() {
+        let expanded =
+            expand_staging_root_placeholders("${usrroot}/usr/share/fonts");
+        assert!(
+            expanded.ends_with("/usr/share/fonts"),
+            "unexpected expansion: {expanded}"
+        );
+        // Store placeholder needs a version dir, so it stays untouched.
+        assert_eq!(
+            expand_staging_root_placeholders("${pkgstore}/bin/foo"),
+            "${pkgstore}/bin/foo"
         );
     }
 }

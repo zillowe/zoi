@@ -1095,6 +1095,24 @@ impl<'a> Orchestrator<'a> {
             ));
         }
 
+        // Run builtin/global transaction hooks (e.g. font-cache, ldconfig)
+        // exactly like update/uninstall do. Without this, `zoi install`
+        // never triggers PostTransaction hooks.
+        if let Ok(modified_files) =
+            transaction::get_modified_files(&transaction_id)
+        {
+            let modified_packages =
+                transaction::get_modified_packages(&transaction_id)
+                    .unwrap_or_default();
+            let _ = crate::pkg::hooks::global::run_global_hooks(
+                crate::pkg::hooks::global::HookWhen::PostTransaction,
+                &modified_files,
+                &modified_packages,
+                "install",
+                scope_override.unwrap_or_default()
+            );
+        }
+
         if let Err(e) = transaction::commit(&transaction_id) {
             eprintln!("Warning: Failed to commit transaction: {e}");
         }

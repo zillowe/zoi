@@ -151,6 +151,80 @@ fn test_hook_path_trigger_still_matches_globs() {
 }
 
 #[test]
+fn test_hook_placeholder_trigger_matches_placeholder_file() {
+    // Regression test for builtin hooks never firing: manifests record
+    // `${usrroot}/...` while triggers are placeholder globs.
+    let trigger = HookTrigger {
+        paths: vec!["${usrroot}/usr/share/fonts/**".to_string()],
+        dirs: Vec::new(),
+        operation: Vec::new(),
+        packages: Vec::new()
+    };
+    let modified_files =
+        vec!["${usrroot}/usr/share/fonts/TTF/example.ttf".to_string()];
+
+    assert!(trigger_matches_modified_files(
+        &trigger,
+        &modified_files,
+        &[]
+    ));
+}
+
+#[test]
+fn test_hook_placeholder_trigger_matches_absolute_file() {
+    // Old manifests may hold expanded absolute paths; placeholder triggers
+    // must still match them.
+    let trigger = HookTrigger {
+        paths: vec!["${usrroot}/usr/share/fonts/**".to_string()],
+        dirs: Vec::new(),
+        operation: Vec::new(),
+        packages: Vec::new()
+    };
+    let modified_files = vec!["/usr/share/fonts/TTF/example.ttf".to_string()];
+
+    assert!(trigger_matches_modified_files(
+        &trigger,
+        &modified_files,
+        &[]
+    ));
+}
+
+#[test]
+fn test_hook_placeholder_dir_trigger_matches() {
+    let trigger = HookTrigger {
+        paths: Vec::new(),
+        dirs: vec!["${usrroot}/usr/share/icons".to_string()],
+        operation: Vec::new(),
+        packages: Vec::new()
+    };
+    let modified_files =
+        vec!["${usrroot}/usr/share/icons/hicolor/index.theme".to_string()];
+
+    assert!(trigger_matches_modified_files(
+        &trigger,
+        &modified_files,
+        &[]
+    ));
+}
+
+#[test]
+fn test_hook_store_files_do_not_trigger_system_hooks() {
+    let trigger = HookTrigger {
+        paths: vec!["${usrroot}/usr/share/fonts/**".to_string()],
+        dirs: Vec::new(),
+        operation: Vec::new(),
+        packages: Vec::new()
+    };
+    let modified_files = vec!["${pkgstore}/share/fonts/foo.ttf".to_string()];
+
+    assert!(!trigger_matches_modified_files(
+        &trigger,
+        &modified_files,
+        &[]
+    ));
+}
+
+#[test]
 fn test_hook_loading_is_deterministic_by_name() {
     let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("tempdir should be created");
