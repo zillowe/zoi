@@ -96,6 +96,7 @@ fn run_list_outdated(
             Cell::new("Latest").add_attribute(Attribute::Bold),
             Cell::new("Repo").add_attribute(Attribute::Bold),
             Cell::new("Registry").add_attribute(Attribute::Bold),
+            Cell::new("Scope").add_attribute(Attribute::Bold),
         ]);
 
     let mut found_outdated = false;
@@ -161,6 +162,8 @@ fn run_list_outdated(
                 Cell::new(latest_display).fg(Color::Green),
                 Cell::new(manifest.repo.clone()).fg(Color::DarkGrey),
                 Cell::new(manifest.registry_handle.clone()).fg(Color::DarkGrey),
+                Cell::new(format!("{:?}", manifest.scope).to_lowercase())
+                    .fg(Color::DarkGrey),
             ]);
             found_outdated = true;
         }
@@ -210,9 +213,13 @@ fn run_list_installed(
             Cell::new("Repo").add_attribute(Attribute::Bold),
             Cell::new("Registry").add_attribute(Attribute::Bold),
             Cell::new("Type").add_attribute(Attribute::Bold),
+            Cell::new("Scope").add_attribute(Attribute::Bold),
         ]);
 
     let mut found_packages = false;
+    // Belt-and-braces display dedupe: legacy databases may still hold
+    // identical rows written before the NULL-safe upsert fix.
+    let mut seen_rows = HashSet::new();
 
     if !db_failed && !packages_from_db.is_empty() {
         for pkg in packages_from_db {
@@ -248,20 +255,35 @@ fn run_list_installed(
                 continue;
             }
 
-            let package_display = if let Some(sub) = &pkg.sub_package {
-                format!("{}:{}", pkg.name, sub)
-            } else {
-                pkg.name
-            };
-
             let version_display = if pkg.revision == "1" {
-                pkg.version.unwrap_or_else(|| "N/A".to_string())
+                pkg.version.as_deref().unwrap_or("N/A").to_string()
             } else {
                 format!(
                     "{}-{}",
                     pkg.version.as_deref().unwrap_or("N/A"),
                     pkg.revision
                 )
+            };
+
+            let scope_display = format!("{:?}", pkg.scope).to_lowercase();
+            let row_key = format!(
+                "{}/{}/{}/{}/{}/{}/{}",
+                pkg.registry_handle.as_deref().unwrap_or("none"),
+                pkg.repo,
+                pkg.name,
+                pkg.sub_package.as_deref().unwrap_or(""),
+                scope_display,
+                version_display,
+                pkg.revision,
+            );
+            if !seen_rows.insert(row_key) {
+                continue;
+            }
+
+            let package_display = if let Some(sub) = &pkg.sub_package {
+                format!("{}:{}", pkg.name, sub)
+            } else {
+                pkg.name
             };
 
             let repo_display = &pkg.repo;
@@ -276,6 +298,7 @@ fn run_list_installed(
                 .fg(Color::DarkGrey),
                 Cell::new(format!("{:?}", pkg.package_type))
                     .fg(Color::DarkGrey),
+                Cell::new(scope_display).fg(Color::DarkGrey),
             ]);
             found_packages = true;
         }
@@ -333,16 +356,31 @@ fn run_list_installed(
                 continue;
             }
 
-            let package_display = if let Some(sub) = pkg.sub_package {
+            let version_display = if m.revision == "1" {
+                pkg.version.clone()
+            } else {
+                format!("{}-{}", pkg.version, m.revision)
+            };
+
+            let scope_display = format!("{:?}", m.scope).to_lowercase();
+            let row_key = format!(
+                "{}/{}/{}/{}/{}/{}/{}",
+                m.registry_handle,
+                pkg.repo,
+                pkg.name,
+                pkg.sub_package.as_deref().unwrap_or(""),
+                scope_display,
+                version_display,
+                m.revision,
+            );
+            if !seen_rows.insert(row_key) {
+                continue;
+            }
+
+            let package_display = if let Some(sub) = &pkg.sub_package {
                 format!("{}:{}", pkg.name, sub)
             } else {
                 pkg.name
-            };
-
-            let version_display = if m.revision == "1" {
-                pkg.version
-            } else {
-                format!("{}-{}", pkg.version, m.revision)
             };
 
             let repo_display = &pkg.repo;
@@ -354,6 +392,7 @@ fn run_list_installed(
                 Cell::new(m.registry_handle).fg(Color::DarkGrey),
                 Cell::new(format!("{:?}", pkg.package_type))
                     .fg(Color::DarkGrey),
+                Cell::new(scope_display).fg(Color::DarkGrey),
             ]);
             found_packages = true;
         }

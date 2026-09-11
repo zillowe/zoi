@@ -213,6 +213,19 @@ fn setup_schema(conn: &Connection) -> Result<()> {
             .execute("ALTER TABLE packages ADD COLUMN archive_hash TEXT", []);
     }
 
+    // Heal legacy duplicate rows. The previous INSERT ... ON CONFLICT upsert
+    // could never match rows with NULL sub_package/scope/registry (SQLite
+    // treats NULLs as distinct in UNIQUE constraints), so repeated installs
+    // and upgrades piled up identical rows. GROUP BY treats NULLs as equal,
+    // which is the intended identity semantics; keep the newest row.
+    conn.execute(
+        "DELETE FROM packages WHERE id NOT IN (
+            SELECT MAX(id) FROM packages
+            GROUP BY name, sub_package, repo, scope, registry
+        )",
+        []
+    )?;
+
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_packages_name ON packages(name)",
         []
@@ -438,23 +451,51 @@ pub fn update_package(
         String::new()
     };
 
+    // NULL-safe upsert in application logic. SQLite UNIQUE constraints treat
+    // NULL as distinct, so ON CONFLICT(name, sub_package, repo, scope,
+    // registry) can never match the common case of a NULL sub_package -
+    // every reinstall would pile up another identical row (the duplicated
+    // `zoi list` entries). `IS` comparisons match NULLs as equal instead.
+    // An UPDATE (rather than DELETE + INSERT) preserves the row id and its
+    // indexed files.
+    let existing: Option<i64> = conn
+        .query_row(
+            "SELECT id FROM packages WHERE name = ?1 AND sub_package IS ?2 \
+             AND repo = ?3 AND scope IS ?4 AND registry IS ?5",
+            params![pkg.name, sub_package, pkg.repo, scope_str, registry],
+            |row| row.get(0)
+        )
+        .ok();
+
+    if let Some(row_id) = existing {
+        conn.execute(
+            "UPDATE packages SET version = ?1, epoch = ?2, description = ?3, \
+             package_type = ?4, tags = ?5, bins = ?6, license = ?7, reason = \
+             COALESCE(?8, reason), dependencies = ?9, revision = ?10 WHERE id \
+             = ?11",
+            params![
+                pkg.version,
+                pkg.epoch,
+                pkg.description,
+                pkg_type,
+                tags_json,
+                bins_json,
+                pkg.license,
+                reason_str,
+                deps_json,
+                pkg.revision,
+                row_id,
+            ]
+        )?;
+        return Ok(row_id);
+    }
+
     conn.execute(
         "INSERT INTO packages (name, sub_package, repo, version, epoch, \
          description, package_type, tags, bins, license, registry, scope, \
          reason, dependencies, revision)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, \
-         ?15)
-         ON CONFLICT(name, sub_package, repo, scope, registry) DO UPDATE SET
-            version = excluded.version,
-            epoch = excluded.epoch,
-            description = excluded.description,
-            package_type = excluded.package_type,
-            tags = excluded.tags,
-            bins = excluded.bins,
-            license = excluded.license,
-            reason = COALESCE(excluded.reason, packages.reason),
-            dependencies = excluded.dependencies,
-            revision = excluded.revision",
+         ?15)",
         params![
             pkg.name,
             sub_package,
@@ -474,15 +515,7 @@ pub fn update_package(
         ]
     )?;
 
-    let row_id = conn.query_row(
-        "SELECT id FROM packages WHERE name = ?1 AND (sub_package IS ?2) AND \
-         repo = ?3 AND (scope IS ?4 OR (scope IS NULL AND ?4 IS NULL)) AND \
-         (registry IS ?5)",
-        params![pkg.name, sub_package, pkg.repo, scope_str, registry],
-        |row| row.get(0)
-    )?;
-
-    Ok(row_id)
+    Ok(conn.last_insert_rowid())
 }
 
 /// Retrieves the internal database ID for a package.
@@ -498,8 +531,8 @@ pub fn get_package_id(
     registry: &str
 ) -> Result<i64> {
     let id = conn.query_row(
-        "SELECT id FROM packages WHERE name = ?1 AND (sub_package IS ?2) AND \
-         repo = ?3 AND registry = ?4",
+        "SELECT id FROM packages WHERE name = ?1 AND sub_package IS ?2 AND \
+         repo = ?3 AND registry IS ?4",
         params![name, sub_package, repo, registry],
         |row| row.get(0)
     )?;
@@ -914,9 +947,11 @@ pub fn delete_package(
     scope: Option<types::Scope>
 ) -> Result<()> {
     let scope_str = scope.map(|s| format!("{s:?}").to_lowercase());
+    // `IS` already matches NULLs as equal; the old `OR scope IS NULL`
+    // deleted NULL-scope rows on every scoped uninstall.
     conn.execute(
-        "DELETE FROM packages WHERE name = ?1 AND (sub_package IS ?2) AND \
-         repo = ?3 AND (scope IS ?4 OR scope IS NULL)",
+        "DELETE FROM packages WHERE name = ?1 AND sub_package IS ?2 AND repo \
+         = ?3 AND scope IS ?4",
         params![name, sub_package, repo, scope_str]
     )?;
     Ok(())
