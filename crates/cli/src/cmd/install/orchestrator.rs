@@ -400,14 +400,32 @@ impl<'a> Orchestrator<'a> {
                     &config
                 );
                 if !options.plan_json {
+                    // With --deps-only the direct package is intentionally
+                    // skipped while its dependencies are still installed, so
+                    // the update hint would only mislead.
+                    let is_direct = matches!(
+                        node.reason,
+                        types::InstallReason::Direct
+                    );
                     if already_at_target {
                         let full_spec =
                             format!("{}@{}", display_name, node.version);
-                        println!(
-                            "{} Package '{}' is already installed. Skipping.",
-                            "::".bold().green(),
-                            full_spec.cyan()
-                        );
+                        if options.deps_only && is_direct {
+                            println!(
+                                "{} Package '{}' is already installed. \
+                                 Installing its dependencies only \
+                                 (--deps-only).",
+                                "::".bold().green(),
+                                full_spec.cyan()
+                            );
+                        } else {
+                            println!(
+                                "{} Package '{}' is already installed. \
+                                 Skipping.",
+                                "::".bold().green(),
+                                full_spec.cyan()
+                            );
+                        }
                     } else {
                         let current_version = installed
                             .first()
@@ -427,11 +445,13 @@ impl<'a> Orchestrator<'a> {
                             available_spec.cyan()
                         );
                     }
-                    println!(
-                        "   {} To update it, run: {}",
-                        "Hint:".bold().blue(),
-                        format!("zoi update {}", node.pkg.name).italic()
-                    );
+                    if !(options.deps_only && is_direct) {
+                        println!(
+                            "   {} To update it, run: {}",
+                            "Hint:".bold().blue(),
+                            format!("zoi update {}", node.pkg.name).italic()
+                        );
+                    }
                 }
                 to_remove.push(pkg_id.clone());
             }
