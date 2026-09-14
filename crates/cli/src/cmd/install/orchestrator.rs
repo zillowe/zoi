@@ -65,6 +65,52 @@ pub struct Orchestrator<'a> {
     options: InstallOptions<'a>
 }
 
+/// Keeps only the external dependencies still required after pruning
+/// already-installed nodes.
+///
+/// A dependency survives when it is requested directly as a source or is
+/// declared by a surviving graph node. With `--deps-only`, dependencies of
+/// skipped (already-installed) nodes survive as well, because the caller
+/// explicitly wants dependencies installed even when the direct package is
+/// already present.
+fn filter_relevant_non_zoi_deps(
+    non_zoi_deps: Vec<String>,
+    sources_to_process: &[String],
+    graph: &resolver::DependencyGraph,
+    skipped_dep_strings: &[String],
+    deps_only: bool
+) -> Vec<String> {
+    fn insert_external(
+        valid: &mut HashSet<String>,
+        dep_strings: impl IntoIterator<Item = impl AsRef<str>>
+    ) {
+        for dep_str in dep_strings {
+            if let Ok(dep) = zoi_deps::parse_dependency_string(dep_str.as_ref())
+                && dep.manager != "zoi"
+            {
+                valid.insert(dep_str.as_ref().to_string());
+            }
+        }
+    }
+
+    let mut valid_non_zoi_deps = HashSet::new();
+    insert_external(&mut valid_non_zoi_deps, sources_to_process);
+    insert_external(
+        &mut valid_non_zoi_deps,
+        graph
+            .nodes
+            .values()
+            .flat_map(|node| node.dependencies.clone())
+    );
+    if deps_only {
+        insert_external(&mut valid_non_zoi_deps, skipped_dep_strings);
+    }
+    non_zoi_deps
+        .into_iter()
+        .filter(|dep| valid_non_zoi_deps.contains(dep))
+        .collect()
+}
+
 impl<'a> Orchestrator<'a> {
     /// Creates a new orchestrator with the given options.
     pub fn new(options: InstallOptions<'a>) -> Self {
@@ -391,6 +437,19 @@ impl<'a> Orchestrator<'a> {
             }
             skipped_existing_count = to_remove.len();
 
+            // Snapshot the dependency lists of skipped nodes before removal:
+            // with --deps-only the caller explicitly wants dependencies
+            // installed even when the direct package is already present.
+            let skipped_dep_strings: Vec<String> = if options.deps_only {
+                to_remove
+                    .iter()
+                    .filter_map(|id| graph.nodes.get(id))
+                    .flat_map(|node| node.dependencies.clone())
+                    .collect()
+            } else {
+                Vec::new()
+            };
+
             for pkg_id in to_remove {
                 graph.nodes.remove(&pkg_id);
                 if let Some(children) = graph.adj.remove(&pkg_id)
@@ -405,24 +464,13 @@ impl<'a> Orchestrator<'a> {
                 }
             }
 
-            let mut valid_non_zoi_deps = std::collections::HashSet::new();
-            for source in &sources_to_process {
-                if let Ok(dep) = zoi_deps::parse_dependency_string(source)
-                    && dep.manager != "zoi"
-                {
-                    valid_non_zoi_deps.insert(source.clone());
-                }
-            }
-            for node in graph.nodes.values() {
-                for dep in &node.dependencies {
-                    if let Ok(dep_req) = zoi_deps::parse_dependency_string(dep)
-                        && dep_req.manager != "zoi"
-                    {
-                        valid_non_zoi_deps.insert(dep.clone());
-                    }
-                }
-            }
-            non_zoi_deps.retain(|dep| valid_non_zoi_deps.contains(dep));
+            non_zoi_deps = filter_relevant_non_zoi_deps(
+                non_zoi_deps,
+                &sources_to_process,
+                &graph,
+                &skipped_dep_strings,
+                options.deps_only
+            );
         }
 
         if graph.nodes.is_empty() && non_zoi_deps.is_empty() {
@@ -830,6 +878,34 @@ impl<'a> Orchestrator<'a> {
             return Ok(());
         }
 
+        // Pre-install external (non-zoi) dependencies through their own
+        // package managers, mirroring `update.rs`. Without this they would be
+        // listed in the plan but never installed, which is exactly what made
+        // `--deps-only` a silent no-op.
+        if !non_zoi_deps.is_empty() {
+            println!(
+                "\n{} Installing external dependencies...",
+                "::".bold().blue()
+            );
+            let m_ext = MultiProgress::new();
+            let processed_deps = Mutex::new(HashSet::new());
+            let mut installed_deps_ext = Vec::new();
+            for dep_str in &non_zoi_deps {
+                let dep =
+                    crate::pkg::dependencies::parse_dependency_string(dep_str)?;
+                crate::pkg::install::dep_install::install_dependency(
+                    &dep,
+                    "install",
+                    scope_override.unwrap_or_default(),
+                    yes,
+                    options.all_optional,
+                    &processed_deps,
+                    &mut installed_deps_ext,
+                    Some(&m_ext)
+                )?;
+            }
+        }
+
         let stages = graph.toposort()?;
         let transaction = Mutex::new(transaction::begin()?);
         let transaction_id = transaction
@@ -1125,5 +1201,119 @@ impl<'a> Orchestrator<'a> {
 
         println!("\n{} Installation complete!", "Success:".green().bold());
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_node(deps: Vec<String>) -> resolver::InstallNode {
+        resolver::InstallNode {
+            pkg: types::Package::default(),
+            version: "1.0.0".to_string(),
+            revision: "1".to_string(),
+            sub_package: None,
+            repo_type: "official".to_string(),
+            description: String::new(),
+            reason: types::InstallReason::Direct,
+            source: "test".to_string(),
+            registry_handle: "local".to_string(),
+            chosen_options: Vec::new(),
+            chosen_optionals: Vec::new(),
+            dependencies: deps,
+            git_sha: None
+        }
+    }
+
+    fn test_graph(
+        nodes: Vec<(&str, Vec<String>)>
+    ) -> resolver::DependencyGraph {
+        let mut graph = resolver::DependencyGraph::new();
+        for (id, deps) in nodes {
+            graph.nodes.insert(id.to_string(), test_node(deps));
+        }
+        graph
+    }
+
+    #[test]
+    fn deps_only_keeps_external_deps_of_skipped_nodes() {
+        let graph = test_graph(vec![]);
+        let kept = filter_relevant_non_zoi_deps(
+            vec!["native:git".to_string()],
+            &["@zillowe/gct".to_string()],
+            &graph,
+            &["native:git".to_string()],
+            true
+        );
+        assert_eq!(kept, vec!["native:git".to_string()]);
+    }
+
+    #[test]
+    fn default_mode_drops_external_deps_of_skipped_nodes() {
+        let graph = test_graph(vec![]);
+        let kept = filter_relevant_non_zoi_deps(
+            vec!["native:git".to_string()],
+            &["@zillowe/gct".to_string()],
+            &graph,
+            &["native:git".to_string()],
+            false
+        );
+        assert!(kept.is_empty());
+    }
+
+    #[test]
+    fn surviving_nodes_keep_their_external_deps_in_both_modes() {
+        for deps_only in [false, true] {
+            let graph = test_graph(vec![(
+                "direct",
+                vec!["pacman:go".to_string(), "zoi:helper".to_string()]
+            )]);
+            let kept = filter_relevant_non_zoi_deps(
+                vec!["pacman:go".to_string(), "native:git".to_string()],
+                &["pkg".to_string()],
+                &graph,
+                &["native:git".to_string()],
+                deps_only
+            );
+            // `pacman:go` comes from a surviving node in both modes;
+            // `native:git` only belongs to a skipped node.
+            if deps_only {
+                assert_eq!(
+                    kept,
+                    vec!["pacman:go".to_string(), "native:git".to_string()]
+                );
+            } else {
+                assert_eq!(kept, vec!["pacman:go".to_string()]);
+            }
+        }
+    }
+
+    #[test]
+    fn zoi_managed_strings_are_never_external_deps() {
+        let graph = test_graph(vec![]);
+        let kept = filter_relevant_non_zoi_deps(
+            vec!["zoi:helper".to_string()],
+            &["pkg".to_string()],
+            &graph,
+            &["zoi:helper".to_string()],
+            true
+        );
+        assert!(kept.is_empty());
+    }
+
+    #[test]
+    fn direct_external_sources_are_always_kept() {
+        let graph = test_graph(vec![]);
+        for deps_only in [false, true] {
+            let kept = filter_relevant_non_zoi_deps(
+                vec!["pacman:go".to_string()],
+                &["pacman:go".to_string()],
+                &graph,
+                &[],
+                deps_only
+            );
+            assert_eq!(kept, vec!["pacman:go".to_string()]);
+        }
     }
 }
