@@ -403,10 +403,8 @@ impl<'a> Orchestrator<'a> {
                     // With --deps-only the direct package is intentionally
                     // skipped while its dependencies are still installed, so
                     // the update hint would only mislead.
-                    let is_direct = matches!(
-                        node.reason,
-                        types::InstallReason::Direct
-                    );
+                    let is_direct =
+                        matches!(node.reason, types::InstallReason::Direct);
                     if already_at_target {
                         let full_spec =
                             format!("{}@{}", display_name, node.version);
