@@ -290,6 +290,434 @@ fn uninstall_collection(
     Ok(manifest.clone())
 }
 
+/// Finds the active installed manifest, ignoring any version pin in the
+/// request.
+///
+/// Installed manifests are only indexed under `latest/`, so a request like
+/// `package@1.2.0` must first resolve the package identity (name, repo,
+/// handle, sub-package, scope) without the version, then decide which stored
+/// version the pin refers to.
+fn find_active_manifest(
+    request: &resolve::PackageRequest,
+    scope_override: Option<types::Scope>
+) -> anyhow::Result<(types::InstallManifest, types::Scope)> {
+    let mut unversioned = resolve::PackageRequest {
+        handle: request.handle.clone(),
+        repo: request.repo.clone(),
+        name: request.name.clone(),
+        sub_package: request.sub_package.clone(),
+        version_spec: None
+    };
+    let _ = &mut unversioned;
+    find_installed_manifest(&unversioned, scope_override)
+}
+
+/// Lists every stored version of a package that has a manifest for the given
+/// sub-package.
+///
+/// Returns `(version, manifest)` pairs sorted by version ascending (semver
+/// when parseable, lexical fallback).
+fn list_stored_version_manifests(
+    package_dir: &std::path::Path,
+    sub_package: Option<&str>
+) -> Vec<(String, types::InstallManifest)> {
+    let mut out = Vec::new();
+    let Ok(entries) = fs::read_dir(package_dir) else {
+        return out;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name == "latest" || name == "dependents" {
+            continue;
+        }
+        let version_dir = entry.path();
+        if !version_dir.is_dir() {
+            continue;
+        }
+        let manifest_path =
+            local::find_store_manifest(&version_dir, sub_package);
+        let Some(manifest_path) = manifest_path else {
+            continue;
+        };
+        if let Ok(manifest) = local::read_store_manifest(&manifest_path)
+            && manifest.sub_package.as_deref() == sub_package
+        {
+            out.push((name, manifest));
+        }
+    }
+    out.sort_by(|a, b| compare_versions(&a.0, &b.0));
+    out
+}
+
+/// Searches every store directory for a specific stored version.
+///
+/// Used when the `latest` link is missing but a versioned uninstall was
+/// requested. Returns the stored manifest and its scope.
+///
+/// This is also used by the CLI to resolve `zoi uninstall package@1.2.0`
+/// when `1.2.0` is no longer the active version.
+pub fn find_stored_version_anywhere(
+    request: &resolve::PackageRequest,
+    scope_override: Option<types::Scope>
+) -> Option<(types::InstallManifest, types::Scope)> {
+    let version = request.version_spec.as_deref()?;
+    let scopes = if let Some(scope) = scope_override {
+        vec![scope]
+    } else {
+        vec![
+            types::Scope::Project,
+            types::Scope::User,
+            types::Scope::System,
+        ]
+    };
+    for scope in scopes {
+        let Ok(store_root) = local::get_store_base_dir(scope) else {
+            continue;
+        };
+        if !store_root.exists() {
+            continue;
+        }
+        let Ok(entries) = fs::read_dir(&store_root) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let package_dir = entry.path();
+            if !package_dir.is_dir() {
+                continue;
+            }
+            for (stored_version, manifest) in list_stored_version_manifests(
+                &package_dir,
+                request.sub_package.as_deref()
+            ) {
+                if stored_version != version {
+                    continue;
+                }
+                if !manifest.name.eq_ignore_ascii_case(&request.name) {
+                    continue;
+                }
+                if request.handle.as_ref().is_some_and(|handle| {
+                    !manifest.registry_handle.eq_ignore_ascii_case(handle)
+                }) {
+                    continue;
+                }
+                if request.repo.as_ref().is_some_and(|repo| {
+                    !manifest.repo.eq_ignore_ascii_case(repo)
+                }) {
+                    continue;
+                }
+                return Some((manifest, scope));
+            }
+        }
+    }
+    None
+}
+
+/// Compares two version strings with semver when possible.
+fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
+    match (
+        semver::Version::parse(a.trim_start_matches('v')),
+        semver::Version::parse(b.trim_start_matches('v'))
+    ) {
+        (Ok(va), Ok(vb)) => va.cmp(&vb),
+        _ => a.cmp(b)
+    }
+}
+
+/// Removes a non-active stored version directory without touching the active
+/// install (shims, database, lockfile).
+fn remove_stored_version_dir(
+    package_dir: &std::path::Path,
+    version: &str,
+    sub_package: Option<&str>,
+    quiet: bool
+) -> anyhow::Result<types::InstallManifest> {
+    let version_dir = package_dir.join(version);
+    let manifest_path = local::find_store_manifest(&version_dir, sub_package)
+        .ok_or_else(|| {
+        anyhow!(
+            "Version '{version}' has no install manifest in {}",
+            version_dir.display()
+        )
+    })?;
+    let manifest = local::read_store_manifest(&manifest_path)?;
+    if manifest_path.exists() {
+        fs::remove_file(&manifest_path)?;
+    }
+    let legacy_path = version_dir.join(format!(
+        "manifest{}.yaml",
+        sub_package.map_or_else(String::new, |sub| format!("-{sub}"))
+    ));
+    if legacy_path != manifest_path && legacy_path.exists() {
+        fs::remove_file(&legacy_path)?;
+    }
+    // Remove the stored source snapshot for this version as well.
+    let source_path = version_dir.join("package.pkg.lua");
+    if source_path.exists() {
+        let _ = fs::remove_file(&source_path);
+    }
+    if version_dir.exists() {
+        let is_empty =
+            fs::read_dir(&version_dir).is_ok_and(|mut e| e.next().is_none());
+        if is_empty {
+            fs::remove_dir_all(&version_dir)?;
+        } else if !quiet {
+            println!(
+                "Keeping non-empty version directory: {}",
+                version_dir.display()
+            );
+        }
+    }
+    Ok(manifest)
+}
+
+/// Loads the richest package definition available for a stored manifest.
+///
+/// Prefers the `package.pkg.lua` snapshot stored next to the manifest so the
+/// database and lockfile keep full metadata (bins, description, tags);
+/// falls back to the manifest-derived blueprint.
+fn load_stored_package(
+    version_dir: &std::path::Path,
+    manifest: &types::InstallManifest
+) -> types::Package {
+    let stored_source = version_dir.join("package.pkg.lua");
+    if stored_source.exists()
+        && let Some(path_str) = stored_source.to_str()
+        && let Ok(mut pkg) = zoi_lua::parser::parse_lua_package(
+            path_str,
+            Some(&manifest.version),
+            Some(manifest.scope),
+            true
+        )
+    {
+        pkg.repo.clone_from(&manifest.repo);
+        pkg.scope = manifest.scope;
+        pkg.registry_handle = Some(manifest.registry_handle.clone());
+        pkg.sub_package.clone_from(&manifest.sub_package);
+        return pkg;
+    }
+    let mut pkg = manifest.clone().into_package();
+    pkg.description.clone_from(&manifest.description);
+    pkg.registry_handle = Some(manifest.registry_handle.clone());
+    pkg
+}
+
+/// Re-creates binary shims for a stored manifest being re-activated.
+fn restore_version_shims(
+    manifest: &types::InstallManifest,
+    scope: types::Scope,
+    quiet: bool
+) {
+    let bins: Vec<String> = manifest.bins.clone().unwrap_or_else(|| {
+        if manifest.sub_package.is_none() {
+            vec![manifest.name.clone()]
+        } else {
+            Vec::new()
+        }
+    });
+    if bins.is_empty() {
+        return;
+    }
+    let Ok(bin_root) = get_bin_root(scope) else {
+        return;
+    };
+    if let Err(e) = fs::create_dir_all(&bin_root) {
+        if !quiet {
+            eprintln!(
+                "{} could not create bin dir {}: {}",
+                "Warning:".yellow(),
+                bin_root.display(),
+                e
+            );
+        }
+        return;
+    }
+    let Ok(zoi_exe) = std::env::current_exe() else {
+        return;
+    };
+    for bin in &bins {
+        let link_path = bin_root.join(bin);
+        if let Err(e) = core_utils::symlink_file(&zoi_exe, &link_path) {
+            if !quiet {
+                eprintln!(
+                    "{} failed to restore shim for {bin}: {}",
+                    "Warning:".yellow(),
+                    e
+                );
+            }
+        } else if !quiet {
+            println!("Restored shim for {}...", bin.cyan());
+        }
+    }
+}
+
+/// Re-creates shell completion symlinks for a stored manifest.
+fn restore_version_completions(
+    manifest: &types::InstallManifest,
+    version_dir: &std::path::Path,
+    scope: types::Scope,
+    quiet: bool
+) {
+    let Some(completions) = &manifest.completions else {
+        return;
+    };
+    for completion in completions {
+        // Current archives stage completions under `<version>/shell/<shell>/`,
+        // older ones under `<version>/data/shell/<shell>/`; try both.
+        let candidates = [
+            version_dir
+                .join("shell")
+                .join(&completion.shell)
+                .join(&completion.filename),
+            version_dir
+                .join("data")
+                .join("shell")
+                .join(&completion.shell)
+                .join(&completion.filename)
+        ];
+        let Some(store_path) = candidates.iter().find(|p| p.exists()) else {
+            if !quiet {
+                eprintln!(
+                    "{} completion source for {} not found in store, skipping.",
+                    "Warning:".yellow(),
+                    completion.filename.cyan()
+                );
+            }
+            continue;
+        };
+        let Ok(completions_root) =
+            get_completions_root(scope, &completion.shell)
+        else {
+            continue;
+        };
+        let pkg_dir = completions_root.join(&manifest.name);
+        let link_path = pkg_dir.join(&completion.filename);
+        if let Some(parent) = link_path.parent()
+            && let Err(e) = fs::create_dir_all(parent)
+            && !quiet
+        {
+            eprintln!(
+                "{} could not create completions dir {}: {}",
+                "Warning:".yellow(),
+                parent.display(),
+                e
+            );
+        }
+        #[cfg(unix)]
+        let mut link_result =
+            std::os::unix::fs::symlink(store_path, &link_path)
+                .map_err(|e| anyhow!(e.to_string()));
+        #[cfg(windows)]
+        let mut link_result =
+            std::os::windows::fs::symlink_file(store_path, &link_path)
+                .map_err(|e| anyhow!(e.to_string()));
+        // `symlink` fails if a link already exists; replace and retry once.
+        if link_result.is_err() {
+            let _ = fs::remove_file(&link_path);
+            #[cfg(unix)]
+            {
+                link_result =
+                    std::os::unix::fs::symlink(store_path, &link_path)
+                        .map_err(|e| anyhow!(e.to_string()));
+            }
+            #[cfg(windows)]
+            {
+                link_result =
+                    std::os::windows::fs::symlink_file(store_path, &link_path)
+                        .map_err(|e| anyhow!(e.to_string()));
+            }
+        }
+        if let Err(e) = link_result
+            && !quiet
+        {
+            eprintln!(
+                "{} failed to restore completion {}: {}",
+                "Warning:".yellow(),
+                completion.filename.cyan(),
+                e
+            );
+        }
+    }
+}
+
+/// Activates a previously stored version after its newer version was
+/// uninstalled.
+///
+/// This mirrors `rollback`: it only uses what is already in the store and
+/// never downloads or reinstalls from a registry. It re-points `latest`,
+/// restores shims and completions, and updates the database and lockfile so
+/// the rolled-back version becomes the recorded install.
+fn activate_stored_version(
+    package_dir: &std::path::Path,
+    scope: types::Scope,
+    version: &str,
+    manifest: &types::InstallManifest,
+    quiet: bool
+) -> anyhow::Result<()> {
+    let version_dir = package_dir.join(version);
+    // Re-point `latest` at the previous version (same helper installs use).
+    if let Err(e) =
+        core_utils::symlink_dir(&version_dir, &package_dir.join("latest"))
+    {
+        return Err(anyhow!(
+            "Failed to point 'latest' at version '{version}': {e}"
+        ));
+    }
+    // Persist through the canonical writer as well so JSON/legacy twins and
+    // symlink handling stay consistent with installs.
+    if let Err(e) = local::write_manifest(manifest)
+        && !quiet
+    {
+        eprintln!(
+            "{} failed to rewrite manifest for version '{version}': {}",
+            "Warning:".yellow(),
+            e
+        );
+    }
+    restore_version_shims(manifest, scope, quiet);
+    restore_version_completions(manifest, &version_dir, scope, quiet);
+
+    let pkg = load_stored_package(&version_dir, manifest);
+    if let Ok(conn) = db::open_connection("local")
+        && let Ok(pkg_id) = db::update_package(
+            &conn,
+            &pkg,
+            &manifest.registry_handle,
+            Some(scope),
+            manifest.sub_package.as_deref(),
+            Some(&manifest.reason)
+        )
+    {
+        let _ = db::clear_package_files(&conn, pkg_id);
+        let _ =
+            db::index_package_files(&conn, pkg_id, &manifest.installed_files);
+    }
+    if let Err(e) = recorder::record_package(
+        &pkg,
+        &manifest.reason,
+        &manifest.installed_dependencies,
+        &manifest.registry_handle,
+        &manifest.repo_type,
+        &manifest.chosen_options,
+        &manifest.chosen_optionals,
+        manifest.sub_package.as_deref()
+    ) && !quiet
+    {
+        eprintln!(
+            "{} failed to record rolled-back version '{version}': {}",
+            "Warning:".yellow(),
+            e
+        );
+    }
+    if !quiet {
+        println!(
+            "{} Activated previous version {} from the store.",
+            "::".bold().green(),
+            version.green()
+        );
+    }
+    Ok(())
+}
+
 /// Finds an installed manifest matching the given package request.
 fn find_installed_manifest(
     request: &resolve::PackageRequest,
@@ -407,7 +835,96 @@ pub fn run(
     dry_run: bool
 ) -> anyhow::Result<types::InstallManifest> {
     let request = resolve::parse_source_string(package_name)?;
-    let (manifest, scope) = find_installed_manifest(&request, scope_override)?;
+    // Resolve the package identity through the active (`latest`) manifest,
+    // ignoring any version pin. The pin is handled below against the store
+    // so `zoi uninstall package@1.2.0` works even when 1.2.0 is not the
+    // active version.
+    let (manifest, scope) = match find_active_manifest(&request, scope_override)
+    {
+        Ok(found) => found,
+        Err(active_err) => {
+            // Fallback for versioned requests when `latest` is missing or
+            // broken but the version still exists in the store.
+            if let Some(version) = request.version_spec.as_deref() {
+                if let Some(found) =
+                    find_stored_version_anywhere(&request, scope_override)
+                {
+                    found
+                } else {
+                    return Err(anyhow!(
+                        "Version '{version}' of package '{}' is not \
+                         installed. {}",
+                        request.name,
+                        active_err
+                    ));
+                }
+            } else {
+                return Err(active_err);
+            }
+        }
+    };
+    // A version pin that does not point at the active version means "remove
+    // just this stored version" - shims, database and lockfile stay on the
+    // active install.
+    if let Some(version) = request.version_spec.clone()
+        && version != manifest.version
+    {
+        let handle = manifest.registry_handle.as_str();
+        let package_dir = local::get_package_dir(
+            scope,
+            handle,
+            &manifest.repo,
+            &manifest.name
+        )?;
+        let stored = list_stored_version_manifests(
+            &package_dir,
+            manifest.sub_package.as_deref()
+        );
+        if stored.iter().any(|(v, _)| v == &version) {
+            if dry_run {
+                return Ok(manifest);
+            }
+            let dependents = local::get_dependents(&package_dir)?;
+            if !dependents.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Cannot uninstall '{}' because other packages depend on \
+                     it:\n  -{}\n\nPlease uninstall these packages first.",
+                    manifest.name,
+                    dependents.join("\n  - ")
+                ));
+            }
+            let removed = remove_stored_version_dir(
+                &package_dir,
+                &version,
+                manifest.sub_package.as_deref(),
+                quiet
+            )?;
+            if !quiet {
+                println!(
+                    "Removed stored version {} of '{}'. Active version {} is \
+                     unchanged.",
+                    version.cyan(),
+                    manifest.name.bold(),
+                    manifest.version.green()
+                );
+            }
+            return Ok(removed);
+        }
+        let available: Vec<String> =
+            stored.iter().map(|(v, _)| v.clone()).collect();
+        if available.is_empty() {
+            return Err(anyhow!(
+                "Version '{version}' of package '{}' is not installed.",
+                request.name
+            ));
+        }
+        return Err(anyhow!(
+            "Version '{version}' of package '{}' is not installed. Stored \
+             versions: {}.",
+            request.name,
+            available.join(", ")
+        ));
+    }
     let sub_package_to_uninstall = manifest.sub_package.clone();
     let registry_handle = Some(manifest.registry_handle.clone());
     let (pkg, pkg_lua_path) = load_installed_package(&manifest, yes)?;
@@ -855,7 +1372,6 @@ pub fn run(
         }
 
         if package_dir.exists() {
-            let _ = cleanup_service(&pkg.name, scope);
             let mut has_other_versions = false;
             if let Ok(entries) = fs::read_dir(&package_dir) {
                 for entry in entries.flatten() {
@@ -867,6 +1383,7 @@ pub fn run(
                 }
             }
             if !has_other_versions {
+                let _ = cleanup_service(&pkg.name, scope);
                 if !quiet {
                     println!(
                         "Removing package store: {}",
@@ -933,6 +1450,137 @@ pub fn run(
             && !quiet
         {
             eprintln!("{} post-remove hook failed: {}", "Warning:".yellow(), e);
+        }
+    }
+
+    // The active version is gone from the store. Decide between complete
+    // removal and rollback:
+    // - Pinned uninstall (`package@1.2.0`) of the active version rolls back to
+    //   the newest remaining stored version, store-only like `rollback`.
+    // - Unpinned uninstall removes the package completely, including any other
+    //   stored versions of the same (sub-)package.
+    let remaining = if package_dir.exists() {
+        list_stored_version_manifests(
+            &package_dir,
+            sub_package_to_uninstall.as_deref()
+        )
+    } else {
+        Vec::new()
+    };
+    if !remaining.is_empty() {
+        if request.version_spec.is_some() {
+            let (prev_version, prev_manifest) =
+                remaining.last().expect("remaining is not empty").clone();
+            if !quiet {
+                println!(
+                    "Version {} still available in the store. Rolling back \
+                     '{}' to {}...",
+                    prev_version.cyan(),
+                    pkg.name.bold(),
+                    prev_version.green()
+                );
+            }
+            match activate_stored_version(
+                &package_dir,
+                scope,
+                &prev_version,
+                &prev_manifest,
+                quiet
+            ) {
+                Ok(()) => {
+                    if let Ok(true) = telemetry::posthog_capture_event(
+                        "uninstall",
+                        &pkg,
+                        env!("CARGO_PKG_VERSION"),
+                        &manifest.registry_handle,
+                        None
+                    ) && !quiet
+                    {
+                        println!("{} telemetry sent", "Info:".green());
+                    }
+                    return Ok(manifest);
+                }
+                Err(e) => {
+                    if needs_escalation {
+                        eprintln!(
+                            "{} rollback activation needs root and failed \
+                             ({}); the old version stays in the store.",
+                            "Warning:".yellow(),
+                            e
+                        );
+                    } else {
+                        return Err(e);
+                    }
+                }
+            }
+        } else {
+            // Complete removal: drop every remaining stored version of this
+            // (sub-)package. Directories shared with other sub-packages are
+            // kept by `remove_stored_version_dir`.
+            for (stored_version, _) in &remaining {
+                if let Err(e) = remove_stored_version_dir(
+                    &package_dir,
+                    stored_version,
+                    sub_package_to_uninstall.as_deref(),
+                    quiet
+                ) && !quiet
+                {
+                    eprintln!(
+                        "{} failed to remove stored version \
+                         '{stored_version}': {}",
+                        "Warning:".yellow(),
+                        e
+                    );
+                }
+            }
+            if package_dir.exists() {
+                let mut has_versions = false;
+                if let Ok(entries) = fs::read_dir(&package_dir) {
+                    for entry in entries.flatten() {
+                        let name =
+                            entry.file_name().to_string_lossy().to_string();
+                        if name != "latest" && name != "dependents" {
+                            has_versions = true;
+                            break;
+                        }
+                    }
+                }
+                if !has_versions {
+                    let _ = cleanup_service(&pkg.name, scope);
+                    let latest_link = package_dir.join("latest");
+                    if latest_link.is_symlink() {
+                        let _ = fs::remove_file(&latest_link);
+                    }
+                    // Only remove the package dir when nothing but metadata
+                    // (latest link, empty dependents) is left.
+                    let mut leftovers = 0;
+                    if let Ok(entries) = fs::read_dir(&package_dir) {
+                        for entry in entries.flatten() {
+                            let name =
+                                entry.file_name().to_string_lossy().to_string();
+                            if name == "dependents" {
+                                let empty = entry
+                                    .path()
+                                    .read_dir()
+                                    .is_ok_and(|mut e| e.next().is_none());
+                                if empty {
+                                    continue;
+                                }
+                            }
+                            leftovers += 1;
+                        }
+                    }
+                    if leftovers == 0 {
+                        if !quiet {
+                            println!(
+                                "Removing package store: {}",
+                                package_dir.display()
+                            );
+                        }
+                        let _ = fs::remove_dir_all(&package_dir);
+                    }
+                }
+            }
         }
     }
 

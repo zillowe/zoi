@@ -4698,6 +4698,7 @@ dependencies = [
  "anyhow",
  "colored",
  "mlua",
+ "semver",
  "serde_json",
  "tempfile",
  "zoi-core",

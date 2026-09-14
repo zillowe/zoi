@@ -54,6 +54,36 @@ fn sample_manifest_in_scope(
     manifest
 }
 
+fn sample_manifest_version(
+    name: &str,
+    repo: &str,
+    version: &str
+) -> types::InstallManifest {
+    let mut manifest = sample_manifest(name, repo);
+    manifest.version = version.to_string();
+    manifest
+}
+
+/// Installs a versioned package directly into the store (manifest + stored
+/// source), mimicking a previous install without a registry.
+fn stage_stored_version(name: &str, repo: &str, version: &str, root: &Path) {
+    let manifest = sample_manifest_version(name, repo, version);
+    local::write_manifest(&manifest).expect("unwrap failed");
+    let source = root.join(format!("{name}-{version}.pkg.lua"));
+    write_package_source(&source, name, repo, version, None);
+    local::persist_package_source(&manifest, &source).expect("unwrap failed");
+}
+
+fn active_version(name: &str) -> String {
+    let request = resolve::parse_source_string(name).expect("unwrap failed");
+    local::find_installed_manifests_matching(&request, types::Scope::User)
+        .expect("unwrap failed")
+        .first()
+        .expect("package should be installed")
+        .version
+        .clone()
+}
+
 fn write_package_source(
     path: &Path,
     name: &str,
@@ -221,6 +251,160 @@ fn test_uninstall_explicit_source_removes_only_matching_install() {
         .expect("unwrap failed")
         .is_empty()
     );
+}
+
+#[test]
+fn test_uninstall_versioned_active_rolls_back_to_previous_stored_version() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("unwrap failed");
+    let root = tmp.path().to_path_buf();
+    ctx.set_env_var("HOME", &root);
+    common::TestContextGuard::set_sysroot(root.clone());
+
+    stage_stored_version("rollback-pkg", "core", "1.1.0", &root);
+    stage_stored_version("rollback-pkg", "core", "1.2.0", &root);
+    assert_eq!(active_version("rollback-pkg"), "1.2.0");
+
+    let removed = uninstall::run(
+        "rollback-pkg@1.2.0",
+        Some(types::Scope::User),
+        true,
+        false,
+        false
+    )
+    .expect("unwrap failed");
+    assert_eq!(removed.version, "1.2.0");
+
+    // The previous stored version is activated like a rollback.
+    assert_eq!(active_version("rollback-pkg"), "1.1.0");
+    let old_dir = local::get_package_version_dir(
+        types::Scope::User,
+        "local",
+        "core",
+        "rollback-pkg",
+        "1.2.0"
+    )
+    .expect("unwrap failed");
+    assert!(
+        !old_dir.exists(),
+        "removed version directory should be gone"
+    );
+}
+
+#[test]
+fn test_uninstall_versioned_last_version_removes_package_completely() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("unwrap failed");
+    let root = tmp.path().to_path_buf();
+    ctx.set_env_var("HOME", &root);
+    common::TestContextGuard::set_sysroot(root.clone());
+
+    stage_stored_version("lastver-pkg", "core", "1.2.0", &root);
+
+    uninstall::run(
+        "lastver-pkg@1.2.0",
+        Some(types::Scope::User),
+        true,
+        false,
+        false
+    )
+    .expect("unwrap failed");
+
+    assert!(
+        local::is_package_installed("lastver-pkg", None, types::Scope::User)
+            .expect("unwrap failed")
+            .is_none()
+    );
+}
+
+#[test]
+fn test_uninstall_non_active_version_keeps_active_install() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("unwrap failed");
+    let root = tmp.path().to_path_buf();
+    ctx.set_env_var("HOME", &root);
+    common::TestContextGuard::set_sysroot(root.clone());
+
+    stage_stored_version("multi-pkg", "core", "1.1.0", &root);
+    stage_stored_version("multi-pkg", "core", "1.2.0", &root);
+
+    let removed = uninstall::run(
+        "multi-pkg@1.1.0",
+        Some(types::Scope::User),
+        true,
+        false,
+        false
+    )
+    .expect("unwrap failed");
+    assert_eq!(removed.version, "1.1.0");
+
+    // The active install is untouched.
+    assert_eq!(active_version("multi-pkg"), "1.2.0");
+    let old_dir = local::get_package_version_dir(
+        types::Scope::User,
+        "local",
+        "core",
+        "multi-pkg",
+        "1.1.0"
+    )
+    .expect("unwrap failed");
+    assert!(
+        !old_dir.exists(),
+        "removed version directory should be gone"
+    );
+}
+
+#[test]
+fn test_uninstall_unknown_version_errors() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("unwrap failed");
+    let root = tmp.path().to_path_buf();
+    ctx.set_env_var("HOME", &root);
+    common::TestContextGuard::set_sysroot(root.clone());
+
+    stage_stored_version("pinned-pkg", "core", "1.2.0", &root);
+
+    let err = uninstall::run(
+        "pinned-pkg@9.9.9",
+        Some(types::Scope::User),
+        true,
+        false,
+        false
+    )
+    .expect_err("unwrap_err failed");
+    assert!(err.to_string().contains("9.9.9"));
+    // The installed version survives the failed removal.
+    assert_eq!(active_version("pinned-pkg"), "1.2.0");
+}
+
+#[test]
+fn test_cmd_uninstall_pinned_active_version_rolls_back() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("unwrap failed");
+    let root = tmp.path().to_path_buf();
+    ctx.set_env_var("HOME", &root);
+    common::TestContextGuard::set_sysroot(root.clone());
+
+    stage_stored_version("cli-rollback-pkg", "core", "1.1.0", &root);
+    stage_stored_version("cli-rollback-pkg", "core", "1.2.0", &root);
+
+    let plugin_manager = plugin::PluginManager::new().expect("unwrap failed");
+    cmd::uninstall::run(
+        &[String::from("cli-rollback-pkg@1.2.0")],
+        Some(InstallScope::User),
+        false,
+        false,
+        false,
+        true,
+        false,
+        Some(&plugin_manager),
+        false,
+        false,
+        false
+    )
+    .expect("unwrap failed");
+
+    assert_eq!(active_version("cli-rollback-pkg"), "1.1.0");
 }
 
 #[test]

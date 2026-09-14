@@ -62,6 +62,12 @@ pub fn run(
     let installed_packages = pkg::local::get_installed_packages()?;
 
     let mut manifests_to_uninstall: Vec<types::InstallManifest> = Vec::new();
+    // Identities (without version) the user explicitly pinned with
+    // `package@version`. Only pinned entries keep `@version` in the source
+    // passed to the uninstaller: pinned removal of the active version rolls
+    // back to the previous stored version, while unpinned removal deletes
+    // the package completely.
+    let mut version_pinned: HashSet<String> = HashSet::new();
     let mut failed_resolution = false;
 
     let expanded_names =
@@ -79,6 +85,7 @@ pub fn run(
             name,
             &installed_packages,
             &mut manifests_to_uninstall,
+            &mut version_pinned,
             scope_override,
             yes
         ) {
@@ -120,6 +127,7 @@ pub fn run(
             .then_with(|| a.registry_handle.cmp(&b.registry_handle))
             .then_with(|| a.repo.cmp(&b.repo))
             .then_with(|| a.sub_package.cmp(&b.sub_package))
+            .then_with(|| a.version.cmp(&b.version))
     });
     manifests_to_uninstall.dedup_by(|a, b| {
         a.name == b.name
@@ -127,6 +135,7 @@ pub fn run(
             && a.repo == b.repo
             && a.registry_handle == b.registry_handle
             && a.scope == b.scope
+            && a.version == b.version
     });
 
     let mut total_size_freed_bytes: u64 = 0;
@@ -179,17 +188,7 @@ pub fn run(
     if !plan_json {
         println!("Packages to remove:");
         for manifest in &manifests_to_uninstall {
-            let source_str = if let Some(sub) = &manifest.sub_package {
-                format!(
-                    "#{}@{}/{}:{}",
-                    manifest.registry_handle, manifest.repo, manifest.name, sub
-                )
-            } else {
-                format!(
-                    "#{}@{}/{}",
-                    manifest.registry_handle, manifest.repo, manifest.name
-                )
-            };
+            let source_str = uninstall_source_str(manifest, &version_pinned);
             println!("  - {source_str}");
         }
 
@@ -217,17 +216,7 @@ pub fn run(
             pkg::local::get_dependents(&package_dir)?
         );
 
-        let source = if let Some(sub) = &manifest.sub_package {
-            format!(
-                "#{}@{}/{}:{}",
-                manifest.registry_handle, manifest.repo, manifest.name, sub
-            )
-        } else {
-            format!(
-                "#{}@{}/{}",
-                manifest.registry_handle, manifest.repo, manifest.name
-            )
-        };
+        let source = uninstall_source_str(manifest, &version_pinned);
 
         if !external_dependents.is_empty() {
             dangerous.push((source.clone(), external_dependents.clone()));
@@ -265,17 +254,7 @@ pub fn run(
     if explain && !plan_json {
         let mut report = ux::ExplainReport::new("Uninstall explanation");
         for manifest in &manifests_to_uninstall {
-            let source = if let Some(sub) = &manifest.sub_package {
-                format!(
-                    "#{}@{}/{}:{}",
-                    manifest.registry_handle, manifest.repo, manifest.name, sub
-                )
-            } else {
-                format!(
-                    "#{}@{}/{}",
-                    manifest.registry_handle, manifest.repo, manifest.name
-                )
-            };
+            let source = uninstall_source_str(manifest, &version_pinned);
             report = report.item(
                 format!("{} [{}]", source, manifest.version),
                 format!("reason={:?}", manifest.reason),
@@ -377,17 +356,7 @@ pub fn run(
             pkg_val = Some(v);
         }
 
-        let source_str = if let Some(sub) = &manifest.sub_package {
-            format!(
-                "#{}@{}/{}:{}",
-                manifest.registry_handle, manifest.repo, manifest.name, sub
-            )
-        } else {
-            format!(
-                "#{}@{}/{}",
-                manifest.registry_handle, manifest.repo, manifest.name
-            )
-        };
+        let source_str = uninstall_source_str(manifest, &version_pinned);
 
         println!(
             "{} Uninstalling package '{}'...",
@@ -535,8 +504,52 @@ fn collect_external_dependents(
     external
 }
 
+/// Identity key for a manifest without the version, used to track
+/// user-pinned `package@version` requests through the removal flow.
+fn unversioned_key(manifest: &types::InstallManifest) -> String {
+    format!(
+        "{}|{}|{}|{}|{:?}",
+        manifest.name,
+        manifest.sub_package.as_deref().unwrap_or(""),
+        manifest.repo,
+        manifest.registry_handle,
+        manifest.scope
+    )
+}
+
+/// Builds the source string handed to the uninstaller.
+///
+/// `@version` is kept only for user-pinned entries: a pinned removal of the
+/// active version rolls back to the previous stored version, while an
+/// unpinned removal deletes the package completely.
+fn uninstall_source_str(
+    manifest: &types::InstallManifest,
+    version_pinned: &HashSet<String>
+) -> String {
+    let mut source = if let Some(sub) = &manifest.sub_package {
+        format!(
+            "#{}@{}/{}:{}",
+            manifest.registry_handle, manifest.repo, manifest.name, sub
+        )
+    } else {
+        format!(
+            "#{}@{}/{}",
+            manifest.registry_handle, manifest.repo, manifest.name
+        )
+    };
+    if version_pinned.contains(&unversioned_key(manifest)) {
+        use std::fmt::Write as _;
+        let _ = write!(source, "@{}", manifest.version);
+    }
+    source
+}
+
 /// Resolves a package source string and adds the matching installed manifest to
 /// the removal list.
+///
+/// A `package@version` pin resolves against the active install first and
+/// falls back to versions kept in the store, so uninstalling a non-active
+/// version works. Pinned entries are recorded in `version_pinned`.
 ///
 /// # Errors
 ///
@@ -546,6 +559,7 @@ fn resolve_and_add_manifest(
     name: &str,
     installed_packages: &[types::InstallManifest],
     manifests_to_uninstall: &mut Vec<types::InstallManifest>,
+    version_pinned: &mut HashSet<String>,
     scope_override: Option<types::Scope>,
     yes: bool
 ) -> Result<(), String> {
@@ -563,7 +577,11 @@ fn resolve_and_add_manifest(
             let sub_matches = m.sub_package == request.sub_package;
             let scope_matches =
                 scope_override.is_none_or(|scope| m.scope == scope);
-            name_matches && sub_matches && scope_matches
+            let version_matches = request
+                .version_spec
+                .as_ref()
+                .is_none_or(|version| m.version == *version);
+            name_matches && sub_matches && scope_matches && version_matches
         })
         .collect();
 
@@ -574,18 +592,36 @@ fn resolve_and_add_manifest(
         candidates.retain(|m| m.registry_handle == *handle);
     }
 
+    // A pinned version that is no longer active lives only in the store.
+    if candidates.is_empty()
+        && let Some(pinned) = request.version_spec.as_deref()
+        && let Some((stored, _)) = pkg::uninstall::find_stored_version_anywhere(
+            &request,
+            scope_override
+        )
+    {
+        debug_assert_eq!(stored.version, pinned);
+        version_pinned.insert(unversioned_key(&stored));
+        manifests_to_uninstall.push(stored);
+        return Ok(());
+    }
+
     match candidates.len() {
         0 => Err(format!("Error: Package '{name}' is not installed.")),
         1 => {
-            if let Some(first) = candidates.first()
-                && !manifests_to_uninstall.iter().any(|m| {
+            if let Some(first) = candidates.first() {
+                if request.version_spec.is_some() {
+                    version_pinned.insert(unversioned_key(first));
+                }
+                if !manifests_to_uninstall.iter().any(|m| {
                     m.name == first.name
                         && m.sub_package == first.sub_package
                         && m.repo == first.repo
                         && m.registry_handle == first.registry_handle
-                })
-            {
-                manifests_to_uninstall.push((*first).clone());
+                        && m.version == first.version
+                }) {
+                    manifests_to_uninstall.push((*first).clone());
+                }
             }
             Ok(())
         }
@@ -606,7 +642,11 @@ fn resolve_and_add_manifest(
                     && m.repo == chosen.repo
                     && m.registry_handle == chosen.registry_handle
                     && m.scope == chosen.scope
+                    && m.version == chosen.version
             }) {
+                if request.version_spec.is_some() {
+                    version_pinned.insert(unversioned_key(&chosen));
+                }
                 manifests_to_uninstall.push(chosen);
             }
             Ok(())
