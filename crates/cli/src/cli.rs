@@ -1030,7 +1030,6 @@ pub fn run() -> anyhow::Result<()> {
             None
         };
 
-        let started = std::time::Instant::now();
         let result = match command {
             Commands::GenerateCompletions { shell } => {
                 let mut cmd = Cli::command();
@@ -1419,16 +1418,11 @@ pub fn run() -> anyhow::Result<()> {
 
         match &result {
             Ok(()) => {
-                // Success-only analytics for DAU/WAU/MAU. Failures are
-                // deliberately excluded here; they go to Sentry below.
-                // Telemetry failures must never break the CLI, so the
-                // outcome is ignored.
-                let _ = zoi_telemetry::posthog_capture_command(
-                    &zoi_telemetry::CommandEvent {
-                        command: command_name.to_string(),
-                        duration_ms: started.elapsed().as_millis()
-                    }
-                );
+                // Daily active-user ping (at most one per 24h, no command
+                // identity attached). Failures are deliberately excluded
+                // here; they go to Sentry below. Telemetry failures must
+                // never break the CLI, so the outcome is ignored.
+                let _ = zoi_telemetry::posthog_capture_dau_ping();
             }
             Err(e) => {
                 zoi_telemetry::sentry_capture_error(command_name, e.as_ref());

@@ -90,7 +90,7 @@ fn test_mini_mode_is_never_tracked() {
 }
 
 #[test]
-fn test_command_event_respects_opt_in_and_mini_mode() {
+fn test_dau_ping_respects_opt_in_and_mini_mode() {
     let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
@@ -99,15 +99,10 @@ fn test_command_event_respects_opt_in_and_mini_mode() {
     ctx.set_env_var("POSTHOG_API_KEY", "");
     common::TestContextGuard::set_sysroot(root.clone());
 
-    let event = telemetry::CommandEvent {
-        command: "update".to_string(),
-        duration_ms: 42
-    };
-
     // Opted-out: silent false, no network.
-    let res = telemetry::posthog_capture_command(&event)
-        .expect("opted-out command event should not error");
-    assert!(!res, "Command event must be silent when opted-out");
+    let res = telemetry::posthog_capture_dau_ping()
+        .expect("opted-out DAU ping should not error");
+    assert!(!res, "DAU ping must be silent when opted-out");
 
     let cfg = types::Config {
         telemetry_enabled: true,
@@ -116,17 +111,17 @@ fn test_command_event_respects_opt_in_and_mini_mode() {
     config::write_user_config(&cfg).expect("unwrap failed");
 
     // Opted-in without a key: surfaces misconfiguration as an error.
-    let res = telemetry::posthog_capture_command(&event);
+    let res = telemetry::posthog_capture_dau_ping();
     assert!(
         res.is_err(),
-        "Command event without POSTHOG_API_KEY should error, got {res:?}"
+        "DAU ping without POSTHOG_API_KEY should error, got {res:?}"
     );
 
     // Mini mode never tracks, even when opted-in.
     ctx.set_env_var("ZOI_MINI_MODE", "1");
-    let res = telemetry::posthog_capture_command(&event)
+    let res = telemetry::posthog_capture_dau_ping()
         .expect("mini mode should not error");
-    assert!(!res, "zoi-mini must never send command events");
+    assert!(!res, "zoi-mini must never send DAU pings");
 }
 
 /// Runs `f` with a client-less Sentry Hub bound to the current thread.
@@ -291,7 +286,7 @@ fn test_crash_send_refuses_when_opted_out() {
 }
 
 #[test]
-fn test_command_event_throttled_to_once_per_day() {
+fn test_dau_ping_throttled_to_once_per_day() {
     let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
@@ -308,25 +303,19 @@ fn test_command_event_throttled_to_once_per_day() {
     };
     config::write_user_config(&cfg).expect("unwrap failed");
 
-    // Pretend a command event was just sent: the next call must be a silent
+    // Pretend a DAU ping was just sent: the next call must be a silent
     // skip, not a second upload.
     let ts_path = zoi_core::utils::get_user_state_dir()
         .expect("state dir should resolve")
         .join("telemetry")
-        .join("last_command_ts");
+        .join("last_dau_ts");
     std::fs::create_dir_all(ts_path.parent().expect("ts file has a parent"))
         .expect("telemetry state dir should be creatable");
-    let now_ms = u128::from(chrono::Utc::now().timestamp_millis().unsigned_abs());
+    let now_ms =
+        u128::from(chrono::Utc::now().timestamp_millis().unsigned_abs());
     std::fs::write(&ts_path, now_ms.to_string()).expect("ts should be writable");
 
-    let event = telemetry::CommandEvent {
-        command: "update".to_string(),
-        duration_ms: 1
-    };
-    let res = telemetry::posthog_capture_command(&event)
-        .expect("throttled command event should not error");
-    assert!(
-        !res,
-        "command event within 24h of the last one must be skipped"
-    );
+    let res = telemetry::posthog_capture_dau_ping()
+        .expect("throttled DAU ping should not error");
+    assert!(!res, "DAU ping within 24h of the last one must be skipped");
 }

@@ -21,7 +21,7 @@ The data we collect is strictly limited to the following fields:
 - **Event Type:** The action you performed. This can be one of the following:
   - `install`: A package was successfully installed (including packages installed as dependencies or via `update`, `exec`, or `shell -p`).
   - `uninstall`: A package was uninstalled.
-  - `command`: A CLI command completed successfully. Properties include the command name (e.g. `update`, `exec`, `shell`) and its duration in milliseconds. These events double as the daily active-user ping and are throttled to at most one per 24 hours (the send time is tracked in the user state dir): any event marks the anonymous client ID active for that period, which is what powers DAU/WAU/MAU counts.
+  - `dau`: A bare daily active-user ping carrying no command or package identity, just the anonymous client ID plus environment fields. It is sent at most once per 24 hours (the last-send time is tracked in the user state dir) and is what powers DAU/WAU/MAU counts: any ping marks the anonymous client ID active for that period.
 - **Failures:** Failed commands are reported to Sentry for error tracking (message plus error chain, tagged with the command name). They are never sent to PostHog, keeping usage analytics separate from errors. Unhandled panics are saved as local crash reports (see below).
 - **A unique, anonymous client ID:** This is a randomly generated UUID that is not tied to any of your personal information. It allows us to distinguish between usage patterns from many users versus a single power user, which helps in prioritizing features.
 - **Package Details:**

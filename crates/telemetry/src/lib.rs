@@ -6,8 +6,10 @@
 //!
 //! Backends:
 //! - `PostHog` via the official `posthog-rs` Rust SDK (blocking client) for
-//!   success-only analytics. Every event carries the anonymous client ID as
-//!   `distinct_id`, so DAU/WAU/MAU fall out of any event stream.
+//!   success-only analytics: per-action install/uninstall package events plus a
+//!   bare daily active-user ping (`dau`, no command identity). Every event
+//!   carries the anonymous client ID as `distinct_id`, so DAU/WAU/MAU fall out
+//!   of any event stream.
 //! - Sentry via the official `sentry` Rust SDK (with network transport) for
 //!   error tracking: panics via the `panic` integration plus explicit
 //!   `capture_error` calls on command failures.
@@ -470,41 +472,22 @@ pub fn posthog_capture_event(
     Ok(true)
 }
 
-/// A successful CLI command invocation, sent to `PostHog` for analytics.
+/// Minimum interval between two daily active-user pings.
 ///
-/// `PostHog` derives DAU/WAU/MAU from the `distinct_id` (the anonymous
-/// client ID) present on every event, so no separate active-user ping is
-/// needed: any command event marks the client active for that period.
-///
-/// To avoid sending an event on every single CLI invocation, command events
-/// double as a daily active-user ping and are throttled to at most one per
-/// 24 hours (see [`COMMAND_EVENT_THROTTLE_MS`]).
-#[derive(Debug)]
-pub struct CommandEvent {
-    /// Subcommand name (e.g. `"install"`, `"update"`, `"exec"`).
-    pub command: String,
-    /// Wall-clock execution time in milliseconds.
-    pub duration_ms: u128
-}
+/// One ping per day is enough for DAU/WAU/MAU - this keeps analytics chatter
+/// down instead of reporting every CLI invocation.
+const DAU_PING_THROTTLE_MS: u128 = 24 * 60 * 60 * 1000;
 
-/// Minimum interval between two `command` events.
-///
-/// Command events mark the client active for DAU purposes, so one per day is
-/// enough - this keeps analytics chatter down instead of reporting every CLI
-/// invocation.
-const COMMAND_EVENT_THROTTLE_MS: u128 = 24 * 60 * 60 * 1000;
-
-/// Returns the path of the file recording when the last `command` event was
-/// sent.
-fn get_last_command_ts_path() -> Result<std::path::PathBuf, Box<dyn Error>> {
+/// Returns the path of the file recording when the last DAU ping was sent.
+fn get_last_dau_ts_path() -> Result<std::path::PathBuf, Box<dyn Error>> {
     Ok(zoi_core::utils::get_user_state_dir()?
         .join("telemetry")
-        .join("last_command_ts"))
+        .join("last_dau_ts"))
 }
 
-/// Returns `true` when a `command` event was sent less than 24 hours ago.
-fn command_event_throttled(now_ms: u128) -> bool {
-    let last = get_last_command_ts_path()
+/// Returns `true` when a DAU ping was sent less than 24 hours ago.
+fn dau_ping_throttled(now_ms: u128) -> bool {
+    let last = get_last_dau_ts_path()
         .and_then(|p| {
             std::fs::read_to_string(&p)
                 .map_err(|e| Box::new(e) as Box<dyn Error>)
@@ -518,15 +501,13 @@ fn command_event_throttled(now_ms: u128) -> bool {
 /// 24-hour window ending at `now_ms`. A missing or unparsable timestamp
 /// means "never sent", which is never throttled.
 fn is_throttled_since(last: Option<u128>, now_ms: u128) -> bool {
-    last.is_some_and(|sent| {
-        now_ms.saturating_sub(sent) < COMMAND_EVENT_THROTTLE_MS
-    })
+    last.is_some_and(|sent| now_ms.saturating_sub(sent) < DAU_PING_THROTTLE_MS)
 }
 
-/// Records the send time of a `command` event. Best-effort: telemetry must
-/// never fail a command when the state dir is unwritable.
-fn record_command_event_sent(now_ms: u128) {
-    if let Ok(path) = get_last_command_ts_path() {
+/// Records the send time of a DAU ping. Best-effort: telemetry must never
+/// fail a command when the state dir is unwritable.
+fn record_dau_ping_sent(now_ms: u128) {
+    if let Ok(path) = get_last_dau_ts_path() {
         if let Some(dir) = path.parent() {
             fs::create_dir_all(dir).ok();
         }
@@ -561,24 +542,26 @@ fn environment_props(
     map
 }
 
-/// Captures a successful command run in `PostHog`.
+/// Sends the daily active-user ping to `PostHog`.
 ///
-/// Success-only by design: failures go to Sentry via
-/// [`sentry_capture_error`] instead, keeping analytics (usage, DAU/WAU/MAU)
-/// separate from error tracking.
+/// This is the only per-command analytics left: a bare ping carrying no
+/// command identity (no command name, no duration, no package data) - just
+/// the anonymous client ID plus environment properties. `PostHog` derives
+/// DAU/WAU/MAU from the `distinct_id`, so one ping per 24 hours is enough.
+/// Per-action analytics (install/uninstall package events) are sent
+/// separately by [`posthog_capture_event`]; failures go to Sentry via
+/// [`sentry_capture_error`] instead, keeping usage analytics separate from
+/// error tracking.
 ///
 /// Returns `Ok(false)` without touching the network when telemetry is
-/// opted-out, offline, unconfigured, running as `zoi-mini`, or when a
-/// command event was already sent within the last 24 hours (command events
-/// double as the daily active-user ping).
+/// opted-out, offline, unconfigured, running as `zoi-mini`, or when a ping
+/// was already sent within the last 24 hours.
 ///
 /// # Errors
 ///
 /// Returns an error when telemetry is enabled but misconfigured (e.g. no API
 /// key) or when delivery fails.
-pub fn posthog_capture_command(
-    event: &CommandEvent
-) -> Result<bool, Box<dyn Error>> {
+pub fn posthog_capture_dau_ping() -> Result<bool, Box<dyn Error>> {
     let config = zoi_core::config::read_config()?;
     if !config.telemetry_enabled {
         return Ok(false);
@@ -599,25 +582,20 @@ pub fn posthog_capture_command(
 
     let now_ms =
         u128::from(chrono::Utc::now().timestamp_millis().unsigned_abs());
-    if command_event_throttled(now_ms) {
+    if dau_ping_throttled(now_ms) {
         return Ok(false);
     }
 
-    let mut props = environment_props(env!("CARGO_PKG_VERSION"));
-    props.insert("command".into(), event.command.clone().into());
-    props.insert(
-        "duration_ms".into(),
-        u64::try_from(event.duration_ms).unwrap_or(u64::MAX).into()
-    );
+    let props = environment_props(env!("CARGO_PKG_VERSION"));
 
-    let mut ph_event = posthog_rs::Event::new("command", client_id.as_str());
+    let mut ph_event = posthog_rs::Event::new("dau", client_id.as_str());
     for (key, value) in props {
         let _ = ph_event.insert_prop(key, value);
     }
     client
         .capture_immediate(ph_event)
         .map_err(|e| format!("PostHog delivery failed: {e}"))?;
-    record_command_event_sent(now_ms);
+    record_dau_ping_sent(now_ms);
     Ok(true)
 }
 
@@ -668,11 +646,11 @@ pub fn shutdown_sentry() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{COMMAND_EVENT_THROTTLE_MS, is_throttled_since};
+    use super::{DAU_PING_THROTTLE_MS, is_throttled_since};
 
     #[test]
     fn throttle_window_is_24_hours() {
-        assert_eq!(COMMAND_EVENT_THROTTLE_MS, 24 * 60 * 60 * 1000);
+        assert_eq!(DAU_PING_THROTTLE_MS, 24 * 60 * 60 * 1000);
     }
 
     #[test]
@@ -690,12 +668,9 @@ mod tests {
     #[test]
     fn stale_send_is_not_throttled() {
         let now = 1_700_000_000_000;
+        assert!(!is_throttled_since(Some(now - DAU_PING_THROTTLE_MS), now));
         assert!(!is_throttled_since(
-            Some(now - COMMAND_EVENT_THROTTLE_MS),
-            now
-        ));
-        assert!(!is_throttled_since(
-            Some(now - COMMAND_EVENT_THROTTLE_MS - 1),
+            Some(now - DAU_PING_THROTTLE_MS - 1),
             now
         ));
     }
