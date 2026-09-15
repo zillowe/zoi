@@ -135,7 +135,7 @@ pub fn download_and_cache_archive(
         delta_applied = if force_redownload {
             false
         } else {
-            try_delta_upgrade_sequence(
+            match try_delta_upgrade_sequence(
                 node,
                 &archive_cache_root,
                 &cached_archive_path,
@@ -143,8 +143,18 @@ pub fn download_and_cache_archive(
                 verbose,
                 pgp_identifiers.as_deref(),
                 config.max_delta_steps
-            )
-            .unwrap_or(false)
+            ) {
+                Ok(applied) => applied,
+                Err(e) => {
+                    if verbose {
+                        println!(
+                            "{} {e}; falling back to full download.",
+                            "Warning:".yellow()
+                        );
+                    }
+                    false
+                }
+            }
         };
 
         // If the delta succeeded, `cached_archive_path` now exists and
@@ -227,39 +237,59 @@ pub fn download_and_cache_archive(
         has_pgp_identifiers
     )?;
 
-    // An embedded `manifest.sig` entry travels inside the archive itself, so
-    // it is preferred over a detached sidecar: it works even when the archive
-    // is distributed out-of-band without its `.sig`.
-    let mut embedded_verified = false;
-    if let Some(ref identifiers) = pgp_identifiers
-        && !identifiers.is_empty()
-        && !matches!(archive_filename.rsplit('.').next(), Some("zsa"))
-    {
-        let trusted_certs = pgp::get_certs_by_name_or_fingerprint(identifiers)?;
-        match try_verify_embedded_signature(&archive_path, trusted_certs) {
-            Ok(true) => {
-                if verbose {
-                    println!(
-                        "{}",
-                        "Embedded signature verified successfully.".green()
-                    );
+    // Delta-rebuilt archives skip archive-level signature re-verification,
+    // just like the whole-archive hash above. Detached `.sig` sidecars sign
+    // the publisher's original bytes, which the rebuilt tar+zstd stream
+    // differs from by design, so they can never verify; and already
+    // published deltas may carry a stale or missing embedded `manifest.sig`.
+    // Trust instead comes from the delta chain itself: the delta patch hash
+    // is mandatory, the delta signature is verified whenever trusted keys
+    // are configured, the base archive was verified at its install time,
+    // and every rebuilt pool entry is hash-verified during application.
+    if delta_applied {
+        if verbose {
+            println!(
+                "{}",
+                "Skipping archive signature re-verification for \
+                 delta-rebuilt archive (delta chain already verified)."
+                    .dimmed()
+            );
+        }
+    } else {
+        // An embedded `manifest.sig` entry travels inside the archive itself, so
+        // it is preferred over a detached sidecar: it works even when the archive
+        // is distributed out-of-band without its `.sig`.
+        let mut embedded_verified = false;
+        if let Some(ref identifiers) = pgp_identifiers
+            && !identifiers.is_empty()
+            && !matches!(archive_filename.rsplit('.').next(), Some("zsa"))
+        {
+            let trusted_certs =
+                pgp::get_certs_by_name_or_fingerprint(identifiers)?;
+            match try_verify_embedded_signature(&archive_path, trusted_certs) {
+                Ok(true) => {
+                    if verbose {
+                        println!(
+                            "{}",
+                            "Embedded signature verified successfully.".green()
+                        );
+                    }
+                    embedded_verified = true;
                 }
-                embedded_verified = true;
-            }
-            Ok(false) => {}
-            Err(e) => {
-                return Err(anyhow!(
-                    "Embedded signature verification failed: {e}"
-                ));
+                Ok(false) => {}
+                Err(e) => {
+                    return Err(anyhow!(
+                        "Embedded signature verification failed: {e}"
+                    ));
+                }
             }
         }
-    }
 
-    if !embedded_verified
-        && let Some(pgp_url) = &details.info.pgp_url
-        && let Some(ref identifiers) = pgp_identifiers
-        && !identifiers.is_empty()
-    {
+        if !embedded_verified
+            && let Some(pgp_url) = &details.info.pgp_url
+            && let Some(ref identifiers) = pgp_identifiers
+            && !identifiers.is_empty()
+        {
         let sig_path = if cached_sig_path.exists() {
             cached_sig_path.clone()
         } else {
@@ -332,6 +362,7 @@ pub fn download_and_cache_archive(
                  package"
             ));
         }
+    }
     }
 
     Ok(archive_path)
@@ -579,7 +610,9 @@ fn try_delta_upgrade_sequence(
         return Ok(false);
     }
 
-    let work_dir = tempfile::Builder::new().prefix("zoi-delta-").tempdir()?;
+    let work_dir = tempfile::Builder::new()
+        .prefix("zoi-delta-")
+        .tempdir_in(archive_cache_root)?;
     let mut current_base = base_path;
     let mut current_version = base_version.to_string();
     for (_, step_string) in &steps {
@@ -616,11 +649,32 @@ fn try_delta_upgrade_sequence(
     // - Each delta application does per-pool-entry structural verification
     // We skip the whole-archive hash check since the tar+zstd stream differs
     // from the original but the content is verified.
-    fs::rename(&current_base, target_path)?;
+    //
+    // The work dir lives inside `archive_cache_root` so this persist stays on
+    // the same filesystem. The copy fallback inside the helper covers
+    // exotic mounts; otherwise a cross-device error would be swallowed by
+    // the caller's delta fallback and surface as a confusing full `.zpa`
+    // re-download after "Delta applied successfully."
+    persist_rebuilt_archive(&current_base, target_path)?;
     if verbose {
         println!("{}", "All delta steps applied successfully.".green());
     }
     Ok(true)
+}
+
+/// Persists a delta-rebuilt archive to its final cache location.
+///
+/// Uses an atomic rename when possible, falling back to copy + remove for
+/// robustness (e.g. exotic mounts where the staging dir and the cache live
+/// on different filesystems). Without the fallback, a cross-device rename
+/// error would be swallowed by the caller's delta fallback and surface as
+/// a confusing full `.zpa` re-download after "Delta applied successfully."
+fn persist_rebuilt_archive(src: &Path, dst: &Path) -> Result<()> {
+    if fs::rename(src, dst).is_err() {
+        fs::copy(src, dst)?;
+        fs::remove_file(src).ok();
+    }
+    Ok(())
 }
 
 /// Attempts to verify an embedded `manifest.sig` entry inside a downloaded
@@ -711,7 +765,7 @@ fn validate_signature_requirements(
 
 #[cfg(test)]
 mod tests {
-    use super::validate_signature_requirements;
+    use super::{persist_rebuilt_archive, validate_signature_requirements};
 
     #[test]
     fn signature_enforcement_requires_a_signature_url() {
@@ -726,6 +780,31 @@ mod tests {
     #[test]
     fn disabled_signature_enforcement_allows_missing_metadata() {
         assert!(validate_signature_requirements(false, false, false).is_ok());
+    }
+
+    #[test]
+    fn persist_rebuilt_archive_moves_content_to_target() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let src = dir.path().join("rebuilt-1.6.3.zpa");
+        let dst = dir.path().join("zbsdiff-1.6.3-linux-amd64.zpa");
+        std::fs::write(&src, b"rebuilt-archive-bytes").expect("write src");
+        persist_rebuilt_archive(&src, &dst).expect("persist");
+        assert!(!src.exists(), "source should be moved away");
+        assert_eq!(
+            std::fs::read(&dst).expect("read dst"),
+            b"rebuilt-archive-bytes"
+        );
+    }
+
+    #[test]
+    fn persist_rebuilt_archive_overwrites_stale_target() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let src = dir.path().join("rebuilt-1.6.3.zpa");
+        let dst = dir.path().join("zbsdiff-1.6.3-linux-amd64.zpa");
+        std::fs::write(&src, b"new-bytes").expect("write src");
+        std::fs::write(&dst, b"stale-bytes").expect("write dst");
+        persist_rebuilt_archive(&src, &dst).expect("persist");
+        assert_eq!(std::fs::read(&dst).expect("read dst"), b"new-bytes");
     }
 }
 

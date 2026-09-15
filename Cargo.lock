@@ -5680,7 +5680,6 @@ dependencies = [
  "semver",
  "serde_json",
  "uuid",
- "yaml_serde",
  "zoi-audit",
  "zoi-core",
  "zoi-install",

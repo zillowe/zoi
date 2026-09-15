@@ -134,16 +134,16 @@ pub fn telemetry_enabled() -> bool {
 /// Resolves the `PostHog` project API key.
 ///
 /// Precedence: runtime `POSTHOG_API_KEY` env, then build-time
-/// `option_env!("POSTHOG_API_KEY")`.
+/// `option_env!("POSTHOG_API_KEY")`. An explicitly-set (even empty) runtime
+/// value always wins so tests and users can override a baked-in key with an
+/// empty value to mean "no key".
 pub fn resolve_posthog_key() -> String {
-    std::env::var("POSTHOG_API_KEY")
-        .ok()
-        .filter(|v| !v.trim().is_empty())
-        .unwrap_or_else(|| {
-            option_env!("POSTHOG_API_KEY")
-                .unwrap_or_default()
-                .to_string()
-        })
+    if let Ok(v) = std::env::var("POSTHOG_API_KEY") {
+        return v;
+    }
+    option_env!("POSTHOG_API_KEY")
+        .unwrap_or_default()
+        .to_string()
 }
 
 /// Resolves the `PostHog` ingest host.
@@ -164,14 +164,15 @@ pub fn resolve_posthog_host() -> String {
 /// Resolves the Sentry DSN.
 ///
 /// Precedence: runtime `SENTRY_DSN` env, then build-time
-/// `option_env!("SENTRY_DSN")`. Returns `None` when unset.
+/// `option_env!("SENTRY_DSN")`. Returns `None` when unset. Like
+/// [`resolve_posthog_key`], an explicitly-set (even empty) runtime value
+/// wins over a baked-in one.
 pub fn resolve_sentry_dsn() -> Option<String> {
-    std::env::var("SENTRY_DSN")
-        .ok()
-        .filter(|v| !v.trim().is_empty())
-        .or_else(|| {
-            option_env!("SENTRY_DSN").map(std::string::ToString::to_string)
-        })
+    if let Ok(v) = std::env::var("SENTRY_DSN") {
+        return if v.trim().is_empty() { None } else { Some(v) };
+    }
+    option_env!("SENTRY_DSN")
+        .map(std::string::ToString::to_string)
         .filter(|v| !v.trim().is_empty())
 }
 
@@ -474,12 +475,63 @@ pub fn posthog_capture_event(
 /// `PostHog` derives DAU/WAU/MAU from the `distinct_id` (the anonymous
 /// client ID) present on every event, so no separate active-user ping is
 /// needed: any command event marks the client active for that period.
+///
+/// To avoid sending an event on every single CLI invocation, command events
+/// double as a daily active-user ping and are throttled to at most one per
+/// 24 hours (see [`COMMAND_EVENT_THROTTLE_MS`]).
 #[derive(Debug)]
 pub struct CommandEvent {
     /// Subcommand name (e.g. `"install"`, `"update"`, `"exec"`).
     pub command: String,
     /// Wall-clock execution time in milliseconds.
     pub duration_ms: u128
+}
+
+/// Minimum interval between two `command` events.
+///
+/// Command events mark the client active for DAU purposes, so one per day is
+/// enough - this keeps analytics chatter down instead of reporting every CLI
+/// invocation.
+const COMMAND_EVENT_THROTTLE_MS: u128 = 24 * 60 * 60 * 1000;
+
+/// Returns the path of the file recording when the last `command` event was
+/// sent.
+fn get_last_command_ts_path() -> Result<std::path::PathBuf, Box<dyn Error>> {
+    Ok(zoi_core::utils::get_user_state_dir()?
+        .join("telemetry")
+        .join("last_command_ts"))
+}
+
+/// Returns `true` when a `command` event was sent less than 24 hours ago.
+fn command_event_throttled(now_ms: u128) -> bool {
+    let last = get_last_command_ts_path()
+        .and_then(|p| {
+            std::fs::read_to_string(&p)
+                .map_err(|e| Box::new(e) as Box<dyn Error>)
+        })
+        .ok()
+        .and_then(|s| s.trim().parse::<u128>().ok());
+    is_throttled_since(last, now_ms)
+}
+
+/// Pure throttle decision: `true` when `last` marks a send inside the
+/// 24-hour window ending at `now_ms`. A missing or unparsable timestamp
+/// means "never sent", which is never throttled.
+fn is_throttled_since(last: Option<u128>, now_ms: u128) -> bool {
+    last.is_some_and(|sent| {
+        now_ms.saturating_sub(sent) < COMMAND_EVENT_THROTTLE_MS
+    })
+}
+
+/// Records the send time of a `command` event. Best-effort: telemetry must
+/// never fail a command when the state dir is unwritable.
+fn record_command_event_sent(now_ms: u128) {
+    if let Ok(path) = get_last_command_ts_path() {
+        if let Some(dir) = path.parent() {
+            fs::create_dir_all(dir).ok();
+        }
+        fs::write(path, now_ms.to_string()).ok();
+    }
 }
 
 /// Collects the environment properties shared by analytics events.
@@ -516,7 +568,9 @@ fn environment_props(
 /// separate from error tracking.
 ///
 /// Returns `Ok(false)` without touching the network when telemetry is
-/// opted-out, offline, unconfigured, or running as `zoi-mini`.
+/// opted-out, offline, unconfigured, running as `zoi-mini`, or when a
+/// command event was already sent within the last 24 hours (command events
+/// double as the daily active-user ping).
 ///
 /// # Errors
 ///
@@ -543,6 +597,12 @@ pub fn posthog_capture_command(
         return Ok(false);
     };
 
+    let now_ms =
+        u128::from(chrono::Utc::now().timestamp_millis().unsigned_abs());
+    if command_event_throttled(now_ms) {
+        return Ok(false);
+    }
+
     let mut props = environment_props(env!("CARGO_PKG_VERSION"));
     props.insert("command".into(), event.command.clone().into());
     props.insert(
@@ -557,6 +617,7 @@ pub fn posthog_capture_command(
     client
         .capture_immediate(ph_event)
         .map_err(|e| format!("PostHog delivery failed: {e}"))?;
+    record_command_event_sent(now_ms);
     Ok(true)
 }
 
@@ -603,4 +664,49 @@ pub fn shutdown_sentry() -> bool {
     sentry::Hub::current().client().is_some_and(|client| {
         client.close(Some(std::time::Duration::from_secs(2)))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{COMMAND_EVENT_THROTTLE_MS, is_throttled_since};
+
+    #[test]
+    fn throttle_window_is_24_hours() {
+        assert_eq!(COMMAND_EVENT_THROTTLE_MS, 24 * 60 * 60 * 1000);
+    }
+
+    #[test]
+    fn missing_timestamp_is_never_throttled() {
+        assert!(!is_throttled_since(None, 1_700_000_000_000));
+    }
+
+    #[test]
+    fn recent_send_is_throttled() {
+        let now = 1_700_000_000_000;
+        assert!(is_throttled_since(Some(now - 1_000), now));
+        assert!(is_throttled_since(Some(now), now));
+    }
+
+    #[test]
+    fn stale_send_is_not_throttled() {
+        let now = 1_700_000_000_000;
+        assert!(!is_throttled_since(
+            Some(now - COMMAND_EVENT_THROTTLE_MS),
+            now
+        ));
+        assert!(!is_throttled_since(
+            Some(now - COMMAND_EVENT_THROTTLE_MS - 1),
+            now
+        ));
+    }
+
+    #[test]
+    fn future_timestamp_is_throttled() {
+        // Clock skew between the write and the read must not cause a send
+        // storm: a timestamp ahead of now saturates to zero elapsed.
+        assert!(is_throttled_since(
+            Some(1_700_000_000_001),
+            1_700_000_000_000
+        ));
+    }
 }
