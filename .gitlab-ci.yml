@@ -7,6 +7,7 @@ variables:
   DS_ENFORCE_NEW_ANALYZER: "true"
   CARGO_INCREMENTAL: "0"
   RUST_BACKTRACE: "1"
+  SENTRY_ENVIRONMENT: "ci"
 
 stages:
   - test
@@ -130,6 +131,8 @@ audit:
   image: rust:latest
   tags:
     - saas-linux-large-amd64
+  variables:
+    SENTRY_ENVIRONMENT: "production"
   before_script:
     - *base_apt
   rules:
@@ -188,6 +191,8 @@ build:windows-amd64:
   tags:
     - saas-macos-medium-m1
   image: macos-15-xcode-16
+  variables:
+    SENTRY_ENVIRONMENT: "production"
   before_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     - source ~/.cargo/env
@@ -291,27 +296,27 @@ package:archive:
   rules:
     - if: $CI_COMMIT_TAG
 
-# generate_notes:
-#   stage: package
-#   image: ubuntu:latest
-#   variables:
-#     GIT_DEPTH: 0
-#     GCT_API_KEY: $GCT_API_KEY_GOOGLE
-#   before_script:
-#     - apt-get update -y && apt-get install -y curl git tar zstd grep sed gnupg coreutils
-#     - curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
-#     - export PATH="$HOME/.local/share/zoi/pkgs/bin:$PATH"
-#     - zoi sync
-#     - zoi install @zillowe/gct --yes
-#   script:
-#     - PREVIOUS_TAG=$(git describe --tags --abbrev=0 $CI_COMMIT_TAG^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
-#     - gct ai log -c "$PREVIOUS_TAG" "$CI_COMMIT_TAG" > notes.md
-#   artifacts:
-#     paths:
-#       - notes.md
-#     expire_in: 3 days
-#   rules:
-#     - if: $CI_COMMIT_TAG
+generate_notes:
+  stage: package
+  image: ubuntu:latest
+  variables:
+    GIT_DEPTH: 0
+    GCT_API_KEY: $GCT_API_KEY_GOOGLE
+  before_script:
+    - apt-get update -y && apt-get install -y curl git tar zstd grep sed gnupg coreutils
+    - curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
+    - export PATH="$HOME/.local/share/zoi/pkgs/bin:$PATH"
+    - zoi sync
+    - zoi install @zillowe/gct --yes
+  script:
+    - PREVIOUS_TAG=$(git describe --tags --abbrev=0 $CI_COMMIT_TAG^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
+    - gct ai log -c "$PREVIOUS_TAG" "$CI_COMMIT_TAG" > notes.md
+  artifacts:
+    paths:
+      - notes.md
+    expire_in: 3 days
+  rules:
+    - if: $CI_COMMIT_TAG
 
 license-report:
   stage: package
@@ -343,9 +348,32 @@ create_release:
     - if: $CI_COMMIT_TAG
   needs:
     - package:archive
-    # - generate_notes
+    - generate_notes
     - job: license-report
       artifacts: true
+
+sentry:release:
+  stage: release
+  image: ubuntu:latest
+  variables:
+    GIT_DEPTH: 0
+    SENTRY_URL: "https://de.sentry.io"
+  before_script:
+    - apt-get update -yq && apt-get install -yq git curl
+    - curl -sL https://sentry.io/get-cli/ | SENTRY_CLI_INSTALL_DIR=/usr/local/bin bash
+  script:
+    - |
+      set -euo pipefail
+      APP_VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+      COMMIT=$(git rev-parse --short=10 HEAD)
+      export SENTRY_RELEASE="zoi@${APP_VERSION}+${COMMIT}"
+      echo "Creating Sentry release $SENTRY_RELEASE..."
+      sentry-cli releases new "$SENTRY_RELEASE"
+      sentry-cli releases set-commits --auto "$SENTRY_RELEASE" || echo "set-commits skipped (link the GitLab repo under Sentry Organization Settings > Integrations for automatic commit matching)"
+      sentry-cli releases finalize "$SENTRY_RELEASE"
+      sentry-cli releases deploys "$SENTRY_RELEASE" new -e production
+  rules:
+    - if: $CI_COMMIT_TAG
 
 build-docker-image:
   stage: release
@@ -357,7 +385,8 @@ build-docker-image:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker build --build-arg POSTHOG_API_KEY="$POSTHOG_API_KEY" --build-arg
       POSTHOG_API_HOST="$POSTHOG_API_HOST" --build-arg
-      ZOI_DEFAULT_REGISTRY="$ZOI_DEFAULT_REGISTRY" -t
+      SENTRY_DSN="$SENTRY_DSN" --build-arg SENTRY_ENVIRONMENT="production"
+      --build-arg ZOI_DEFAULT_REGISTRY="$ZOI_DEFAULT_REGISTRY" -t
       $CI_REGISTRY_IMAGE/zoi:$CI_COMMIT_TAG -t $CI_REGISTRY_IMAGE/zoi:latest -f
       Dockerfile .
     - docker push $CI_REGISTRY_IMAGE/zoi:$CI_COMMIT_TAG

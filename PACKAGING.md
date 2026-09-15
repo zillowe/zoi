@@ -112,6 +112,8 @@ docker build -t zoi .
 docker build \
   --build-arg POSTHOG_API_KEY="your_key" \
   --build-arg POSTHOG_API_HOST="your_host" \
+  --build-arg SENTRY_DSN="your_dsn" \
+  --build-arg SENTRY_ENVIRONMENT="production" \
   --build-arg ZOI_DEFAULT_REGISTRY="https://my-registry.com/repo.git" \
   --build-arg ZOI_AUTHORITIES_KEY_1="trusted_fingerprint" \
   -t zoi .
@@ -148,7 +150,15 @@ set this automatically.
 - **`POSTHOG_API_KEY`** & **`POSTHOG_API_HOST`**: These are used to configure
 the optional, opt-in telemetry feature. They can be set in a `.env` file at
 the root of the project or passed as build arguments to Docker.
-The `.env.example` file shows the format.
+The `.env.example` file shows the format. Runtime environment variables with
+the same names take precedence over the baked-in build-time values.
+- **`SENTRY_DSN`** & **`SENTRY_ENVIRONMENT`**: These configure the optional,
+opt-in Sentry error reporting and local crash envelopes. `SENTRY_DSN` is the
+Sentry project DSN. `SENTRY_ENVIRONMENT` is a free-form tag (`production`,
+`development`, `ci`) attached to events for filtering in the Sentry UI; it
+does not change SDK behavior. Set `development` locally, `ci` in CI, and
+`production` for releases. Like the PostHog keys, they can come from `.env`,
+Docker build args, or CI/CD variables, with runtime env winning.
 - **`ZOI_DEFAULT_REGISTRY`**: Sets the default package registry URL.
 This is used when no registry is configured by the user.
 It can be set in a `.env` file or as a build argument to Docker.

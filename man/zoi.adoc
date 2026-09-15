@@ -306,7 +306,11 @@ a detached signature (*--file*, *--sig*, and *--key* are required).
 
 *telemetry* _ACTION_::
   Manage opt-in anonymous telemetry (disabled by default). _ACTION_ is
-  one of *status*, *enable*, or *disable*.
+  one of *status*, *enable*, or *disable*. Crash reports are managed
+  under *telemetry crash*: *list* (*ls*) shows locally stored
+  `.zoicrash` files in `$XDG_STATE_HOME/zoi/crash`, *show* _FILE_
+  prints one, *send* _FILE_ uploads it to Sentry (requires opt-in),
+  and *clear* deletes all stored reports.
 
 == Package authoring
 

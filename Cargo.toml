@@ -44,7 +44,8 @@ categories = ["command-line-utilities", "development-tools"]
 lto = "thin"
 codegen-units = 1
 panic = "abort"
-strip = true
+strip = "debuginfo"
+debug = "line-tables-only"
 opt-level = 3
 
 [profile.dev]
@@ -184,6 +185,14 @@ rand = { version = "0.10.2", features = ["std", "thread_rng", "sys_rng"] }
 getrandom = "0.4.3"
 argon2 = "0.6.0"
 base64 = "0.23.1"
+posthog-rs = { version = "0.25.4", default-features = false }
+sentry = { version = "0.49.2", default-features = false, features = [
+    "backtrace",
+    "contexts",
+    "panic",
+    "transport",
+    "release-health",
+] }
 
 zoi-common = { path = "crates/common", version = "1.28.0-dev" }
 zoi-core = { path = "crates/core", version = "1.28.0-dev" }
