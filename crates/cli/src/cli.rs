@@ -617,9 +617,9 @@ enum Commands {
                             understand package popularity. Default is \
                             disabled.")]
     Telemetry {
-        /// The telemetry action to perform.
-        #[arg(value_enum)]
-        action: TelemetryAction
+        /// The telemetry subcommand to execute.
+        #[command(subcommand)]
+        command: TelemetrySubcommand
     },
 
     /// Create an application using a package template
@@ -828,14 +828,105 @@ pub enum TransactionCommands {
 }
 
 /// The available actions for telemetry.
-#[derive(clap::ValueEnum, Clone)]
-enum TelemetryAction {
+#[derive(clap::Subcommand, Clone)]
+pub enum TelemetrySubcommand {
     /// Show the current telemetry status.
     Status,
     /// Enable anonymous telemetry.
     Enable,
     /// Disable anonymous telemetry.
-    Disable
+    Disable,
+    /// Manage local crash reports (`.zoicrash` files in
+    /// `$XDG_STATE_HOME/zoi/crash`).
+    Crash {
+        /// The crash-report action to perform.
+        #[command(subcommand)]
+        command: CrashSubcommand
+    }
+}
+
+/// The available crash-report actions.
+#[derive(clap::Subcommand, Clone)]
+pub enum CrashSubcommand {
+    /// List locally stored crash reports.
+    #[command(alias = "ls")]
+    List,
+    /// Print a crash report envelope to stdout.
+    Show {
+        /// Crash report file name or full path.
+        file: PathBuf
+    },
+    /// Upload a crash report to Sentry (requires telemetry opt-in).
+    Send {
+        /// Crash report file name or full path.
+        file: PathBuf,
+        /// Skip the confirmation prompt.
+        #[arg(long)]
+        yes: bool
+    },
+    /// Delete all locally stored crash reports.
+    Clear {
+        /// Skip the confirmation prompt.
+        #[arg(long)]
+        yes: bool
+    }
+}
+
+/// Returns the analytics name for a subcommand.
+fn command_name(command: &Commands) -> &'static str {
+    match command {
+        Commands::GenerateCompletions { .. } => "generate-completions",
+        Commands::Complete { .. } => "complete",
+        Commands::Version => "version",
+        Commands::About => "about",
+        Commands::Info => "info",
+        Commands::Download { .. } => "download",
+        Commands::Sync { .. } => "sync",
+        Commands::Migrate(_) => "migrate",
+        Commands::List { .. } => "list",
+        Commands::Show { .. } => "show",
+        Commands::Pin { .. } => "pin",
+        Commands::Provides { .. } => "provides",
+        Commands::Tree { .. } => "tree",
+        Commands::Unpin { .. } => "unpin",
+        Commands::Mark { .. } => "mark",
+        Commands::Update { .. } => "update",
+        Commands::Install(_) => "install",
+        Commands::Use { .. } => "use",
+        Commands::Uninstall(_) => "uninstall",
+        Commands::Run { .. } => "run",
+        Commands::Env { .. } => "env",
+        Commands::Dev { .. } => "dev",
+        Commands::Upgrade { .. } => "upgrade",
+        Commands::Autoremove { .. } => "autoremove",
+        Commands::Why { .. } => "why",
+        Commands::Owner { .. } => "owner",
+        Commands::Files { .. } => "files",
+        Commands::History { .. } => "history",
+        Commands::Search { .. } => "search",
+        Commands::Service(_) => "service",
+        Commands::Shell { .. } => "shell",
+        Commands::Exec { .. } => "exec",
+        Commands::Clone { .. } => "clone",
+        Commands::Cache { .. } => "cache",
+        Commands::Transaction { .. } => "transaction",
+        Commands::Repo(_) => "repo",
+        Commands::Registry(_) => "registry",
+        Commands::Home(_) => "home",
+        Commands::System { .. } => "system",
+        Commands::Telemetry { .. } => "telemetry",
+        Commands::Create { .. } => "create",
+        Commands::Downgrade { .. } => "downgrade",
+        Commands::Extension(_) => "extension",
+        Commands::Rollback { .. } => "rollback",
+        Commands::Man { .. } => "man",
+        Commands::Package(_) => "package",
+        Commands::Pgp(_) => "pgp",
+        Commands::Helper(_) => "helper",
+        Commands::Doctor => "doctor",
+        Commands::Audit { .. } => "audit",
+        Commands::External(_) => "external"
+    }
 }
 
 /// The main entry point for the Zoi CLI.
@@ -873,6 +964,18 @@ pub fn run() -> anyhow::Result<()> {
     let is_offline = cli.offline || config.offline_mode;
     crate::pkg::offline::set_offline(is_offline);
 
+    // - Always installs the local panic hook so crashes land in
+    //   `$XDG_STATE_HOME/zoi/crash/*.zoicrash`.
+    // - Initializes Sentry only when opted-in with a DSN.
+    // - Prompts to upload pending crashes on interactive TTYs when opted-in,
+    //   except for telemetry-management commands: opting out (or inspecting
+    //   crashes) must never be gated behind an upload prompt for potentially
+    //   sensitive reports.
+    let prompt_pending_crashes =
+        !matches!(cli.command, Some(Commands::Telemetry { .. }));
+    let _telemetry_guards =
+        zoi_telemetry::init_telemetry(prompt_pending_crashes);
+
     let mut all_pkg_dirs = cli.pkg_dirs;
     for dir in config.pkg_dirs {
         let path = std::path::PathBuf::from(dir);
@@ -903,6 +1006,14 @@ pub fn run() -> anyhow::Result<()> {
     }
 
     if let Some(command) = cli.command {
+        let command_name = command_name(&command);
+        // Exposed to the crash reporter so panic envelopes can tag the
+        // in-flight command. Set before dispatch, cleared afterwards.
+        // SAFETY: Set at startup before worker threads do telemetry work.
+        unsafe {
+            std::env::set_var("ZOI_CRASH_COMMAND", command_name);
+        }
+
         let needs_lock = matches!(
             command,
             Commands::Install { .. }
@@ -919,6 +1030,7 @@ pub fn run() -> anyhow::Result<()> {
             None
         };
 
+        let started = std::time::Instant::now();
         let result = match command {
             Commands::GenerateCompletions { shell } => {
                 let mut cmd = Cli::command();
@@ -1187,12 +1299,31 @@ pub fn run() -> anyhow::Result<()> {
             Commands::Registry(args) => cmd::registry::run(args),
             Commands::Home(args) => cmd::home::run(args),
             Commands::System(args) => cmd::system::run(args, cli.yes),
-            Commands::Telemetry { action } => {
-                use cmd::telemetry::{TelemetryCommand, run};
-                let cmd = match action {
-                    TelemetryAction::Status => TelemetryCommand::Status,
-                    TelemetryAction::Enable => TelemetryCommand::Enable,
-                    TelemetryAction::Disable => TelemetryCommand::Disable
+            Commands::Telemetry { command } => {
+                use cmd::telemetry::{CrashCommand, TelemetryCommand, run};
+                let cmd = match command {
+                    TelemetrySubcommand::Status => TelemetryCommand::Status,
+                    TelemetrySubcommand::Enable => TelemetryCommand::Enable,
+                    TelemetrySubcommand::Disable => TelemetryCommand::Disable,
+                    TelemetrySubcommand::Crash { command } => {
+                        TelemetryCommand::Crash(match command {
+                            CrashSubcommand::List => CrashCommand::List,
+                            CrashSubcommand::Show { file } => {
+                                CrashCommand::Show { file }
+                            }
+                            CrashSubcommand::Send { file, yes } => {
+                                CrashCommand::Send {
+                                    file,
+                                    yes: yes || cli.yes
+                                }
+                            }
+                            CrashSubcommand::Clear { yes } => {
+                                CrashCommand::Clear {
+                                    yes: yes || cli.yes
+                                }
+                            }
+                        })
+                    }
                 };
                 run(cmd)
             }
@@ -1280,8 +1411,38 @@ pub fn run() -> anyhow::Result<()> {
             }
         };
 
+        // SAFETY: Paired with the `set_var` above; no telemetry worker reads
+        // this after dispatch completes.
+        unsafe {
+            std::env::remove_var("ZOI_CRASH_COMMAND");
+        }
+
+        match &result {
+            Ok(()) => {
+                // Success-only analytics for DAU/WAU/MAU. Failures are
+                // deliberately excluded here; they go to Sentry below.
+                // Telemetry failures must never break the CLI, so the
+                // outcome is ignored.
+                let _ = zoi_telemetry::posthog_capture_command(
+                    &zoi_telemetry::CommandEvent {
+                        command: command_name.to_string(),
+                        duration_ms: started.elapsed().as_millis()
+                    }
+                );
+            }
+            Err(e) => {
+                zoi_telemetry::sentry_capture_error(command_name, e.as_ref());
+            }
+        }
+
         if let Err(e) = result {
             eprintln!("Error: {e}");
+            // Flush queued Sentry events (e.g. the failure report above)
+            // before exiting: `process::exit` skips destructors, so without
+            // this the telemetry guard would never drain the transport queue.
+            // Bounded to ~2s inside `shutdown_sentry`, then the process exits
+            // regardless of delivery.
+            zoi_telemetry::shutdown_sentry();
             std::process::exit(1);
         }
     }

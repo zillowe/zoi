@@ -9,12 +9,20 @@ This page aims to be radically transparent about what we collect, why we collect
 
 ## What We Collect
 
-When you choose to enable telemetry, Zoi sends a secure, anonymous events to an EU PostHog cloud-hosted ([https://eu.i.posthog.com](https://posthog.com)) instance when you perform certain actions. The data we collect is strictly limited to the following fields:
+When you choose to enable telemetry, Zoi sends secure, anonymous events through two official Rust SDKs:
+
+- **PostHog** (`posthog-rs`, blocking client) for usage analytics, sent to an EU PostHog cloud-hosted ([`https://eu.i.posthog.com`](https://posthog.com)) instance when you perform certain actions.
+- **Sentry** (`sentry` crate with network transport) for error tracking. Failed commands are reported to Sentry automatically while opted-in (error message, cause chain, and stacktrace, tagged with the command name). Crash files you approve are uploaded the same way.
+
+Scope: telemetry applies to the main `zoi` CLI and follows the user's opt-in. The lightweight `zoi-mini` helper never sends telemetry, even when telemetry is enabled.
+
+The data we collect is strictly limited to the following fields:
 
 - **Event Type:** The action you performed. This can be one of the following:
-  - `install`: A package was successfully installed.
+  - `install`: A package was successfully installed (including packages installed as dependencies or via `update`, `exec`, or `shell -p`).
   - `uninstall`: A package was uninstalled.
-  - `exec`: A package was executed without being installed via `zoi exec`.
+  - `command`: A CLI command completed successfully. Properties include the command name (e.g. `update`, `exec`, `shell`) and its duration in milliseconds. These per-command events are what power DAU/WAU/MAU counts: any event marks the anonymous client ID active for that period.
+- **Failures:** Failed commands are reported to Sentry for error tracking (message plus error chain, tagged with the command name). They are never sent to PostHog, keeping usage analytics separate from errors. Unhandled panics are saved as local crash reports (see below).
 - **A unique, anonymous client ID:** This is a randomly generated UUID that is not tied to any of your personal information. It allows us to distinguish between usage patterns from many users versus a single power user, which helps in prioritizing features.
 - **Package Details:**
   - The `name` of the package.
@@ -37,7 +45,7 @@ When you choose to enable telemetry, Zoi sends a secure, anonymous events to an 
   - Your detected shell (e.g. `zsh`, `fish`).
   - The version of the Zoi application you are using.
 
-**We do not and will never collect any personal or identifying information.** We do not track your IP address, hostname, or any other data that is not explicitly listed above. The code that collects and sends this data is fully open-source and can be reviewed in [`crates/telemetry/src/lib.rs`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/blob/main/crates/telemetry/src/lib.rs).
+**Success analytics (PostHog) never include personal information.** We do not track your IP address, hostname, or any data not explicitly listed above. Failure reports (Sentry) are different by nature: error messages and stacktraces can inadvertently contain local file paths, so treat them as potentially sensitive. The code that collects and sends this data is fully open-source and can be reviewed in [`crates/telemetry/src/lib.rs`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/blob/main/crates/telemetry/src/lib.rs).
 
 ## Why We Collect It
 
@@ -46,7 +54,7 @@ The data we collect helps us answer important questions that guide the developme
 - Which packages are the most popular? This helps us focus our maintenance efforts on the tools that matter most to the community.
 - Which operating systems and architectures are most widely used? This informs our decisions about which platforms to prioritize for testing and binary releases.
 - Which custom registries are being used? This helps us understand how the community is extending Zoi.
-- Are there installation errors we need to address? (Note: We only track successful events, not failures.)
+- Are there errors we need to address? Failed commands send their error message, cause chain, and a stacktrace to Sentry.
 
 By understanding how Zoi is used, we can make it a better tool for everyone.
 
@@ -77,5 +85,35 @@ You can disable telemetry at any time. Zoi will immediately stop sending anonymo
 ```sh
 zoi telemetry disable
 ```
+
+## Crash Reports
+
+Zoi has a built-in crash reporter inspired by Ghostty. When Zoi panics, it saves a crash report to disk. Crash reports are saved to the `$XDG_STATE_HOME/zoi/crash` directory (default `~/.local/state/zoi/crash` on Linux). Crash reports are not automatically sent anywhere off your machine.
+
+Crash files use the `.zoicrash` extension and contain a Sentry envelope (header line, item-header line, event-payload line with panic message, backtrace, OS/arch, release, and environment). You can upload these to your own Sentry account with the SDK-backed sender or with `sentry-cli`, and any tool that reads Sentry envelopes can inspect them.
+
+If telemetry is enabled, the next time you start Zoi after a crash it will ask whether to upload each pending report. If telemetry is disabled, reports are only saved locally and you are never prompted.
+
+```sh
+# List stored crash reports
+zoi telemetry crash list
+
+# Print a report envelope to stdout
+zoi telemetry crash show <file>
+
+# Upload a report to Sentry (requires telemetry opt-in)
+zoi telemetry crash send <file>
+
+# Delete all stored reports
+zoi telemetry crash clear
+```
+
+To send a crash report to the Zoi project manually with the Sentry CLI:
+
+```sh
+SENTRY_DSN="https://c8d665d2f696aa636baa4b68ff4a44c0@o4511544490459136.ingest.de.sentry.io/4511544501600336" sentry-cli send-envelope --raw <path to crash report>
+```
+
+Warning: a crash report can contain sensitive information. The report does not purposely contain sensitive data, but it does contain a backtrace and runtime context captured at the time of the crash, which may include sensitive values depending on when the crash occurred. Review a report with `zoi telemetry crash show` before uploading it.
 
 We are grateful to everyone who chooses to opt-in. Your anonymous contributions are invaluable in helping us build a better package manager.
