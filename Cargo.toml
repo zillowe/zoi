@@ -101,7 +101,7 @@ chrono = { version = "0.4.45", default-features = false, features = [
     "std",
 ] }
 clap = { version = "4.6.7", features = ["derive", "color"] }
-clap_complete = "4.6.10"
+clap_complete = "4.6.11"
 colored = "3.1.1"
 comfy-table = "8.0.0"
 crossterm = "0.29.0"
@@ -185,7 +185,7 @@ rand = { version = "0.10.2", features = ["std", "thread_rng", "sys_rng"] }
 getrandom = "0.4.3"
 argon2 = "0.6.0"
 base64 = "0.23.1"
-posthog-rs = { version = "0.25.4", default-features = false }
+posthog-rs = { version = "0.25.5", default-features = false }
 sentry = { version = "0.49.2", default-features = false, features = [
     "backtrace",
     "contexts",
