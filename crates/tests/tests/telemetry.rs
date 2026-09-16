@@ -313,7 +313,8 @@ fn test_dau_ping_throttled_to_once_per_day() {
         .expect("telemetry state dir should be creatable");
     let now_ms =
         u128::from(chrono::Utc::now().timestamp_millis().unsigned_abs());
-    std::fs::write(&ts_path, now_ms.to_string()).expect("ts should be writable");
+    std::fs::write(&ts_path, now_ms.to_string())
+        .expect("ts should be writable");
 
     let res = telemetry::posthog_capture_dau_ping()
         .expect("throttled DAU ping should not error");

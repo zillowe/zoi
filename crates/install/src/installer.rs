@@ -250,15 +250,16 @@ pub fn download_and_cache_archive(
         if verbose {
             println!(
                 "{}",
-                "Skipping archive signature re-verification for \
-                 delta-rebuilt archive (delta chain already verified)."
+                "Skipping archive signature re-verification for delta-rebuilt \
+                 archive (delta chain already verified)."
                     .dimmed()
             );
         }
     } else {
-        // An embedded `manifest.sig` entry travels inside the archive itself, so
-        // it is preferred over a detached sidecar: it works even when the archive
-        // is distributed out-of-band without its `.sig`.
+        // An embedded `manifest.sig` entry travels inside the archive itself,
+        // so it is preferred over a detached sidecar: it works even
+        // when the archive is distributed out-of-band without its
+        // `.sig`.
         let mut embedded_verified = false;
         if let Some(ref identifiers) = pgp_identifiers
             && !identifiers.is_empty()
@@ -290,79 +291,82 @@ pub fn download_and_cache_archive(
             && let Some(ref identifiers) = pgp_identifiers
             && !identifiers.is_empty()
         {
-        let sig_path = if cached_sig_path.exists() {
-            cached_sig_path.clone()
-        } else {
-            if zoi_core::offline::is_offline() {
-                return Err(anyhow!(
-                    "Signature not found in cache and cannot download: Zoi is \
-                     in offline mode."
-                ));
-            }
-            let temp_dir =
-                tempfile::Builder::new().prefix("zoi-sig-dl-").tempdir()?;
-            let temp_sig_path = temp_dir.path().join(&sig_filename);
-            let mut last_error = None;
-            let mut downloaded = false;
-            for candidate_url in cache::mirror_candidate_urls(pgp_url) {
-                match util::download_file_with_progress(
-                    &candidate_url,
-                    &temp_sig_path,
-                    pb,
-                    None
-                ) {
-                    Ok(()) => {
-                        downloaded = true;
-                        break;
-                    }
-                    Err(e) => last_error = Some((candidate_url, e))
+            let sig_path = if cached_sig_path.exists() {
+                cached_sig_path.clone()
+            } else {
+                if zoi_core::offline::is_offline() {
+                    return Err(anyhow!(
+                        "Signature not found in cache and cannot download: \
+                         Zoi is in offline mode."
+                    ));
                 }
+                let temp_dir =
+                    tempfile::Builder::new().prefix("zoi-sig-dl-").tempdir()?;
+                let temp_sig_path = temp_dir.path().join(&sig_filename);
+                let mut last_error = None;
+                let mut downloaded = false;
+                for candidate_url in cache::mirror_candidate_urls(pgp_url) {
+                    match util::download_file_with_progress(
+                        &candidate_url,
+                        &temp_sig_path,
+                        pb,
+                        None
+                    ) {
+                        Ok(()) => {
+                            downloaded = true;
+                            break;
+                        }
+                        Err(e) => last_error = Some((candidate_url, e))
+                    }
+                }
+                if !downloaded {
+                    let (url, error) = last_error.ok_or_else(|| {
+                        anyhow!(
+                            "signature download failed but no error recorded"
+                        )
+                    })?;
+                    return Err(anyhow!(
+                        "Failed to download signature from {url}: {error}"
+                    ));
+                }
+                fs::copy(&temp_sig_path, &cached_sig_path)?;
+                cached_sig_path.clone()
+            };
+
+            if verbose {
+                println!("Verifying signature...");
             }
-            if !downloaded {
-                let (url, error) = last_error.ok_or_else(|| {
-                    anyhow!("signature download failed but no error recorded")
-                })?;
+            let trusted_certs =
+                pgp::get_certs_by_name_or_fingerprint(identifiers)?;
+            pgp::verify_detached_signature_multi_key(
+                &archive_path,
+                &sig_path,
+                trusted_certs
+            )?;
+            if verbose {
+                println!("{}", "Signature verified successfully.".green());
+            }
+        } else if !embedded_verified
+            && details.info.pgp_url.is_none()
+            && has_authorities
+        {
+            let msg = format!(
+                "Warning: Installing unsigned package '{}' from a registry \
+                 that claims to be secure.",
+                node.pkg.name
+            );
+            if let Some(p) = pb {
+                p.println(msg.yellow().to_string());
+            } else {
+                println!("{}", msg.yellow());
+            }
+            if signature_policy.is_some() {
                 return Err(anyhow!(
-                    "Failed to download signature from {url}: {error}"
+                    "Signature enforcement is active, but no PGP URL found \
+                     for package"
                 ));
             }
-            fs::copy(&temp_sig_path, &cached_sig_path)?;
-            cached_sig_path.clone()
-        };
-
-        if verbose {
-            println!("Verifying signature...");
         }
-        let trusted_certs = pgp::get_certs_by_name_or_fingerprint(identifiers)?;
-        pgp::verify_detached_signature_multi_key(
-            &archive_path,
-            &sig_path,
-            trusted_certs
-        )?;
-        if verbose {
-            println!("{}", "Signature verified successfully.".green());
-        }
-    } else if !embedded_verified
-        && details.info.pgp_url.is_none()
-        && has_authorities
-    {
-        let msg = format!(
-            "Warning: Installing unsigned package '{}' from a registry that \
-             claims to be secure.",
-            node.pkg.name
-        );
-        if let Some(p) = pb {
-            p.println(msg.yellow().to_string());
-        } else {
-            println!("{}", msg.yellow());
-        }
-        if signature_policy.is_some() {
-            return Err(anyhow!(
-                "Signature enforcement is active, but no PGP URL found for \
-                 package"
-            ));
-        }
-    }
     }
 
     Ok(archive_path)

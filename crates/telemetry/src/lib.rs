@@ -224,12 +224,16 @@ fn posthog_client() -> Option<posthog_rs::Client> {
         return None;
     }
     let host = resolve_posthog_host();
+    // Timeouts are deliberately tight: analytics are best-effort and must
+    // never stall the CLI. `capture_immediate` blocks up to the request
+    // timeout and `Client` drop blocks up to the shutdown timeout, so these
+    // two bound the worst-case per-send exit lag.
     let options = posthog_rs::ClientOptionsBuilder::default()
         .api_key(key)
         .host(host)
-        .request_timeout_seconds(4)
+        .request_timeout_seconds(2)
         .flush_at(1)
-        .shutdown_timeout_ms(4000)
+        .shutdown_timeout_ms(1000)
         .disable_geoip(true)
         .build()
         .ok()?;
@@ -249,6 +253,15 @@ fn posthog_client() -> Option<posthog_rs::Client> {
 /// name is the custom [`app_release`] value (`zoi@<version>+<commit>`, which
 /// the `sentry:release` CI job reproduces), not `sentry::release_name!`,
 /// which would resolve to this crate's name without the commit hash.
+///
+/// The exit flush is deliberately capped at 500ms (`shutdown_timeout`):
+/// dropping the guard ends the session and blocks until the transport
+/// drains, which measured ~0.85s on a trivial command with the 2s default.
+/// Telemetry must never stall the CLI, so on slow networks some session
+/// closes are dropped instead of holding the process open. Fast networks
+/// deliver well within the budget, so release health stays accurate there.
+/// (Truly backgrounding delivery past exit is impossible: process exit kills
+/// all threads, so any guaranteed delivery must complete beforehand.)
 pub fn init_sentry() -> Option<sentry::ClientInitGuard> {
     if !telemetry_enabled()
         || zoi_core::offline::is_offline()
@@ -267,6 +280,7 @@ pub fn init_sentry() -> Option<sentry::ClientInitGuard> {
             .release(app_release())
             .auto_session_tracking(true)
             .session_mode(sentry::SessionMode::Application)
+            .shutdown_timeout(std::time::Duration::from_millis(500))
     );
     Some(guard)
 }
