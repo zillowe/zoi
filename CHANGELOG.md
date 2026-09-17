@@ -4,6 +4,43 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](./INSTALL.md).
 
+## [Prod. Release 1.28.0] - 2026-09-17
+
+### ♻️ Refactor
+
+- [`08a2cbca`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/08a2cbca8ab9f4ded6df3d6cc3ed1e9cbcf99ea9) *(telemetry)* Reduce telemetry timeout and flush durations
+- [`a9cc0634`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/a9cc063481963d066257719a0e3967e43c690958) *(telemetry)* Replace command events with dedicated DAU ping
+
+### ✨ Features
+
+- [`289b8fa1`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/289b8fa19feda37cbadaf28bb28c38a867d57091) *(telemetry)* Implement durable out-of-process PostHog delivery queue
+- [`2be2dd96`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/2be2dd96a9811fd6f8cfbffb77a5b69f883baa1e) *(telemetry)* Throttle command events to once per day
+- [`06f904cc`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/06f904cc42f89a761805c928625c21b8870ca8e1) *(telemetry)* Integrate Sentry for error tracking and local crash reports
+- [`ecc95105`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/ecc95105ff827a168bb6f3da976d31d628938681) *(uninstall)* Support version-pinned uninstalls and automatic rollbacks
+
+### ➡️ Migrations
+
+- [`c16857d2`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/c16857d274a856494ac9f99962095cc3b5d94c00) Migrate install manifests from YAML to JSON
+
+### 🛡️ Dependencies
+
+- [`f2cf16b8`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/f2cf16b8accc682341e73e143753a5f1892acfbc) Update posthog-rs
+- [`531b9072`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/531b90727d69ab8502852c8372846e8c713e951d) Update zbsdiff to v1.6.3
+- [`304aa552`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/304aa55277fcf5be132900445c62234ddc9f928d) Update
+- [`3d7411b2`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/3d7411b20c6da925045ac598d1e5b6caf73a572b) Update Rust crate uuid to 1.26.1
+- [`4c7594b3`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/4c7594b30e0e50aaa16694e3d1eca8d3b2ea7fcf) Update Rust crate toml to 1.1.6
+
+### 🧹 Cleanup
+
+- [`94698697`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/94698697f461e34bd2e386140991c9fac8fd09e7) Remove zoi.yaml support completely
+
+### 🩹 Bug Fixes
+
+- [`50d8373c`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/50d8373c27343c9fd356e01fa925470266bd2bc9) Improve install message and hint handling for deps-only flag
+- [`a1cde51e`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/a1cde51e7098d4fff428c05cc8923ed7e6743ecb) *(install)* Fix silent no-op for --deps-only and install external dependencies
+- [`5f9aaabd`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/5f9aaabdbf08d57b32f8f41a29de0de62ff26a4e) *(db)* Implement null-safe package upsert and schema healing
+- [`cce2f8b7`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/cce2f8b7b77bd63e633dd22873a1e960f6278828) *(hooks)* Trigger post-transaction hooks during installation and fix placeholder matching
+
 ## [Prod. Release 1.27.2] - 2026-09-10
 
 ### ♻️ Refactor
