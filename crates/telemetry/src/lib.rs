@@ -5,11 +5,14 @@
 //! non-identifiable data and requiring explicit user opt-in.
 //!
 //! Backends:
-//! - `PostHog` via the official `posthog-rs` Rust SDK (blocking client) for
-//!   success-only analytics: per-action install/uninstall package events plus a
-//!   bare daily active-user ping (`dau`, no command identity). Every event
-//!   carries the anonymous client ID as `distinct_id`, so DAU/WAU/MAU fall out
-//!   of any event stream.
+//! - `PostHog` via the official `posthog-rs` Rust SDK for success-only
+//!   analytics: per-action install/uninstall package events plus a bare daily
+//!   active-user ping (`dau`, no command identity). Delivery is asynchronous:
+//!   producers append events to a durable disk queue (`state/telemetry/queue/`,
+//!   see [`queue`]) and spawn a detached `zoi telemetry flush` child, so the
+//!   CLI hot path never touches the network and slow networks never stall
+//!   command exit. Every event carries the anonymous client ID as
+//!   `distinct_id`, so DAU/WAU/MAU fall out of any event stream.
 //! - Sentry via the official `sentry` Rust SDK (with network transport) for
 //!   error tracking: panics via the `panic` integration plus explicit
 //!   `capture_error` calls on command failures.
@@ -25,6 +28,7 @@ use serde::Serialize;
 use uuid::Timestamp;
 
 pub mod crash;
+pub mod queue;
 
 /// Represents an anonymous telemetry event sent to `PostHog`.
 #[derive(Debug, Serialize)]
@@ -209,9 +213,13 @@ pub fn app_release() -> String {
     )
 }
 
-/// Builds a `posthog-rs` blocking client, or `None` when telemetry must stay
-/// silent (opted-out, offline, missing API key, or running as `zoi-mini`,
-/// which is never tracked).
+/// Builds a `posthog-rs` blocking client for the detached flush worker, or
+/// `None` when telemetry must stay silent (opted-out, offline, missing API
+/// key, or running as `zoi-mini`, which is never tracked).
+///
+/// Only the background flusher (`zoi telemetry flush`, see [`queue`]) builds
+/// this client: no CLI invocation waits on it, so timeouts are generous to
+/// maximize delivery odds on slow networks instead of bounding exit lag.
 fn posthog_client() -> Option<posthog_rs::Client> {
     if !telemetry_enabled()
         || zoi_core::offline::is_offline()
@@ -224,16 +232,14 @@ fn posthog_client() -> Option<posthog_rs::Client> {
         return None;
     }
     let host = resolve_posthog_host();
-    // Timeouts are deliberately tight: analytics are best-effort and must
-    // never stall the CLI. `capture_immediate` blocks up to the request
-    // timeout and `Client` drop blocks up to the shutdown timeout, so these
-    // two bound the worst-case per-send exit lag.
+    // - Generous on purpose: only the detached flusher uses this client and
+    //   nothing waits on it, so slow networks get every chance to deliver.
     let options = posthog_rs::ClientOptionsBuilder::default()
         .api_key(key)
         .host(host)
-        .request_timeout_seconds(2)
+        .request_timeout_seconds(10)
         .flush_at(1)
-        .shutdown_timeout_ms(1000)
+        .shutdown_timeout_ms(15_000)
         .disable_geoip(true)
         .build()
         .ok()?;
@@ -347,7 +353,13 @@ fn prompt_pending_crashes() {
     }
 }
 
-/// Securely captures an anonymous event and sends it via the `posthog-rs` SDK.
+/// Securely captures an anonymous event for delivery via the `posthog-rs` SDK.
+///
+/// The hot path never touches the network: the event is appended to the
+/// durable disk queue and a detached `zoi telemetry flush` child is spawned
+/// (see [`queue`]), so slow networks never stall the CLI. `Ok(true)` means
+/// accepted for delivery, not delivered; files that fail stay queued and are
+/// retried by the next flush.
 ///
 /// Privacy Guarantee:
 /// - No IP addresses, hostnames, or personal data are ever collected
@@ -356,10 +368,11 @@ fn prompt_pending_crashes() {
 ///   state directory under `telemetry/client_id`.
 /// - Telemetry is strictly opt-in. This function returns `Ok(false)`
 ///   immediately if `telemetry_enabled` is not set to `true` in the user's
-///   config, or when offline, or when no API key is configured.
+///   config. Offline commands are queued and delivered once back online.
 /// - `zoi-mini` is never tracked: this function returns `Ok(false)` for it even
 ///   when telemetry is enabled. (`zoid` follows the user's opt-in like the main
 ///   CLI.)
+/// - The detached flusher child itself never enqueues.
 ///
 /// Data collected is limited to: event type (install/uninstall), package
 /// metadata (name, version, license), and basic environment info (OS, Arch,
@@ -370,7 +383,8 @@ fn prompt_pending_crashes() {
 /// Returns an error if:
 /// - The Zoi configuration cannot be read.
 /// - The anonymous client ID cannot be ensured.
-/// - The `posthog-rs` client cannot be built or delivery fails.
+/// - No `PostHog` API key is configured.
+/// - The event cannot be appended to the delivery queue.
 pub fn posthog_capture_event(
     event_name: &str,
     pkg: &zoi_core::types::Package,
@@ -387,8 +401,16 @@ pub fn posthog_capture_event(
     if zoi_core::utils::is_mini_mode() {
         return Ok(false);
     }
+    // - The detached flusher child delivers; it must never enqueue itself.
+    if queue::is_flusher_child() {
+        return Ok(false);
+    }
 
     let client_id = ensure_client_id()?;
+
+    if resolve_posthog_key().trim().is_empty() {
+        return Err("Telemetry enabled but POSTHOG_API_KEY is not set".into());
+    }
 
     let platform = zoi_core::utils::get_platform()
         .unwrap_or_else(|_| "unknown-unknown".into());
@@ -463,26 +485,14 @@ pub fn posthog_capture_event(
         install_type: install_type.map(std::string::ToString::to_string)
     };
 
-    let Some(client) = posthog_client() else {
-        if resolve_posthog_key().trim().is_empty() {
-            return Err(
-                "Telemetry enabled but POSTHOG_API_KEY is not set".into()
-            );
-        }
-        return Ok(false);
-    };
-
     let props = serde_json::to_value(&ev)
         .map_err(|e| format!("Failed to serialize telemetry event: {e}"))?;
     let props_map = props.as_object().cloned().unwrap_or_default();
-    let mut event = posthog_rs::Event::new(event_name, client_id.as_str());
-    for (key, value) in props_map {
-        let _ = event.insert_prop(key, value);
-    }
 
-    client
-        .capture_immediate(event)
-        .map_err(|e| format!("PostHog delivery failed: {e}"))?;
+    // - Local I/O only: the detached flusher delivers after this process exits,
+    //   so even a stalled network cannot delay the command.
+    queue::enqueue(event_name, client_id.as_str(), &props_map)?;
+    queue::spawn_flusher();
     Ok(true)
 }
 
@@ -556,43 +566,39 @@ fn environment_props(
     map
 }
 
-/// Sends the daily active-user ping to `PostHog`.
+/// Queues the daily active-user ping for `PostHog` delivery.
 ///
 /// This is the only per-command analytics left: a bare ping carrying no
 /// command identity (no command name, no duration, no package data) - just
 /// the anonymous client ID plus environment properties. `PostHog` derives
 /// DAU/WAU/MAU from the `distinct_id`, so one ping per 24 hours is enough.
-/// Per-action analytics (install/uninstall package events) are sent
+/// Per-action analytics (install/uninstall package events) are queued
 /// separately by [`posthog_capture_event`]; failures go to Sentry via
 /// [`sentry_capture_error`] instead, keeping usage analytics separate from
 /// error tracking.
 ///
-/// Returns `Ok(false)` without touching the network when telemetry is
-/// opted-out, offline, unconfigured, running as `zoi-mini`, or when a ping
-/// was already sent within the last 24 hours.
+/// Returns `Ok(false)` without queueing anything when telemetry is
+/// opted-out, running as `zoi-mini`, inside the flusher child itself, or when
+/// a ping was already queued within the last 24 hours. Offline commands are
+/// queued and delivered once back online.
 ///
 /// # Errors
 ///
 /// Returns an error when telemetry is enabled but misconfigured (e.g. no API
-/// key) or when delivery fails.
+/// key) or when the ping cannot be appended to the delivery queue.
 pub fn posthog_capture_dau_ping() -> Result<bool, Box<dyn Error>> {
     let config = zoi_core::config::read_config()?;
     if !config.telemetry_enabled {
         return Ok(false);
     }
-    if zoi_core::utils::is_mini_mode() || zoi_core::offline::is_offline() {
+    if zoi_core::utils::is_mini_mode() || queue::is_flusher_child() {
         return Ok(false);
     }
 
     let client_id = ensure_client_id()?;
-    let Some(client) = posthog_client() else {
-        if resolve_posthog_key().trim().is_empty() {
-            return Err(
-                "Telemetry enabled but POSTHOG_API_KEY is not set".into()
-            );
-        }
-        return Ok(false);
-    };
+    if resolve_posthog_key().trim().is_empty() {
+        return Err("Telemetry enabled but POSTHOG_API_KEY is not set".into());
+    }
 
     let now_ms =
         u128::from(chrono::Utc::now().timestamp_millis().unsigned_abs());
@@ -602,14 +608,11 @@ pub fn posthog_capture_dau_ping() -> Result<bool, Box<dyn Error>> {
 
     let props = environment_props(env!("CARGO_PKG_VERSION"));
 
-    let mut ph_event = posthog_rs::Event::new("dau", client_id.as_str());
-    for (key, value) in props {
-        let _ = ph_event.insert_prop(key, value);
-    }
-    client
-        .capture_immediate(ph_event)
-        .map_err(|e| format!("PostHog delivery failed: {e}"))?;
+    // - Local I/O only: the detached flusher delivers after this process exits,
+    //   so even a stalled network cannot delay the command.
+    queue::enqueue("dau", client_id.as_str(), &props)?;
     record_dau_ping_sent(now_ms);
+    queue::spawn_flusher();
     Ok(true)
 }
 

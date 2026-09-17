@@ -284,7 +284,7 @@ fn uninstall_collection(
         None
     ) && !quiet
     {
-        println!("{} telemetry sent", "Info:".green());
+        println!("{} telemetry queued", "Info:".green());
     }
 
     Ok(manifest.clone())
@@ -1496,7 +1496,7 @@ pub fn run(
                         None
                     ) && !quiet
                     {
-                        println!("{} telemetry sent", "Info:".green());
+                        println!("{} telemetry queued", "Info:".green());
                     }
                     return Ok(manifest);
                 }
@@ -1616,7 +1616,7 @@ pub fn run(
         None
     ) && !quiet
     {
-        println!("{} telemetry sent", "Info:".green());
+        println!("{} telemetry queued", "Info:".green());
     }
 
     Ok(manifest)

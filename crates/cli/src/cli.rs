@@ -842,7 +842,11 @@ pub enum TelemetrySubcommand {
         /// The crash-report action to perform.
         #[command(subcommand)]
         command: CrashSubcommand
-    }
+    },
+    /// Deliver queued analytics events (internal: spawned detached after
+    /// commands that enqueue telemetry, never runs on the hot path).
+    #[command(hide = true)]
+    Flush
 }
 
 /// The available crash-report actions.
@@ -1007,6 +1011,15 @@ pub fn run() -> anyhow::Result<()> {
 
     if let Some(command) = cli.command {
         let command_name = command_name(&command);
+        // - The detached queue flusher delivers; it must never enqueue (and
+        //   re-spawn) itself. The library reentrancy guard
+        //   (`ZOI_TELEMETRY_FLUSHING`) backs this up.
+        let is_flush_command = matches!(
+            command,
+            Commands::Telemetry {
+                command: TelemetrySubcommand::Flush
+            }
+        );
         // Exposed to the crash reporter so panic envelopes can tag the
         // in-flight command. Set before dispatch, cleared afterwards.
         // SAFETY: Set at startup before worker threads do telemetry work.
@@ -1304,6 +1317,7 @@ pub fn run() -> anyhow::Result<()> {
                     TelemetrySubcommand::Status => TelemetryCommand::Status,
                     TelemetrySubcommand::Enable => TelemetryCommand::Enable,
                     TelemetrySubcommand::Disable => TelemetryCommand::Disable,
+                    TelemetrySubcommand::Flush => TelemetryCommand::Flush,
                     TelemetrySubcommand::Crash { command } => {
                         TelemetryCommand::Crash(match command {
                             CrashSubcommand::List => CrashCommand::List,
@@ -1419,10 +1433,14 @@ pub fn run() -> anyhow::Result<()> {
         match &result {
             Ok(()) => {
                 // Daily active-user ping (at most one per 24h, no command
-                // identity attached). Failures are deliberately excluded
-                // here; they go to Sentry below. Telemetry failures must
-                // never break the CLI, so the outcome is ignored.
-                let _ = zoi_telemetry::posthog_capture_dau_ping();
+                // identity attached). Queued to disk with a detached
+                // flusher, so this never blocks on the network. Failures
+                // are deliberately excluded here; they go to Sentry below.
+                // Telemetry failures must never break the CLI, so the
+                // outcome is ignored.
+                if !is_flush_command {
+                    let _ = zoi_telemetry::posthog_capture_dau_ping();
+                }
             }
             Err(e) => {
                 zoi_telemetry::sentry_capture_error(command_name, e.as_ref());

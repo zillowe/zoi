@@ -5647,6 +5647,7 @@ version = "1.28.0-dev"
 dependencies = [
  "chrono",
  "dotenvy",
+ "nix",
  "posthog-rs",
  "reqwest",
  "sentry",

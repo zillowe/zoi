@@ -39,7 +39,9 @@ pub enum TelemetryCommand {
     /// Disable telemetry.
     Disable,
     /// Manage local crash reports.
-    Crash(CrashCommand)
+    Crash(CrashCommand),
+    /// Deliver queued analytics events (internal flusher entry point).
+    Flush
 }
 
 /// Resolves a user-supplied crash file (bare name or path) against the crash
@@ -162,7 +164,14 @@ pub fn run(cmd: TelemetryCommand) -> Result<()> {
             crate::pkg::config::write_user_config(&cfg)?;
             println!("{} telemetry disabled", "Success:".green());
         }
-        TelemetryCommand::Crash(crash_cmd) => run_crash(crash_cmd)?
+        TelemetryCommand::Crash(crash_cmd) => run_crash(crash_cmd)?,
+        TelemetryCommand::Flush => {
+            let summary = crate::pkg::telemetry::queue::flush_queue();
+            println!(
+                "Telemetry flush: {} sent, {} failed, {} skipped.",
+                summary.sent, summary.failed, summary.skipped
+            );
+        }
     }
     Ok(())
 }

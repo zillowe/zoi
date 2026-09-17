@@ -40,7 +40,7 @@ pub fn send_telemetry(
         registry_handle,
         install_type
     ) {
-        Ok(true) => println!("{} telemetry sent", "Info:".green()),
+        Ok(true) => println!("{} telemetry queued", "Info:".green()),
         Ok(false) => (),
         Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e)
     }

@@ -23,6 +23,9 @@ dotenvy.workspace = true
 [lints]
 workspace = true
 
+[target.'cfg(unix)'.dependencies]
+nix.workspace = true
+
 [dependencies]
 chrono.workspace = true
 reqwest.workspace = true
