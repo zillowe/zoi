@@ -14,7 +14,7 @@ use crate::{cmd, utils};
 
 // Development, Special, Public or Production
 /// The release branch of the current build.
-const BRANCH: &str = "Development";
+const BRANCH: &str = "Production";
 /// The release status of the current build.
 const STATUS: &str = "Release";
 /// The version number of the current build.
