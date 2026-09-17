@@ -253,6 +253,7 @@ pub fn run(
     }
 }
 
+#[cfg(any(target_os = "linux", test))]
 #[allow(clippy::too_many_arguments)]
 /// Builds the argument vector passed directly to `zoi` inside Bubblewrap.
 fn build_command_args(

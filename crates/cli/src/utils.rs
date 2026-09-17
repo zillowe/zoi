@@ -366,6 +366,7 @@ pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
 ///
 /// Backslashes are escaped first so that escaping the double quotes
 /// afterwards cannot produce double-escaped sequences.
+#[cfg(any(unix, test))]
 fn elvish_quote(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
