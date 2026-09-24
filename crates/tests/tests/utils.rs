@@ -134,6 +134,71 @@ fn test_is_safe_path() {
     assert!(!zoi::utils::is_safe_path(base, Path::new("/etc/shadow")));
 }
 
+#[test]
+fn safe_join_should_reject_traversal_and_absolute_paths() {
+    let base = tempfile::tempdir().expect("temporary base should exist");
+
+    assert!(
+        zoi::utils::safe_join(base.path(), std::path::Path::new("../outside"))
+            .is_err()
+    );
+    assert!(
+        zoi::utils::safe_join(base.path(), std::path::Path::new("/outside"))
+            .is_err()
+    );
+    assert!(
+        zoi::utils::safe_join(base.path(), std::path::Path::new("nested/file"))
+            .is_ok()
+    );
+}
+
+#[test]
+fn path_components_should_reject_separators_and_parent_components() {
+    assert!(zoi::utils::validate_path_component("binary").is_ok());
+    assert!(zoi::utils::validate_path_component("../binary").is_err());
+    assert!(zoi::utils::validate_path_component("bin/child").is_err());
+    assert!(zoi::utils::validate_path_component("bin\\child").is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn read_file_within_should_reject_symlinked_targets() {
+    let base = tempfile::tempdir().expect("temporary base should exist");
+    let outside = tempfile::tempdir().expect("temporary outside should exist");
+    let outside_file = outside.path().join("secret");
+    std::fs::write(&outside_file, "secret")
+        .expect("outside file should be written");
+    std::os::unix::fs::symlink(&outside_file, base.path().join("link"))
+        .expect("link should be created");
+
+    assert!(
+        zoi::utils::read_file_within(base.path(), &base.path().join("link"))
+            .is_err()
+    );
+}
+
+#[test]
+fn placeholder_paths_should_reject_parent_components() {
+    let base = tempfile::tempdir().expect("temporary base should exist");
+
+    assert!(
+        zoi::utils::expand_placeholders(
+            "${pkgstore}/../outside",
+            base.path(),
+            zoi::pkg::types::Scope::User
+        )
+        .is_err()
+    );
+    assert!(
+        zoi::utils::expand_placeholders(
+            "../outside",
+            base.path(),
+            zoi::pkg::types::Scope::User
+        )
+        .is_err()
+    );
+}
+
 #[cfg(not(windows))]
 #[test]
 fn command_exists_should_not_interpret_shell_syntax() {

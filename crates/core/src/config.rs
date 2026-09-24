@@ -950,7 +950,7 @@ pub fn remove_added_registry(handle_or_url: &str) -> Result<()> {
 ///
 /// Returns an error if `repo.yaml` is not found or cannot be parsed.
 pub fn read_repo_config(db_path: &Path) -> Result<RepoConfig> {
-    let config_path = db_path.join("repo.yaml");
+    let config_path = crate::utils::safe_join(db_path, Path::new("repo.yaml"))?;
     if !config_path.exists() {
         return Err(anyhow!(
             "repo.yaml not found in the root of the package database."

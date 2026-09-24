@@ -1021,7 +1021,8 @@ pub fn run(
             true
         )
         .map_err(|e| anyhow!(e.to_string()))?;
-        let lua_code = fs::read_to_string(pkg_lua_path)?;
+        let lua_code =
+            core_utils::read_file_within(&version_dir, &pkg_lua_path)?;
         lua.load(&lua_code)
             .exec()
             .map_err(|e| anyhow!(e.to_string()))?;
@@ -1045,23 +1046,15 @@ pub fn run(
                 if let Ok(op_type) = op.get::<String>("op")
                     && op_type == "zrm"
                 {
-                    let mut path_to_remove: String =
+                    let path_to_remove: String =
                         op.get("path").map_err(|e| anyhow!(e.to_string()))?;
-
-                    path_to_remove = path_to_remove
-                        .replace("${pkgstore}", &version_dir.to_string_lossy());
-
-                    if let Some(home_dir) = core_utils::get_user_home() {
-                        path_to_remove = path_to_remove
-                            .replace("${usrhome}", &home_dir.to_string_lossy());
-                    }
-                    path_to_remove = path_to_remove.replace(
-                        "${usrroot}",
-                        &sysroot::apply_sysroot(PathBuf::from("/"))
-                            .to_string_lossy()
+                    let path = std::path::PathBuf::from(
+                        core_utils::expand_placeholders(
+                            &path_to_remove,
+                            &version_dir,
+                            scope
+                        )?
                     );
-
-                    let path = std::path::PathBuf::from(path_to_remove);
                     if path.exists() {
                         if !quiet {
                             println!("Removing {}...", path.display());

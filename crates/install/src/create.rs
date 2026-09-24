@@ -27,7 +27,7 @@ fn create_destination_path(
             relative_path.display()
         ));
     }
-    Ok(destination_dir.join(relative_path))
+    utils::safe_join(destination_dir, relative_path)
 }
 
 /// Extracts an app from a ZPA archive to a destination directory.
@@ -89,7 +89,9 @@ fn install_app_from_archive(
                 if let Some(parent) = dest_path.parent() {
                     fs::create_dir_all(parent)?;
                 }
-                fs::copy(pool_dir.join(&mapped_file.hash), &dest_path)?;
+                let pool_file =
+                    utils::safe_join(&pool_dir, Path::new(&mapped_file.hash))?;
+                fs::copy(pool_file, &dest_path)?;
             }
         }
         for mapped_link in &scope_mapping.symlinks {

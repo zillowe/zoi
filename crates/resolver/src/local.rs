@@ -34,11 +34,12 @@ pub fn get_package_dir(
     package_name: &str
 ) -> Result<PathBuf> {
     let base_dir = get_store_base_dir(scope)?;
+    utils::validate_path_component(package_name)?;
     let package_id =
         utils::generate_package_id(registry_handle, repo_path, package_name);
     let package_dir_name =
         utils::get_package_dir_name(&package_id, package_name);
-    Ok(base_dir.join(package_dir_name))
+    utils::safe_join(&base_dir, Path::new(&package_dir_name))
 }
 
 /// Returns the directory for a specific version of a package in the store.
@@ -56,7 +57,7 @@ pub fn get_package_version_dir(
 ) -> Result<PathBuf> {
     let package_dir =
         get_package_dir(scope, registry_handle, repo_path, package_name)?;
-    Ok(package_dir.join(version))
+    utils::safe_join(&package_dir, Path::new(version))
 }
 
 use rayon::prelude::*;

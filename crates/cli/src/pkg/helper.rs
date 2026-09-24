@@ -13,6 +13,25 @@ use crate::pkg::install::manifest;
 use crate::pkg::install::resolver::InstallNode;
 use crate::pkg::{local, types};
 
+/// Reads an internal input file after confining it to the system temp
+/// directory.
+fn read_temp_input(path: &Path) -> Result<String> {
+    let temp_root = std::env::temp_dir();
+    if !crate::pkg::utils::is_safe_path(&temp_root, path) {
+        return Err(anyhow!(
+            "Temporary input path is outside the temp directory."
+        ));
+    }
+    let root = temp_root.canonicalize()?;
+    let resolved = path.canonicalize()?;
+    if !resolved.starts_with(root) {
+        return Err(anyhow!(
+            "Temporary input path is outside the temp directory."
+        ));
+    }
+    Ok(std::fs::read_to_string(resolved)?)
+}
+
 /// Installs a package with elevated privileges.
 ///
 /// # Errors
@@ -22,7 +41,7 @@ use crate::pkg::{local, types};
 pub fn elevate_install_node(
     cmd: &crate::cmd::helper::ElevateInstallNodeCommand
 ) -> Result<()> {
-    let content = std::fs::read_to_string(&cmd.node_json)?;
+    let content = read_temp_input(&cmd.node_json)?;
     let node: InstallNode = serde_json::from_str(&content)?;
 
     let pkg = &node.pkg;
@@ -76,7 +95,7 @@ pub fn elevate_install_node(
 pub fn elevate_uninstall(
     cmd: &crate::cmd::helper::ElevateUninstallCommand
 ) -> Result<()> {
-    let content = std::fs::read_to_string(&cmd.manifest_json)?;
+    let content = read_temp_input(&cmd.manifest_json)?;
     let manifest: types::InstallManifest = serde_json::from_str(&content)?;
 
     let handle = &manifest.registry_handle;
@@ -128,7 +147,10 @@ pub fn elevate_uninstall(
         )
         .is_ok()
         {
-            let lua_code = std::fs::read_to_string(&pkg_lua_path)?;
+            let lua_code = crate::pkg::utils::read_file_within(
+                &version_dir,
+                &pkg_lua_path
+            )?;
             if lua.load(&lua_code).exec().is_ok() {
                 if let Ok(uninstall_fn) =
                     lua.globals().get::<Function>("uninstall")
@@ -144,29 +166,15 @@ pub fn elevate_uninstall(
                             && let Ok(op_type) = op.get::<String>("op")
                             && op_type == "zrm"
                         {
-                            let mut path_to_remove: String =
+                            let path_to_remove: String =
                                 op.get("path").unwrap_or_default();
-                            path_to_remove = path_to_remove.replace(
-                                "${pkgstore}",
-                                &version_dir.to_string_lossy()
+                            let path = std::path::PathBuf::from(
+                                crate::pkg::utils::expand_placeholders(
+                                    &path_to_remove,
+                                    &version_dir,
+                                    scope
+                                )?
                             );
-                            if let Some(home_dir) =
-                                crate::pkg::utils::get_user_home()
-                            {
-                                path_to_remove = path_to_remove.replace(
-                                    "${usrhome}",
-                                    &home_dir.to_string_lossy()
-                                );
-                            }
-                            path_to_remove = path_to_remove.replace(
-                                "${usrroot}",
-                                &crate::pkg::sysroot::apply_sysroot(
-                                    PathBuf::from("/")
-                                )
-                                .to_string_lossy()
-                            );
-
-                            let path = std::path::PathBuf::from(path_to_remove);
                             if path.exists() {
                                 if path.is_dir() {
                                     let _ = std::fs::remove_dir_all(path);

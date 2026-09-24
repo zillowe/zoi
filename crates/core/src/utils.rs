@@ -982,7 +982,15 @@ pub fn format_size_diff(diff: i64) -> String {
 /// This is a critical security check against "Path Traversal" attacks in
 /// package archives or Lua scripts.
 pub fn is_safe_path(base: &Path, path: &Path) -> bool {
+    let base_exists = base.exists();
     let base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
+    if path
+        .components()
+        .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
+        return false;
+    }
+
     let joined = if path.is_absolute() {
         path.to_path_buf()
     } else {
@@ -995,15 +1003,93 @@ pub fn is_safe_path(base: &Path, path: &Path) -> bool {
                 normalized.push(component);
             }
             std::path::Component::CurDir => {}
-            std::path::Component::ParentDir => {
-                if !normalized.pop() {
-                    return false;
-                }
-            }
-            std::path::Component::Normal(p) => normalized.push(p)
+            std::path::Component::Normal(p) => normalized.push(p),
+            std::path::Component::ParentDir => return false
         }
     }
-    normalized.starts_with(&base)
+    if !normalized.starts_with(&base) {
+        return false;
+    }
+
+    if !base_exists {
+        return true;
+    }
+
+    let mut existing = joined.as_path();
+    loop {
+        if existing.exists() || existing.is_symlink() {
+            return existing
+                .canonicalize()
+                .is_ok_and(|resolved| resolved.starts_with(&base));
+        }
+        let Some(parent) = existing.parent() else {
+            return false;
+        };
+        existing = parent;
+    }
+}
+
+/// Joins a relative path to a base after validating the path.
+///
+/// # Errors
+///
+/// Returns an error if `relative` is absolute, contains parent components, or
+/// would resolve outside `base`.
+pub fn safe_join(base: &Path, relative: &Path) -> Result<PathBuf> {
+    if relative.is_absolute()
+        || relative.components().any(|component| {
+            matches!(
+                component,
+                std::path::Component::ParentDir
+                    | std::path::Component::Prefix(_)
+                    | std::path::Component::RootDir
+            )
+        })
+        || !is_safe_path(base, relative)
+    {
+        return Err(anyhow!(
+            "Path escapes its base directory: {}",
+            relative.display()
+        ));
+    }
+    Ok(base.join(relative))
+}
+
+/// Validates a value used as one filesystem path component.
+///
+/// # Errors
+///
+/// Returns an error if the value is empty, a dot component, or contains a path
+/// separator or NUL byte.
+pub fn validate_path_component(value: &str) -> Result<()> {
+    if value.is_empty()
+        || value == "."
+        || value == ".."
+        || value.contains('/')
+        || value.contains('\\')
+        || value.as_bytes().contains(&0)
+    {
+        return Err(anyhow!("Invalid path component: {value}"));
+    }
+    Ok(())
+}
+
+/// Reads a file only when its resolved path remains inside `base`.
+///
+/// # Errors
+///
+/// Returns an error if either path cannot be canonicalized, the file is outside
+/// `base`, or the file cannot be read.
+pub fn read_file_within(base: &Path, path: &Path) -> Result<String> {
+    let base = base.canonicalize()?;
+    let path = path.canonicalize()?;
+    if !path.starts_with(&base) {
+        return Err(anyhow!(
+            "Path escapes its base directory: {}",
+            path.display()
+        ));
+    }
+    Ok(fs::read_to_string(path)?)
 }
 
 /// Creates a symbolic link for a file, handling platform-specific requirements.
@@ -1347,6 +1433,31 @@ pub fn expand_placeholders(
     version_dir: &Path,
     scope: crate::types::Scope
 ) -> Result<String> {
+    let placeholders =
+        ["${pkgstore}", "${usrroot}", "${usrhome}", "${applications}"];
+    for placeholder in placeholders {
+        if let Some(index) = path.find(placeholder) {
+            if index != 0 || path[placeholder.len()..].contains("${") {
+                return Err(anyhow!("Invalid placeholder path: {path}"));
+            }
+            let suffix =
+                path[placeholder.len()..].trim_start_matches(['/', '\\']);
+            if Path::new(suffix).components().any(|component| {
+                matches!(component, std::path::Component::ParentDir)
+            }) {
+                return Err(anyhow!(
+                    "Placeholder path escapes its root: {path}"
+                ));
+            }
+        }
+    }
+    if Path::new(path)
+        .components()
+        .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
+        return Err(anyhow!("Path contains parent components: {path}"));
+    }
+
     let mut expanded = path.to_string();
     expanded = expanded.replace("${pkgstore}", &version_dir.to_string_lossy());
     expanded = expanded.replace(

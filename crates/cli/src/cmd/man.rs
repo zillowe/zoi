@@ -366,7 +366,8 @@ fn find_man_pages_in_hierarchy(
         if entry.file_type().is_file() {
             let name = entry.file_name().to_string_lossy();
             if name.starts_with(term) {
-                let content = fs::read_to_string(entry.path())?;
+                let content =
+                    crate::pkg::utils::read_file_within(root, entry.path())?;
                 pages.insert(name.to_string(), content);
             }
         }
@@ -448,7 +449,13 @@ fn gather_manual_pages_from_upstream(
         let file = fs::File::open(&prepared.archive_path)?;
         let decoder = zstd::stream::read::Decoder::new(file)?;
         let mut archive = tar::Archive::new(decoder);
-        archive.unpack(extract_path)?;
+        for entry in archive.entries()? {
+            let mut entry = entry?;
+            let path = entry.path()?.to_path_buf();
+            entry.unpack_in(extract_path).map_err(|e| {
+                anyhow!("Failed to unpack file '{}': {}", path.display(), e)
+            })?;
+        }
     }
 
     // Look for man pages in the extracted content
@@ -474,9 +481,14 @@ fn gather_manual_pages_from_upstream(
                         || file.dest.ends_with(".1")
                         || file.dest.ends_with(".5")
                     {
-                        let pool_file = pool_dir.join(&file.hash);
+                        let pool_file = crate::pkg::utils::safe_join(
+                            &pool_dir,
+                            Path::new(&file.hash)
+                        )?;
                         if pool_file.exists() {
-                            let content = fs::read_to_string(pool_file)?;
+                            let content = crate::pkg::utils::read_file_within(
+                                &pool_dir, &pool_file
+                            )?;
                             let file_name = Path::new(&file.dest)
                                 .file_name()
                                 .expect("Dest should have a file name")
@@ -508,12 +520,18 @@ fn find_local_man_pages(latest_dir: &Path) -> Result<BTreeMap<String, String>> {
     let txt_path = latest_dir.join("man.txt");
 
     if md_path.exists() {
-        pages.insert("main".to_string(), fs::read_to_string(md_path)?);
+        pages.insert(
+            "main".to_string(),
+            crate::pkg::utils::read_file_within(latest_dir, &md_path)?
+        );
         return Ok(pages);
     }
 
     if txt_path.exists() {
-        pages.insert("main".to_string(), fs::read_to_string(txt_path)?);
+        pages.insert(
+            "main".to_string(),
+            crate::pkg::utils::read_file_within(latest_dir, &txt_path)?
+        );
         return Ok(pages);
     }
 
@@ -522,7 +540,7 @@ fn find_local_man_pages(latest_dir: &Path) -> Result<BTreeMap<String, String>> {
 
     for dir in search_dirs {
         if dir.exists() {
-            for entry in WalkDir::new(dir) {
+            for entry in WalkDir::new(&dir) {
                 let entry = entry?;
                 if entry.file_type().is_file() {
                     let path = entry.path();
@@ -531,7 +549,8 @@ fn find_local_man_pages(latest_dir: &Path) -> Result<BTreeMap<String, String>> {
                         .expect("Path should have a file name")
                         .to_string_lossy()
                         .to_string();
-                    let content = fs::read_to_string(path)?;
+                    let content =
+                        crate::pkg::utils::read_file_within(&dir, path)?;
                     pages.insert(name, content);
                 }
             }

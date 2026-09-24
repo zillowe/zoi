@@ -276,9 +276,11 @@ pub fn run(
         true
     )?;
 
-    let pooled_manifest_path = unpack_path.join("manifest.json");
+    let pooled_manifest_path =
+        utils::safe_join(&unpack_path, Path::new("manifest.json"))?;
     if pooled_manifest_path.exists() {
-        let content = fs::read_to_string(&pooled_manifest_path)?;
+        let content =
+            utils::read_file_within(&unpack_path, &pooled_manifest_path)?;
         if let Ok(pooled_manifest) =
             serde_json::from_str::<types::PooledZpaManifest>(&content)
         {
@@ -352,10 +354,11 @@ pub fn run(
             let sub_data_dir = if sub.is_empty() {
                 data_dir.clone()
             } else {
+                utils::validate_path_component(&sub)?;
                 if pb.is_none() {
                     println!("Installing sub-package: {}", sub.bold());
                 }
-                data_dir.join(&sub)
+                utils::safe_join(&data_dir, Path::new(&sub))?
             };
 
             if !sub_data_dir.exists() {
@@ -887,7 +890,8 @@ fn extract_pooled_zpa(
 
         // Step 2: Extract files
         for mapped_file in &scope_mapping.files {
-            let pool_file = pool_dir.join(&mapped_file.hash);
+            let pool_file =
+                utils::safe_join(&pool_dir, Path::new(&mapped_file.hash))?;
             if !pool_file.exists() {
                 return Err(anyhow!("Pool file missing: {}", mapped_file.hash));
             }

@@ -470,7 +470,8 @@ pub fn setup_path(scope: Scope) -> anyhow::Result<()> {
             File::create(&profile_file_path)?;
         }
 
-        let content = fs::read_to_string(&profile_file_path)?;
+        let content =
+            crate::pkg::utils::read_file_within(&home, &profile_file_path)?;
         if content.contains(zoi_bin_str.as_ref()) {
             println!("Zoi bin directory is already in your shell's config.");
             return Ok(());
