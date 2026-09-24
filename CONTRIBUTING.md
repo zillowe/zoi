@@ -14,11 +14,7 @@ making our project better. Every contribution, no matter how small, is valuable 
   - [Prerequisites](#prerequisites)
   - [First-Time Setup](#first-time-setup)
   - [Development with Docker](#development-with-docker)
-  - [Development Workflow with Zoi](#development-workflow-with-zoi)
-    - [The `zoi.lua` file](#the-zoilua-file)
-    - [Passing Arguments to Commands](#passing-arguments-to-commands)
-    - [Environment Preparation](#environment-preparation)
-    - [Development Commands](#development-commands)
+  - [Development Commands](#development-commands)
 - [Crash Reports](#crash-reports)
 - [Commit Messages](#commit-messages)
 - [Code of Conduct](#code-of-conduct)
@@ -141,106 +137,18 @@ host system, run these commands:
 
    You will now have a `zoi` executable in your current directory.
 
-### Development Workflow with Zoi
+### Development Commands
 
-We use `zoi` itself to manage project tasks, which are defined in the `zoi.lua`
-file. You can run tasks using `zoi run <command>` or set up environments
-with `zoi env <environment>`.
-
-If you run `zoi run` or `zoi env` without arguments, you'll get an interactive
-list of available commands.
-
-#### The `zoi.lua` file
-
-The `zoi.lua` file is the heart of our project-specific workflow. It defines:
-
-- `commands`: Aliases for longer shell commands, e.g. `zoi run lint`.
-These can be platform-specific.
-- `environments`: Groups of commands to set up a development environment,
-e.g. `zoi env pre`.
-
-When adding a new build step or a useful script, you should add it to the
-`commands` section in `zoi.lua`.
-
-#### Passing Arguments to Commands
-
-To pass arguments to the underlying script, add them after the command alias.
-Use `--` to separate the arguments from Zoi's own options.
-
-```sh
-# This runs 'cargo check --tests'
-zoi run check -- --tests
-```
-
-#### Environment Preparation
-
-Before you commit changes, run the `pre` environment to ensure your changes
-meet our quality standards. It will check for unused dependencies,
-format your code, and run lints and other checks.
-
-```sh
-zoi env pre
-```
-
-This single command is equivalent to running `zoi run deps`, `zoi run lint`,
-`zoi run fmt`, `zoi run check`, and `zoi run test` in sequence.
-
-#### Development Commands
-
-Here are the most common commands defined in `zoi.lua`:
-
-- **`check`**: Checks the project for errors without performing a full build.
-
-  ```sh
-  zoi run check
-  ```
-
-- **`lint`**: Lints the code using Clippy and applies automatic fixes where possible.
-
-  ```sh
-  zoi run lint
-  ```
-
-- **`fmt`**: Formats all code in the project according to our style guidelines.
-
-  ```sh
-  zoi run fmt
-  ```
-
-- **`deps`**: Checks for unused dependencies with `cargo-machete`.
-
-  ```sh
-  zoi run deps
-  ```
-
-- **`test`**: Runs the entire test suite.
-
-  ```sh
-  zoi run test
-  ```
-
-- **`build`**: Builds a dev version of Zoi.
-
-  ```sh
-  zoi run build
-  ```
-
-- **`build` (Just)**: Builds a release version of Zoi.
+- **`build`**: Builds a release version of Zoi.
 
   ```sh
   just build
   ```
 
-- **`dev` (Just)**: Builds a dev version of Zoi.
+- **`dev`**: Builds a dev version of Zoi.
 
   ```sh
   just dev
-  ```
-
-- **`lines`**: Counts the lines of code in the project using `cloc`.
-
-  ```sh
-  zoi run lines
   ```
 
 ## Crash Reports
