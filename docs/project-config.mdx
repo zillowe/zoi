@@ -23,6 +23,22 @@ project({
     }
 })
 
+-- Clone and pin repositories as project-local inputs
+imports({
+    base = {
+        repo = "zillowe/base",
+        rev = "main" -- A branch, tag, or exact commit
+    }
+})
+
+-- Repository roots can also export one or more installable packages
+package({
+    main = "./hello.pkg.lua",
+    packages = {
+        extra = "./packages/extra.pkg.lua"
+    }
+})
+
 -- Define supplementary registries
 registries({
 custom = {
@@ -36,6 +52,7 @@ packages({
 -- Simple list
 "@core/eza",
 "@community/bat",
+"base:shared", -- A package export from an imports() entry
 
     -- Advanced pinning and options
     ["@community/fzf"] = {
@@ -98,6 +115,11 @@ checks({
 - **`project`**:
   - `name`: (string) Required project name.
   - `config.local`: (boolean) If `true`, dependencies and registries are stored in the project root (`./.zoi/pkgs`).
+- **`imports`**: A map of repository aliases imported by the project.
+  - `repo`: (string) Repository in `owner/repo`, provider-prefixed, URL, or local Git form.
+  - `rev`: (string) Optional branch, tag, or commit. The exact commit is pinned in `zoi.lock`.
+  - Refer to exports as `alias:selector`. Imports are cloned under `.zoi/imports/alias`.
+- **`package`**: Optional repository export declaration. `main` is selected by default; `packages` maps selectors to `.pkg.lua` files or repository-relative folders. `package("path")` remains shorthand for `package({ main = "path" })`. This is separate from the `.pkg.lua` lifecycle function named `package`.
 - **`registries`**: A map of handles to registry definitions (`url`, `revision`, `type`).
   - `type`: (string) `"set"` (default), bare package names search this registry's repos; `"added"`, requires explicit `#handle` prefix.
 - **`packages`**: A map or list of `@repo/package` identifiers.
@@ -134,22 +156,54 @@ Zoi Specification v2 lockfiles are designed for absolute reproducibility. They p
 ```json
 {
   "version": "2",
-  "packages_hash": "sha512-...", // Hash of all package files
-  "registries_hash": "sha512-...", // Hash of the local database
+  "platform": "linux-amd64",
+  "manifest": { "path": "zoi.lua", "hash": "sha512-..." },
+  "project": {
+    "manifest_hash": "sha512-...",
+    "tasks_hash": "sha512-...",
+    "environments_hash": "sha512-...",
+    "shell_hash": "sha512-...",
+    "checks_hash": "sha512-...",
+    "local": true
+  },
   "registries": {
     "zoidberg": {
       "url": "https://github.com/zillowe/zoidberg.git",
-      "revision": "a1b2c3d4..." // Exact commit hash
+      "revision": "a1b2c3d4..."
     }
   },
+  "imports": {
+    "base": {
+      "repo": "zillowe/base",
+      "requested_revision": "main",
+      "resolved_revision": "0123456789abcdef...",
+      "manifest_hash": "sha512-...",
+      "exports": { "shared": ".zoi/imports/base/shared.pkg.lua" }
+    }
+  },
+  "root_requirements": [
+    { "source": "base:shared", "declared_by": "packages", "spec": {} }
+  ],
   "installed_packages": {
     "@core/curl": {
       "version": "8.4.0",
       "hash": "sha512-...",
       "platform": "linux-amd64",
-      "why": "direct"
+      "why": "direct",
+      "definition_hash": "sha512-...",
+      "source": {
+        "kind": "registry",
+        "request": "#zoidberg@core/curl@8.4.0"
+      },
+      "resolved_dependencies": ["openssl@3.5.0"],
+      "chosen_options": [],
+      "chosen_optionals": [],
+      "git_sha": null,
+      "required_by": []
     }
-  }
+  },
+  "packages_hash": "sha512-...",
+  "registries_hash": "sha512-..."
 }
 ```
 
@@ -165,5 +219,5 @@ Zoi Specification v2 lockfiles are designed for absolute reproducibility. They p
 ## Best Practices
 
 1. **Commit your lockfile**: Always commit `zoi.lock` to ensure your team uses the exact same environment.
-2. **Use `@repo/package`**: Always use scoped identifiers in `zoi.lua` to avoid ambiguity.
+2. **Use explicit sources**: Prefer `@repo/package` for registry packages and `alias:selector` for imported repository packages.
 3. **Pin Registry Revisions**: For production projects, pin your `registries` in `zoi.lua` to a specific commit hash for maximum security.

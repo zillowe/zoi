@@ -1,14 +1,111 @@
+//! Project lockfile persistence and package snapshot extraction.
+
 use std::fs;
+use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
+use serde::Serialize;
+use sha2::{Digest, Sha512};
 use zoi_core::types;
 
-/// Returns the path to the project's lockfile (`zoi.lock`).
-fn get_lockfile_path() -> Result<std::path::PathBuf> {
+use crate::config::ProjectConfig;
+
+/// Returns the lockfile path in the current project directory.
+///
+/// # Errors
+///
+/// Returns an error if the current working directory cannot be determined.
+fn get_lockfile_path() -> Result<PathBuf> {
     Ok(std::env::current_dir()?.join("zoi.lock"))
 }
 
-/// Reads and parses a lockfile from the specified path.
+/// Computes the prefixed SHA-512 hash of byte content.
+fn hash_bytes(content: &[u8]) -> String {
+    format!("sha512-{}", hex::encode(Sha512::digest(content)))
+}
+
+/// Serializes a value and computes its prefixed SHA-512 hash.
+///
+/// # Errors
+///
+/// Returns an error if the value cannot be serialized.
+fn hash_serializable<T: Serialize>(value: &T) -> Result<String> {
+    Ok(hash_bytes(&serde_json::to_vec(value)?))
+}
+
+/// Records the evaluated project manifest and its configuration sections.
+///
+/// # Errors
+///
+/// Returns an error if the manifest cannot be read or the lockfile cannot be
+/// updated.
+pub fn record_project_config(
+    config: &ProjectConfig,
+    manifest_path: &std::path::Path
+) -> Result<()> {
+    if zoi_core::frozen::is_frozen() {
+        return Ok(());
+    }
+
+    let manifest = fs::read(manifest_path)?;
+    let mut lockfile = read_zoi_lock()?;
+    let manifest_hash = hash_bytes(&manifest);
+    lockfile.version = "2".to_string();
+    lockfile.platform = Some(zoi_core::utils::get_platform()?);
+    lockfile.manifest = Some(types::LockManifestV2 {
+        path: manifest_path
+            .file_name()
+            .unwrap_or(manifest_path.as_os_str())
+            .to_string_lossy()
+            .into_owned(),
+        hash: manifest_hash.clone()
+    });
+    lockfile.project = Some(types::LockProjectV2 {
+        manifest_hash,
+        tasks_hash: hash_serializable(&config.commands)?,
+        environments_hash: hash_serializable(&config.environments)?,
+        shell_hash: hash_serializable(&config.shell)?,
+        checks_hash: hash_serializable(&config.packages)?,
+        local: config.config.local
+    });
+    lockfile.root_requirements = config
+        .pkgs_v2
+        .iter()
+        .map(|(source, spec)| {
+            Ok(types::LockRequirementV2 {
+                source: source.clone(),
+                declared_by: "packages".to_string(),
+                spec: serde_json::to_value(spec)?
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    lockfile
+        .root_requirements
+        .sort_by(|left, right| left.source.cmp(&right.source));
+    write_zoi_lock(&mut lockfile)
+}
+
+/// Records resolved project imports in `zoi.lock`.
+///
+/// # Errors
+///
+/// Returns an error if the lockfile cannot be updated.
+pub fn record_imports(
+    imports: &std::collections::BTreeMap<String, types::LockImportV2>
+) -> Result<()> {
+    if zoi_core::frozen::is_frozen() {
+        return Ok(());
+    }
+    let mut lockfile = read_zoi_lock()?;
+    lockfile.imports = imports.clone();
+    write_zoi_lock(&mut lockfile)
+}
+
+/// Reads and parses a lockfile from a specific path.
+///
+/// # Errors
+///
+/// Returns an error if an existing lockfile cannot be read or parsed.
 fn read_lockfile_from(
     path: &std::path::Path
 ) -> Result<Option<types::ZoiLockV2>> {
@@ -19,38 +116,48 @@ fn read_lockfile_from(
     if content.trim().is_empty() {
         return Ok(None);
     }
-    serde_json::from_str(&content).map(Some).map_err(|e| {
+    serde_json::from_str(&content).map(Some).map_err(|error| {
         anyhow!(
             "Failed to parse {}. It might be corrupted or in an old format. \
              Error: {}",
             path.display(),
-            e
+            error
         )
     })
 }
 
-/// Checks if the lockfile is compatible with the current platform.
+/// Reports whether a lockfile supports the current platform.
 fn is_lockfile_compatible(lockfile: &types::ZoiLockV2) -> bool {
     let current_platform = zoi_core::utils::get_platform().unwrap_or_default();
+    if let Some(platform) = &lockfile.platform
+        && !platform.is_empty()
+        && platform != &current_platform
+        && !zoi_core::utils::is_platform_compatible(
+            &current_platform,
+            std::slice::from_ref(platform)
+        )
+    {
+        return false;
+    }
     if lockfile.installed_packages.is_empty() {
         return true;
     }
-    lockfile.installed_packages.values().all(|pkg| {
-        pkg.platform.is_empty()
-            || pkg.platform == current_platform
+    lockfile.installed_packages.values().all(|package| {
+        package.platform.is_empty()
+            || package.platform == current_platform
             || zoi_core::utils::is_platform_compatible(
                 &current_platform,
-                std::slice::from_ref(&pkg.platform)
+                std::slice::from_ref(&package.platform)
             )
     })
 }
 
-/// Reads the project's `zoi.lock` file, falling back to platform-specific
-/// lockfiles if necessary.
+/// Reads and parses the project's `zoi.lock` file, falling back to
+/// platform-specific lockfiles when necessary.
 ///
 /// # Errors
 ///
-/// Returns an error if there is an issue reading or parsing the lockfile.
+/// Returns an error if the lockfile is incompatible, missing, or malformed.
 pub fn read_zoi_lock() -> Result<types::ZoiLockV2> {
     let path = get_lockfile_path()?;
 
@@ -65,11 +172,10 @@ pub fn read_zoi_lock() -> Result<types::ZoiLockV2> {
             return Ok(platform_lock);
         }
 
-        eprintln!(
-            "Warning: zoi.lock has packages targeting a different platform \
-             and no zoi.{platform}.lock was found, falling back to \
-             unconstrained resolution"
-        );
+        return Err(anyhow!(
+            "zoi.lock targets an incompatible platform and no \
+             zoi.{platform}.lock was found"
+        ));
     }
 
     Ok(types::ZoiLockV2 {
@@ -119,7 +225,7 @@ pub fn write_zoi_lock(lockfile: &mut types::ZoiLockV2) -> Result<()> {
 /// Represents a package in a frozen lockfile state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FrozenLockPackage {
-    /// The package source string (e.g. `name@version`).
+    /// The package source string.
     pub source: String,
     /// The specific revision or commit.
     pub revision: String,
@@ -129,8 +235,10 @@ pub struct FrozenLockPackage {
     pub chosen_options: Vec<String>,
     /// List of enabled optional features.
     pub chosen_optionals: Vec<String>,
-    /// Dependencies for this frozen package.
+    /// Declared dependencies for this frozen package.
     pub dependencies: Option<types::DependenciesV2>,
+    /// Exact package identifiers selected as dependencies.
+    pub resolved_dependencies: Vec<String>,
     /// Optional Git SHA if applicable.
     pub git_sha: Option<String>
 }
@@ -139,19 +247,60 @@ pub struct FrozenLockPackage {
 pub fn locked_packages(lockfile: &types::ZoiLockV2) -> Vec<FrozenLockPackage> {
     let mut packages = Vec::new();
 
-    for (key, detail) in &lockfile.installed_packages {
+    for detail in lockfile.installed_packages.values() {
+        let legacy_source = if let Some(sub_package) = &detail.sub_package {
+            format!(
+                "#{}@{}/{}:{}@{}",
+                detail.registry,
+                detail.repo,
+                detail.name,
+                sub_package,
+                detail.version
+            )
+        } else {
+            format!(
+                "#{}@{}/{}@{}",
+                detail.registry, detail.repo, detail.name, detail.version
+            )
+        };
+        let source = detail
+            .source
+            .as_ref()
+            .filter(|source| {
+                !source.request.is_empty()
+                    && (source.kind != "local"
+                        || source.path.as_deref().is_none_or(str::is_empty))
+            })
+            .map_or_else(
+                || {
+                    detail
+                        .source
+                        .as_ref()
+                        .filter(|source| source.kind == "local")
+                        .and_then(|source| source.path.clone())
+                        .unwrap_or(legacy_source)
+                },
+                |source| source.request.clone()
+            );
+        let git_sha = detail.git_sha.clone().or_else(|| {
+            detail
+                .source
+                .as_ref()
+                .and_then(|source| source.revision.clone())
+        });
         packages.push(FrozenLockPackage {
-            source: format!("{}@{}", key.trim(), detail.version),
+            source,
             revision: detail.revision.clone(),
             direct: detail.why == "direct",
-            chosen_options: Vec::new(),
-            chosen_optionals: Vec::new(),
+            chosen_options: detail.chosen_options.clone(),
+            chosen_optionals: detail.chosen_optionals.clone(),
             dependencies: detail.dependencies.clone(),
-            git_sha: None
+            resolved_dependencies: detail.resolved_dependencies.clone(),
+            git_sha
         });
     }
 
-    packages.sort_by(|a, b| a.source.cmp(&b.source));
+    packages.sort_by(|left, right| left.source.cmp(&right.source));
     packages
 }
 

@@ -57,11 +57,18 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
         None
     };
 
-    let config = if is_repo {
+    let mut config = if is_repo {
         project_config::load_with_env(&HashMap::new())?
     } else {
         project_config::load()?
     };
+    zoi_project::lockfile::record_project_config(
+        &config,
+        std::path::Path::new("zoi.lua")
+    )?;
+    let resolved_imports =
+        zoi_project::imports::resolve(&mut config, std::path::Path::new("."))?;
+    zoi_project::lockfile::record_imports(&resolved_imports)?;
     println!(
         "{} Entering development shell for project: {}",
         "::".bold().blue(),

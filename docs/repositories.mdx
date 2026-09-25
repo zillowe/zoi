@@ -122,26 +122,51 @@ zoi repo git rm my-zoi-repo
 
 ### Direct Git Repository Installation
 
-In addition to adding a git repository to your local configuration with `zoi repo add`, you can install a package directly from a remote git repository using the `--repo` flag with `zoi install`.
+`zoi install --repo` clones the complete repository, evaluates its root `zoi.lua`, selects one exported package, installs it, and removes the temporary clone afterward. The complete tree remains available throughout dependency resolution and package builds, so adjacent `IMPORT`/`INCLUDE` files and local assets are preserved.
 
-```sh
-# Install from a GitHub repository
-zoi install --repo zillowe/hello
-
-# Install from a GitLab repository
-zoi install --repo gl:zillowe/hello
-
-# Install from a Codeberg repository
-zoi install --repo cb:zillowe/hello
+```lua
+package({
+    main = "./hello.pkg.lua",
+    packages = {
+        extra = "./packages/extra.pkg.lua"
+    }
+})
 ```
 
-This works if the target repository has a `zoi.lua` file in its root declaring `package("...")`. The declaration can specify a package name (e.g. `hello`), a path to a `.pkg.lua` file within the repository, or a URL to a `.pkg.lua` file. This provides a quick way to install packages from git repositories without permanently adding them to your configuration.
+```sh
+# Select the main export
+zoi install --repo zillowe/hello
+
+# Select a named export
+zoi install --repo zillowe/hello:extra
+zoi install --repo gl:zillowe/hello:extra
+zoi install --repo cb:zillowe/hello:extra
+
+# URL sources use a fragment selector
+zoi install --repo 'https://github.com/zillowe/hello.git#extra'
+```
+
+`package("./path.pkg.lua")` remains shorthand for `package({ main = "./path.pkg.lua" })`. A source may also be a repository-relative folder. Zoi first tries `<folder>/<folder-name>.pkg.lua`; otherwise the folder must contain exactly one `.pkg.lua` file. Sources cannot escape the repository root.
+
+If `main` is absent and only one named export exists, that export is selected. If several named exports exist without `main`, the command lists the available selectors.
 
 **Provider Prefixes:**
 
-- `gh:` or `github:` for GitHub (this is the default if no prefix is given).
+- `gh:` or `github:` for GitHub (default if omitted).
 - `gl:` or `gitlab:` for GitLab.
 - `cb:` or `codeberg:` for Codeberg.
+
+A repository can reuse another repository's exports through `imports`:
+
+```lua
+imports({
+    shared = { repo = "zillowe/shared", rev = "main" }
+})
+
+package("shared:common")
+```
+
+Project imports are cloned below `.zoi/imports/shared`. Their requested revisions, exact resolved commits, and manifest hashes are stored in `zoi.lock`, allowing frozen installs to reproduce the same inputs.
 
 ## Installing from a specific repository
 

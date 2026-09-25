@@ -40,6 +40,21 @@ dependencies({
 })
 ```
 
+### Local `.pkg.lua` Dependencies
+
+Zoi dependencies can point to another package definition relative to the declaring `.pkg.lua` file:
+
+```lua
+dependencies({
+  runtime = {
+    "zoi:./shared/helper.pkg.lua",
+    "zoi:../common/utility"
+  }
+})
+```
+
+A directory is accepted when it contains `directory-name.pkg.lua` or exactly one `.pkg.lua` file. Relative paths are resolved independently of the caller's current working directory, and the selected file and version are recorded in `zoi.lock`.
+
 ### Advanced Dependency Object
 
 For more complex scenarios involving optional or selectable dependencies, use nested tables.

@@ -699,7 +699,9 @@ fn activate_stored_version(
         &manifest.repo_type,
         &manifest.chosen_options,
         &manifest.chosen_optionals,
-        manifest.sub_package.as_deref()
+        manifest.sub_package.as_deref(),
+        "",
+        None
     ) && !quiet
     {
         eprintln!(

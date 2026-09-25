@@ -51,6 +51,23 @@ Build a definition with *zoi package build* (see *zoi*(1)), and use
 *zoi package init-lsp* to get Lua language-server support while authoring.
 Longer guides live at https://zillowe.qzz.io/docs/zds/zoi.
 
+== Project and repository manifests
+
+A `zoi.lua` manifest is separate from `.pkg.lua` package definitions. It may
+declare *project*, *packages*, *registries*, *tasks*, *environments*,
+*shell*, *checks*, *imports*, and a repository *package* export.
+
+*imports*(_table_)::
+  Map aliases to repository definitions with *repo* and optional *rev*. Zoi
+  clones each repository and resolves `alias:selector` package exports. Exact
+  commits and manifest hashes are recorded in `zoi.lock`.
+
+*package*(_string_ or _table_)::
+  Export a repository package. A string is shorthand for a `main` export. A
+  table may define *main* and a *packages* selector map containing `.pkg.lua`
+  files or folders. This declaration is distinct from the `.pkg.lua`
+  lifecycle function `package(args)`.
+
 == Global variables
 
 *SYSTEM*::
@@ -114,7 +131,10 @@ Longer guides live at https://zillowe.qzz.io/docs/zds/zoi.
   list of `{type, packages}` entries (the form used by published registry
   indexes). A dependency string looks like
   `[manager:]package[@version][:description]`; the manager defaults to
-  `zoi`, for example `"zoi:core/foo@1.2.3"` or `"pacman:zip"`.
+  `zoi`, for example `"zoi:core/foo@1.2.3"` or `"pacman:zip"`. Local
+  definitions use paths relative to the declaring `.pkg.lua`, such as
+  `"zoi:./helper.pkg.lua"` or `"zoi:../shared/utility"`. A directory must
+  contain `<directory-name>.pkg.lua` or exactly one `.pkg.lua` file.
 
 *updates*(_list_)::
   Update messages shown to the user during upgrades. Each entry has

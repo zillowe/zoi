@@ -10,6 +10,8 @@ pub mod config;
 pub mod environment;
 /// Command execution logic.
 pub mod executor;
+/// Repository imports declared by project configuration.
+pub mod imports;
 /// Lockfile management and frozen package definitions.
 pub mod lockfile;
 /// Lua-based configuration parsing.

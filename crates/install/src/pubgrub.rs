@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::path::Path;
 
 use colored::Colorize;
 use pubgrub::{Dependencies, DependencyProvider, Ranges};
@@ -39,6 +40,75 @@ pub struct PkgName {
     pub registry: String,
     /// An explicit source URL, file path, or git reference, if provided.
     pub explicit_source: Option<String>
+}
+
+/// Resolves a local package dependency relative to its declaring package.
+fn normalize_local_dependency(
+    source: &str,
+    parent_source: Option<&str>
+) -> Result<String, String> {
+    if !(source.starts_with("./") || source.starts_with("../")) {
+        return Ok(source.to_string());
+    }
+    let parent_source = parent_source.ok_or_else(|| {
+        format!("relative dependency '{source}' has no local parent source")
+    })?;
+    let parent_path = Path::new(parent_source);
+    let parent_dir = parent_path.parent().ok_or_else(|| {
+        format!("cannot determine parent directory for '{parent_source}'")
+    })?;
+    let (source_path, suffix) = source
+        .rsplit_once('@')
+        .map_or((source, None), |(path, version)| {
+            (path, Some(format!("@{version}")))
+        });
+    let mut resolved = parent_dir.join(source_path);
+    if resolved.is_dir() {
+        let folder_name = resolved
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| {
+            format!("invalid package folder '{}'", resolved.display())
+        })?;
+        let conventional = resolved.join(format!("{folder_name}.pkg.lua"));
+        if conventional.is_file() {
+            resolved = conventional;
+        } else {
+            let mut candidates = std::fs::read_dir(&resolved)
+                .map_err(|error| error.to_string())?
+                .filter_map(Result::ok)
+                .map(|entry| entry.path())
+                .filter(|path| {
+                    path.is_file()
+                        && path.extension().and_then(|ext| ext.to_str())
+                            == Some("lua")
+                        && path
+                            .file_name()
+                            .and_then(|name| name.to_str())
+                            .is_some_and(|name| name.ends_with(".pkg.lua"))
+                })
+                .collect::<Vec<_>>();
+            candidates.sort();
+            if candidates.len() != 1 {
+                return Err(format!(
+                    "package folder '{}' must contain exactly one .pkg.lua \
+                     file",
+                    resolved.display()
+                ));
+            }
+            resolved = candidates.first().cloned().ok_or_else(|| {
+                format!("no package definition in '{}'", resolved.display())
+            })?;
+        }
+    }
+    resolved = resolved.canonicalize().map_err(|error| {
+        format!("failed to resolve '{}': {error}", resolved.display())
+    })?;
+    let mut normalized = resolved.to_string_lossy().into_owned();
+    if let Some(suffix) = suffix {
+        normalized.push_str(&suffix);
+    }
+    Ok(normalized)
 }
 
 impl Display for PkgName {
@@ -723,29 +793,43 @@ impl DependencyProvider for ZoiDependencyProvider {
                         })?;
 
                     if dep_req.manager == "zoi" {
+                        let mut dep_source = dep_req.package.to_string();
+                        if let Some(version) = &dep_req.version_str {
+                            dep_source.push('@');
+                            dep_source.push_str(version);
+                        }
+                        let dep_source = normalize_local_dependency(
+                            &dep_source,
+                            package.explicit_source.as_deref()
+                        )
+                        .map_err(|error| {
+                            ZoiSolverError::Dependency(format!(
+                                "normalize local dependency fail for '{}': {}",
+                                dep_req.package, error
+                            ))
+                        })?;
                         let req =
-                            match resolve::parse_source_string(dep_req.package)
-                            {
+                            match resolve::parse_source_string(&dep_source) {
                                 Ok(r) => r,
                                 Err(e) => {
                                     println!(
                                         "{} Dependency parse failed for '{}': \
                                          {}",
                                         "::".bold().red(),
-                                        dep_req.package,
+                                        dep_source,
                                         e
                                     );
                                     return Err(ZoiSolverError::Dependency(
                                         format!(
-                                            "parse source fail for '{}': {}",
-                                            dep_req.package, e
+                                            "parse source fail for \
+                                             '{dep_source}': {e}"
                                         )
                                     ));
                                 }
                             };
 
                         let resolved_dep = match resolve::resolve_source(
-                            dep_req.package,
+                            &dep_source,
                             self.scope,
                             false,
                             self.yes
@@ -756,13 +840,12 @@ impl DependencyProvider for ZoiDependencyProvider {
                                     "{} Dependency resolution failed for \
                                      '{}': {}",
                                     "::".bold().red(),
-                                    dep_req.package,
+                                    dep_source,
                                     e
                                 );
                                 return Err(ZoiSolverError::Dependency(
                                     format!(
-                                        "resolve fail for '{}': {}",
-                                        dep_req.package, e
+                                        "resolve fail for '{dep_source}': {e}"
                                     )
                                 ));
                             }
@@ -785,12 +868,12 @@ impl DependencyProvider for ZoiDependencyProvider {
                                     | zoi_core::types::SourceType::Url
                                     | zoi_core::types::SourceType::GitRepo(_)
                             )
-                            .then(|| dep_req.package.to_string())
+                            .then(|| dep_source.clone())
                         };
 
                         let range = if req.version_spec.is_some() {
                             match resolve::resolve_requested_version_spec(
-                                dep_req.package,
+                                &dep_source,
                                 self.scope,
                                 false,
                                 true
@@ -802,13 +885,13 @@ impl DependencyProvider for ZoiDependencyProvider {
                                         "{} Version resolution failed for \
                                          '{}': {}",
                                         "::".bold().red(),
-                                        dep_req.package,
+                                        dep_source,
                                         e
                                     );
                                     return Err(ZoiSolverError::Dependency(
                                         format!(
-                                            "version resolve fail for '{}': {}",
-                                            dep_req.package, e
+                                            "version resolve fail for \
+                                             '{dep_source}': {e}"
                                         )
                                     ));
                                 }
@@ -822,6 +905,23 @@ impl DependencyProvider for ZoiDependencyProvider {
                 }
             }
             all_req.clone_from(&dependencies.runtime);
+            for requirement in &mut all_req {
+                if let Ok(parsed) =
+                    zoi_deps::parse_dependency_string(requirement)
+                    && parsed.manager == "zoi"
+                {
+                    let mut source = parsed.package.to_string();
+                    if let Some(version) = &parsed.version_str {
+                        source.push('@');
+                        source.push_str(version);
+                    }
+                    *requirement = normalize_local_dependency(
+                        &source,
+                        package.explicit_source.as_deref()
+                    )
+                    .map_err(ZoiSolverError::Dependency)?;
+                }
+            }
         }
 
         self.deps_cache

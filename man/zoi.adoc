@@ -38,8 +38,9 @@ authoritative per-command help.
 *Package sources*::
   Most commands accept a package source: a registry name such as
   `@core/ripgrep`, a git source such as `#git@repo/name`, a local path to a
-  `.pkg.lua` file or `.zpa`/`.zsa` archive, or a URL. Some commands also
-  accept PURL identifiers.
+  `.pkg.lua` file or `.zpa`/`.zsa` archive, or a URL. A repository `zoi.lua`
+  may import pinned repositories with `imports()` and expose named package
+  exports such as `base:tools`. Some commands also accept PURL identifiers.
 
 *Installation scopes*::
   Packages install into one of three scopes: *user* (the current user,
@@ -88,7 +89,9 @@ These options may appear before any command.
   Install one or more packages from registry names, local files, URLs, or
   git repositories.
 +
-*--repo*=_REPO_:: Install from a git repository (conflicts with sources).
+*--repo*=_REPO_:: Clone a repository and install a package exported by its
+  root `zoi.lua` (conflicts with sources). Select a named export with
+  `owner/repo:name`; URL sources use a `#name` fragment.
 *--force*:: Re-install even if already installed.
 *--all-optional*:: Accept all optional dependencies.
 *--scope*=_user|system|project_:: Installation scope.
@@ -528,14 +531,16 @@ a setting. See the online configuration reference for every key.
   *~/.local/share/zoi/* on most systems.
 
 *./zoi.lua*::
-  Project configuration: task runner, environments, shell setup,
-  package checks, and dependency declarations.
+  Unified project and repository configuration: metadata, packages, tasks,
+  environments, pinned imports, and selectable package exports.
 
 *./zoi.lock*::
-  Pinned project dependency lockfile (used with *--frozen*).
+  Complete reproducibility state: manifest/config hashes, registry and import
+  commits, root requirements, package sources, selections, and content hashes.
 
 *./.zoi/*::
-  Per-project lockfile and local package store.
+  Per-project lockfile, imported repository clones, registry database, and
+  local package store.
 
 == Environment
 

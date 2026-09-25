@@ -97,12 +97,14 @@ fn write_lockfile(
 pub fn record_package(
     pkg: &types::Package,
     reason: &types::InstallReason,
-    _installed_dependencies: &[String],
+    installed_dependencies: &[String],
     registry_handle: &str,
     repo_type: &str,
-    _chosen_options: &[String],
-    _chosen_optionals: &[String],
-    sub_package: Option<&str>
+    chosen_options: &[String],
+    chosen_optionals: &[String],
+    sub_package: Option<&str>,
+    source_request: &str,
+    git_sha: Option<&str>
 ) -> Result<()> {
     let _lock = RECORD_MUTEX
         .lock()
@@ -124,6 +126,49 @@ pub fn record_package(
     let platform = format!("{os}-{arch}");
 
     let hash = compute_package_hash(pkg, registry_handle);
+    let source_path = Path::new(source_request);
+    let definition_hash = source_path
+        .is_file()
+        .then(|| {
+            crate::hash::calculate_file_hash(
+                source_path,
+                crate::hash::HashAlgorithm::Sha512
+            )
+        })
+        .transpose()?
+        .map(|hash| format!("sha512-{hash}"));
+    let source_kind = if source_request.is_empty() {
+        "unknown"
+    } else if source_request.starts_with("http://")
+        || source_request.starts_with("https://")
+    {
+        "url"
+    } else if source_request.starts_with("#git") {
+        "git"
+    } else if source_path.is_file()
+        && !source_path.components().any(|component| {
+            component.as_os_str() == ".zoi" && source_path.ends_with("db")
+        })
+    {
+        "local"
+    } else {
+        "registry"
+    };
+    let source =
+        (!source_request.is_empty()).then(|| types::LockPackageSourceV2 {
+            kind: source_kind.to_string(),
+            request: source_request.to_string(),
+            url: (source_kind == "url").then(|| source_request.to_string()),
+            revision: git_sha.map(ToString::to_string),
+            path: source_path.is_file().then(|| {
+                source_path
+                    .strip_prefix(std::env::current_dir().unwrap_or_default())
+                    .unwrap_or(source_path)
+                    .to_string_lossy()
+                    .into_owned()
+            }),
+            definition_hash: definition_hash.clone()
+        });
 
     let detail = types::LockPackageDetailV2 {
         name: pkg.name.clone(),
@@ -152,7 +197,14 @@ pub fn record_package(
             .unwrap_or_default(),
         platform,
         hash,
-        dependencies: pkg.dependencies.clone().map(types::to_dependencies_v2)
+        dependencies: pkg.dependencies.clone().map(types::to_dependencies_v2),
+        source,
+        definition_hash,
+        resolved_dependencies: installed_dependencies.to_vec(),
+        chosen_options: chosen_options.to_vec(),
+        chosen_optionals: chosen_optionals.to_vec(),
+        git_sha: git_sha.map(ToString::to_string),
+        required_by: Vec::new()
     };
 
     lockfile.installed_packages.insert(package_key, detail);

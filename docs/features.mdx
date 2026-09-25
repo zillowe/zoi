@@ -38,13 +38,13 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Automated Relocation Engine:** Automatically rewrites ELF binary headers (`RUNPATH`/`RPATH`) to use `$ORIGIN` relative paths during build. This ensures Zoi packages are fully relocatable and can find their internal shared libraries regardless of where they are installed or symlinked.
 
-- **Lua-Based Project Configuration (`zoi.lua`):** Define project environments with a powerful, scriptable Lua API. Supports dynamic dependency selection, registry overrides, and complex environment setup.
+- **Lua-Based Project and Repository Configuration (`zoi.lua`):** Define project environments with a scriptable Lua API and export one or more package definitions from the same repository. The manifest supports project metadata, packages, tasks, environments, pinned repository imports, and selectable package exports.
 
 - **Hermetic Project Environments:** Strictly isolate project dependencies and registries within `./.zoi/pkgs/`. Ensure that project-level syncs do not affect global state and remain reproducible across machines.
 
-- **Pinned Registry Inputs:** Lock registries to exact Git revisions (branch, tag, or commit hash) in `zoi.lua`. `zoi.lock` automatically pins these to SHA-1 hashes for absolute reproducibility.
+- **Pinned Registry and Import Inputs:** Lock registries and `imports()` repositories to exact Git revisions in `zoi.lua`. `zoi.lock` records the requested ref, resolved commit, manifest hash, and exported package paths.
 
-- **Reproducible Project Installs (`--frozen`):** Rebuild a project environment from `zoi.lock` without re-resolving versions, sub-packages, or recorded dependency choices. Zoi Specification v2 lockfiles include directory hashes to verify the integrity of the entire local state.
+- **Reproducible Project Installs (`--frozen`):** Rebuild a project from `zoi.lock` using pinned registry and import commits, manifest/config hashes, source provenance, exact versions, selected options, optionals, and dependency selections. Directory and package hashes verify the resulting local state.
 
 - **Automated Dev Repo Discovery (`zoi dev --repo`):** Instantly enter a development shell for any Git repository. Zoi clones the repository to a temporary directory, sets up the environment defined in its `zoi.lua`, and cleans up automatically on exit.
 

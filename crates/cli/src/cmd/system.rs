@@ -275,7 +275,9 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                             zoi_project::config::ProjectLocalConfig::default(),
                         commands: Vec::new(),
                         environments: Vec::new(),
-                        shell: Some(zoi_project::config::ShellSpec::default())
+                        shell: Some(zoi_project::config::ShellSpec::default()),
+                        imports: std::collections::BTreeMap::default(),
+                        package_export: None
                     };
 
                     crate::cmd::install::run(

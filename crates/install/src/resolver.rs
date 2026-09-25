@@ -157,7 +157,12 @@ fn extract_zoi_dependencies(deps: &types::DependenciesV2) -> Vec<String> {
         if let Ok(dep) = dependencies::parse_dependency_string(&dep_str)
             && dep.manager == "zoi"
         {
-            zoi_deps.push(dep.package.to_string());
+            let mut source = dep.package.to_string();
+            if let Some(version) = &dep.version_str {
+                source.push('@');
+                source.push_str(version);
+            }
+            zoi_deps.push(source);
         }
     }
     zoi_deps

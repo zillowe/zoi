@@ -1498,13 +1498,121 @@ pub struct ZoiLockV2 {
     pub registries_hash: Option<String>,
     /// A map of registry handles to their pinned Git URLs and commit
     /// revisions.
+    #[serde(default)]
     pub registries: BTreeMap<String, LockRegistryV2>,
     /// A map of package identifiers to their fully resolved installation
     /// state.
+    #[serde(default)]
     pub installed_packages: BTreeMap<String, LockPackageDetailV2>,
     /// The target platform this lockfile was generated for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub platform: Option<String>
+    pub platform: Option<String>,
+    /// The project manifest captured by this lockfile.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manifest: Option<LockManifestV2>,
+    /// The project configuration captured by this lockfile.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<LockProjectV2>,
+    /// Imported projects keyed by repository URL.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub imports: BTreeMap<String, LockImportV2>,
+    /// The package requirements declared at the project root.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub root_requirements: Vec<LockRequirementV2>
+}
+
+/// Detailed lock information for a project manifest.
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+pub struct LockManifestV2 {
+    /// The path of the project manifest.
+    #[serde(default)]
+    pub path: String,
+    /// The hash of the project manifest.
+    #[serde(default)]
+    pub hash: String
+}
+
+/// Detailed lock information for a project configuration.
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+pub struct LockProjectV2 {
+    /// The hash of the project manifest.
+    #[serde(default)]
+    pub manifest_hash: String,
+    /// The hash of the task configuration.
+    #[serde(default)]
+    pub tasks_hash: String,
+    /// The hash of the environment configuration.
+    #[serde(default)]
+    pub environments_hash: String,
+    /// The hash of the shell configuration.
+    #[serde(default)]
+    pub shell_hash: String,
+    /// The hash of the check configuration.
+    #[serde(default)]
+    pub checks_hash: String,
+    /// Whether the project is local to the lockfile.
+    #[serde(default)]
+    pub local: bool
+}
+
+/// A package requirement captured in the lockfile.
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+pub struct LockRequirementV2 {
+    /// The source from which the requirement was declared.
+    #[serde(default)]
+    pub source: String,
+    /// The identifier of the requirement's declarer.
+    #[serde(default)]
+    pub declared_by: String,
+    /// The normalized requirement specification.
+    #[serde(default)]
+    pub spec: serde_json::Value
+}
+
+/// Detailed lock information for an imported project.
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+pub struct LockImportV2 {
+    /// The URL of the imported repository.
+    #[serde(default)]
+    pub repo: String,
+    /// The revision requested from the repository.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_revision: Option<String>,
+    /// The exact revision resolved from the repository.
+    #[serde(default)]
+    pub resolved_revision: String,
+    /// The hash of the imported project manifest.
+    #[serde(default)]
+    pub manifest_hash: String,
+    /// The path of the imported project within the repository.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    /// Exports made available by the imported project, keyed by export name.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub exports: BTreeMap<String, String>
+}
+
+/// The resolved source of an installed package.
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+pub struct LockPackageSourceV2 {
+    /// The source kind used to resolve the package.
+    #[serde(default)]
+    pub kind: String,
+    /// The original source request.
+    #[serde(default)]
+    pub request: String,
+    /// The resolved source URL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// The resolved source revision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<String>,
+    /// The source path within the resolved source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    /// The hash of the package definition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub definition_hash: Option<String>
 }
 
 /// Detailed lock information for a registry.
@@ -1517,7 +1625,7 @@ pub struct LockRegistryV2 {
 }
 
 /// Detailed lock information for an installed package.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct LockPackageDetailV2 {
     /// The name of the package.
     pub name: String,
@@ -1553,7 +1661,28 @@ pub struct LockPackageDetailV2 {
     /// The SHA-512 hash of the installed package content.
     pub hash: String,
     /// The resolved dependencies of the package.
-    pub dependencies: Option<DependenciesV2>
+    pub dependencies: Option<DependenciesV2>,
+    /// The resolved source of the package.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<LockPackageSourceV2>,
+    /// The hash of the package definition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub definition_hash: Option<String>,
+    /// The package identifiers resolved as dependencies.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub resolved_dependencies: Vec<String>,
+    /// The selected dependency options.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub chosen_options: Vec<String>,
+    /// The selected optional dependencies.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub chosen_optionals: Vec<String>,
+    /// The exact Git commit used as the package source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git_sha: Option<String>,
+    /// The package identifiers that require this package.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub required_by: Vec<String>
 }
 
 /// A link to a Git repository in a repository configuration.

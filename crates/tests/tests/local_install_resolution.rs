@@ -1,5 +1,6 @@
 //! Integration tests for local package installation and resolution.
 
+use std::fs;
 use std::path::PathBuf;
 
 use tempfile::tempdir;
@@ -160,4 +161,61 @@ fn resolves_dependency_graph_for_local_pkg_lua_alpha_channel() {
         .next()
         .expect("graph should contain one node");
     assert_eq!(node.version, "1.1.0-alpha");
+}
+
+#[test]
+fn resolves_relative_pkg_lua_dependency_from_declaring_file() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("tempdir should be created");
+    let root = tmp.path().to_path_buf();
+
+    ctx.set_env_var("HOME", &root);
+    common::TestContextGuard::set_sysroot(root.clone());
+
+    let app = root.join("app.pkg.lua");
+    let dependency_dir = root.join("dependency");
+    fs::create_dir_all(&dependency_dir)
+        .expect("dependency folder should be created");
+    fs::write(
+        &app,
+        r"
+metadata({ name = 'relative-app', repo = 'community', version = '1.0.0', description = 'App', maintainer = { name = 'Test', email = 'test@example.com' }, types = { 'source' } })
+dependencies({ runtime = { 'zoi:./dependency' } })
+",
+    )
+    .expect("app package should be written");
+    fs::write(
+        dependency_dir.join("dependency.pkg.lua"),
+        "metadata({ name = 'relative-dependency', repo = 'community', version \
+         = '1.0.0', description = 'Dependency', maintainer = { name = 'Test', \
+         email = 'test@example.com' }, types = { 'source' } })"
+    )
+    .expect("dependency package should be written");
+
+    let (graph, non_zoi_deps) = install::resolver::resolve_dependency_graph(
+        &[app.to_string_lossy().into_owned()],
+        Some(types::Scope::User),
+        true,
+        true,
+        false,
+        None,
+        true,
+        None
+    )
+    .expect("relative package dependency should resolve");
+
+    assert!(non_zoi_deps.is_empty());
+    assert_eq!(graph.nodes.len(), 2);
+    assert!(
+        graph
+            .nodes
+            .values()
+            .any(|node| node.pkg.name == "relative-app")
+    );
+    assert!(
+        graph
+            .nodes
+            .values()
+            .any(|node| node.pkg.name == "relative-dependency")
+    );
 }

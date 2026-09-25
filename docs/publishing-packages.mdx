@@ -181,27 +181,37 @@ Publish this extension (e.g. in a separate git repository that users can add). U
 
 ## Making a Git Repository Directly Installable
 
-You can make a Git repository directly installable via `zoi install --repo <repo-spec>` by placing a `zoi.lua` file in its root. This file tells Zoi what package to install from your repository.
-
-**Example `zoi.lua`:**
+Place a root `zoi.lua` in a Git repository to make one or more package definitions installable with `zoi install --repo`.
 
 ```lua
--- zoi.lua in the root of your repository
-package("my-awesome-package")
+package({
+    main = "./packages/my-awesome-package",
+    packages = {
+        tools = "./tools.pkg.lua"
+    }
+})
 ```
 
-The `package` declaration takes one source string, which can be:
-
-- A package name (e.g. `my-package` or `@my-repo/my-package`). Zoi will resolve this from the official repositories.
-- A relative path to a `.pkg.lua` file in the repository.
-- A full URL to a raw `.pkg.lua` file.
-
-With this file in place, users can install the package from your repository without adding it first:
+`package("path")` is shorthand for `package({ main = "path" })`. Sources are repository-relative `.pkg.lua` files or folders. A folder must contain `<folder-name>.pkg.lua` or exactly one `.pkg.lua` file. Zoi clones the complete repository for dependency resolution and build execution.
 
 ```sh
-# Install from GitHub (default)
+# Install main from GitHub
 zoi install --repo YourUsername/my-zoi-repo
 
-# Install from GitLab
-zoi install --repo gl:YourUsername/my-zoi-repo
+# Select a named package export
+zoi install --repo YourUsername/my-zoi-repo:tools
+
+# Install from GitLab or Codeberg
+zoi install --repo gl:YourUsername/my-zoi-repo:tools
+zoi install --repo cb:YourUsername/my-zoi-repo:tools
+```
+
+A repository can import another repository with the same `zoi.lua` vocabulary:
+
+```lua
+imports({
+    shared = { repo = "YourOrganization/shared-packages", rev = "main" }
+})
+
+package("shared:common")
 ```

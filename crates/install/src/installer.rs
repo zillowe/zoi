@@ -1182,7 +1182,9 @@ pub fn install_prepared_node(
             &node.repo_type,
             &node.chosen_options,
             &node.chosen_optionals,
-            sub_package_to_install.as_deref()
+            sub_package_to_install.as_deref(),
+            &node.source,
+            node.git_sha.as_deref()
         ) {
             eprintln!(
                 "Warning: failed to record package installation for '{}': {}",

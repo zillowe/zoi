@@ -183,9 +183,14 @@ impl<'a> Orchestrator<'a> {
         let mut sources_to_process: Vec<String> = sources.to_vec();
         let mut _is_project_install = false;
         let mut frozen_packages = None;
+        let mut _repo_workspace = None;
 
         if options.frozen {
             let lockfile = project::lockfile::read_zoi_lock()?;
+            project::imports::materialize_locked(
+                &lockfile,
+                std::path::Path::new(".")
+            )?;
             let locked_packages = project::lockfile::locked_packages(&lockfile);
             sources_to_process = locked_packages
                 .iter()
@@ -207,7 +212,7 @@ impl<'a> Orchestrator<'a> {
             _is_project_install = true;
         } else if sources.is_empty() && repo.is_none() {
             if std::path::Path::new("zoi.lua").exists() {
-                if let Ok(config) = project::config::load() {
+                if let Ok(mut config) = project::config::load() {
                     let config_file = "zoi.lua";
                     if !options.plan_json {
                         if lockfile_exists {
@@ -225,6 +230,15 @@ impl<'a> Orchestrator<'a> {
                             );
                         }
                     }
+                    project::lockfile::record_project_config(
+                        &config,
+                        std::path::Path::new(config_file)
+                    )?;
+                    let resolved_imports = project::imports::resolve(
+                        &mut config,
+                        std::path::Path::new(".")
+                    )?;
+                    project::lockfile::record_imports(&resolved_imports)?;
                     sources_to_process.clone_from(&config.pkgs);
                     if scope_override.is_none() {
                         scope_override = Some(types::Scope::Project);
@@ -238,17 +252,31 @@ impl<'a> Orchestrator<'a> {
             }
         }
 
-        if let Some(_repo_spec) = repo {
+        if let Some(repo_spec) = repo {
             if scope_override == Some(types::Scope::Project) {
                 return Err(anyhow!(
                     "Installing from a repository to a project scope is not \
                      supported."
                 ));
             }
-
-            return Err(anyhow!(
-                "Repository installation not implemented in Orchestrator yet."
-            ));
+            crate::pkg::repo_install::confirm_repository_source(
+                &repo_spec,
+                options.yes
+            )?;
+            let workspace =
+                crate::pkg::repo_install::RepoWorkspace::prepare(&repo_spec)?;
+            if !options.plan_json {
+                println!(
+                    "{} Cloned repository at commit {}",
+                    "::".bold().blue(),
+                    workspace.revision().cyan()
+                );
+            }
+            sources_to_process = workspace.sources().to_vec();
+            for source in &sources_to_process {
+                crate::pkg::repo_install::print_prepared_source(source);
+            }
+            _repo_workspace = Some(workspace);
         }
 
         if sources_to_process.is_empty() {

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::Path;
 
@@ -6,7 +6,7 @@ use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 
 /// Project-local configuration overrides.
-#[derive(Debug, Deserialize, Default, Clone)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct ProjectLocalConfig {
     /// Whether the project is isolated from the system registry.
     #[serde(default)]
@@ -14,7 +14,7 @@ pub struct ProjectLocalConfig {
 }
 
 /// Shell configuration for the project.
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ShellSpec {
     /// Environment variables for the shell, potentially platform-specific.
     #[serde(default)]
@@ -22,7 +22,7 @@ pub struct ShellSpec {
 }
 
 /// Specification for a project-scoped registry.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RegistrySpec {
     /// The URL of the registry.
     pub url: String,
@@ -31,6 +31,29 @@ pub struct RegistrySpec {
     /// The type of registry (e.g. "git").
     #[serde(rename = "type")]
     pub registry_type: Option<String>
+}
+
+/// Specification for a repository import.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct ImportSpec {
+    /// The repository in `owner/repo` form.
+    pub repo: String,
+    /// The git revision to import.
+    #[serde(default)]
+    pub rev: Option<String>
+}
+
+/// Specification for exported package definitions.
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(deny_unknown_fields)]
+pub struct PackageExportSpec {
+    /// The main package definition.
+    #[serde(default)]
+    pub main: Option<String>,
+    /// Named additional package definitions.
+    #[serde(default)]
+    pub packages: BTreeMap<String, String>
 }
 
 /// Specification for a package dependency.
@@ -60,7 +83,7 @@ pub struct PackageSpec {
 /// (`tasks`), environment setups (`environments`), ephemeral shell
 /// configuration (`shell`), and declarative package checks (`checks`)
 /// defined in `zoi.lua`.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct ProjectConfig {
     /// The name of the project.
@@ -90,7 +113,13 @@ pub struct ProjectConfig {
     pub environments: Vec<EnvironmentSpec>,
     /// Ephemeral shell configurations.
     #[serde(default)]
-    pub shell: Option<ShellSpec>
+    pub shell: Option<ShellSpec>,
+    /// Repository imports declared by the configuration.
+    #[serde(default)]
+    pub imports: BTreeMap<String, ImportSpec>,
+    /// Package definitions exported by a repository configuration.
+    #[serde(default)]
+    pub package_export: Option<PackageExportSpec>
 }
 
 /// Deserializes the flat `pkgs` list where each entry can either be a plain
@@ -126,7 +155,7 @@ where
 }
 
 /// A declarative package check.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PackageCheck {
     /// The name of the package.
     pub name: String,
@@ -135,7 +164,7 @@ pub struct PackageCheck {
 }
 
 /// A value that can be a single string or a map of platform-specific strings.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum PlatformOrString {
     /// A simple string value.
@@ -146,7 +175,7 @@ pub enum PlatformOrString {
 
 /// A value that can be a list of strings or a map of platform-specific string
 /// lists.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum PlatformOrStringVec {
     /// A simple list of strings.
@@ -157,7 +186,7 @@ pub enum PlatformOrStringVec {
 
 /// A value that can be an environment map or a map of platform-specific
 /// environment maps.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum PlatformOrEnvMap {
     /// A simple environment map.
@@ -173,7 +202,7 @@ impl Default for PlatformOrEnvMap {
 }
 
 /// Specification for a declarative task/command.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CommandSpec {
     /// The name of the task.
     pub cmd: String,
@@ -191,7 +220,7 @@ pub struct CommandSpec {
 }
 
 /// Specification for a project environment setup.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EnvironmentSpec {
     /// The name of the environment.
     pub name: String,

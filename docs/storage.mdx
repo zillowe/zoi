@@ -69,6 +69,9 @@ project package data, registries, configuration, and task cache live under
 
 - `.zoi/pkgs/store`: project-local package store
 - `.zoi/pkgs/bin`: project-local command shims
+- `.zoi/imports/<alias>`: cloned repositories declared by `imports()` in `zoi.lua`
+- `./zoi.lock`: pinned registries, imports, root requirements, package provenance, and selections
+- `./zoi.lua`: declarative project and repository configuration
 
 This makes projects reproducible and keeps their dependencies fully isolated
 from your user or system installations.
