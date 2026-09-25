@@ -103,7 +103,7 @@ chrono = { version = "0.4.45", default-features = false, features = [
 clap = { version = "4.6.7", features = ["derive", "color"] }
 clap_complete = "4.6.11"
 colored = "3.1.1"
-comfy-table = "8.0.0"
+comfy-table = "8.0.1"
 crossterm = "0.29.0"
 dialoguer = "0.12.0"
 dirs = "7.0.0"
@@ -149,7 +149,7 @@ serde = { version = "1.0.229", default-features = false, features = ["derive"] }
 serde_json = "1.0.151"
 serde_yaml = { package = "yaml_serde", version = "0.10.7" }
 sha2 = "0.11.0"
-zbsdiff = { version = "1.6.3", features = ["zdelta"] }
+zbsdiff = { version = "1.6.4", features = ["zdelta"] }
 spdx = "0.13.5"
 tar = { version = "0.4.46", features = ["xattr"] }
 tempfile = "3.27.0"
@@ -165,7 +165,7 @@ xz2 = "0.1.7"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 zstd = "0.14.0"
 ar = "0.9.0"
-sevenz-rust2 = "0.22.2"
+sevenz-rust2 = "0.23.0"
 phf = "0.14.0"
 rusqlite = { version = "0.40.2", default-features = false, features = [
     "bundled",
