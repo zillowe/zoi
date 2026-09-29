@@ -62,6 +62,14 @@ git:
     url: "https://gitlab.com/zillowe/zillwen/zusty/zoidberg.git"
   - type: "mirror"
     url: "https://github.com/zillowe/zoidberg.git"
+zrepo:
+  - type: "main"
+    url: "https://packages.zillowe.qzz.io/zoidberg/main.zrepo"
+    delta: "https://packages.zillowe.qzz.io/zoidberg/main.zrepo.zdelta"
+    pgp: "https://packages.zillowe.qzz.io/zoidberg/main.zrepo.sig"
+    hash: "https://packages.zillowe.qzz.io/zoidberg/main.zrepo.sha256"
+  - type: "mirror"
+    url: "https://mirror.example.com/zoidberg/main.zrepo"
 pkg:
   - type: "main"
     url: "https://gitlab.com/api/v4/projects/71125308/packages/generic/{id}/{version}/{name}-{version}-{platform}.zpa"
@@ -88,11 +96,12 @@ repos:
 - **`description`** (String): Description of the repository collection.
 - **`handle`** (String): Short identifier used as the registry handle. This is what users see in `@handle/repo/package` install syntax.
 - **`advisory_prefix`** (String, Optional): Prefix used for security advisories (e.g. `ZSA`).
-- **`git`** (List of Objects): Git mirrors for the repository content.
+- **`git`** (List of Objects, Optional): Git mirrors for the repository content. May be omitted entirely when the registry is published as a `zrepo` snapshot.
+- **`zrepo`** (List of Objects, Optional): zstd-compressed registry snapshots (`.zrepo`) and their incremental update patches. Takes precedence over `git` when present, so a client downloads one immutable file instead of cloning.
 - **`pkg`** (List of Objects): Package download mirrors. Supports placeholders like `{repo}`, `{os}`, `{arch}`, `{version}`, `{id}`.
 - **`delta`** (List of Objects): Delta patch mirrors for bandwidth-efficient upgrades. Supports placeholders like `{repo}`, `{os}`, `{arch}`, `{version}`, `{id}`.
 - **`pgp`** (List of Objects): Trusted PGP keys for signature verification.
-- **`repos`** (List of Objects): Sub-repositories contained within this registry.
+- **`repos`** (List of Objects, Optional): Sub-repositories contained within this registry.
   - **`name`** (String): Name of the sub-repo (e.g. `main`).
   - **`type`** (String): Type of the repository (`official`, `community`, `unofficial`, `testing`, `archive`).
   - **`active`** (Boolean): Whether the sub-repo is active and should be read.
@@ -127,6 +136,51 @@ delta:
 When upgrading, Zoi looks up the delta URL using the **target version** (the version being upgraded to). The delta patch is verified against its hash and signature before application. If no delta is configured, unavailable, or fails verification, Zoi silently falls back to downloading the full archive.
 
 When the cached version is more than one release behind the target, Zoi applies deltas sequentially: each intermediate delta is downloaded, verified, and applied on top of the previously rebuilt archive until the target version is reached. The number of steps is limited by the `max_delta_steps` user config (default `3`); anything beyond that falls back to a full download.
+
+### Registry Snapshots (.zrepo)
+
+A registry may publish its entire content as a single `.zrepo` file instead of relying on a Git clone.
+
+**Format:** zstd frame wrapping a POSIX tar
+
+The tar holds the same tree a Git clone would produce: `repo.yaml`, `packages.json`, and every `.pkg.lua` and `.sec.yaml`. A snapshot missing `repo.yaml` is rejected, since it cannot be used to build a registry.
+
+Snapshots are configured in the `zrepo` section of `repo.yaml`, using the same `main`/`mirror` mirror types as `git`. When `zrepo` is present it takes precedence over `git`: the snapshot is the cheaper transport, and the Git repository remains available as a fallback.
+
+- `url`: The `.zrepo` snapshot URL.
+- `delta`: (Optional) URL of the incremental update patch. Defaults to `<url>.zdelta`.
+- `pgp`: (Optional) URL of the snapshot's detached PGP signature.
+- `hash`: (Optional) URL of the snapshot's SHA-256 checksum.
+- `size`: (Optional) URL of the snapshot's size information.
+
+**Update patches:** a registry `.zdelta` is a bsdiff diff computed over the *uncompressed tar* of the previous snapshot. Tar stores each file in a contiguous, byte-stable block, so unchanged entries diff to almost nothing; diffing the compressed bytes would not compress well.
+
+A patch is published in one of two shapes:
+
+- **Container** (recommended): a zstd-compressed tar holding a `meta.json` descriptor and a single patch entry. The descriptor binds the patch to its base and target:
+
+  ```json
+  {
+    "format": "zdelta.v1",
+    "type": "zrepo",
+    "base_sha256": "<sha256 of the previous snapshot's tar>",
+    "target_sha256": "<sha256 of the new snapshot's tar>",
+    "patch": "data.bsdiff"
+  }
+  ```
+
+  Zoi verifies `base_sha256` against the cached snapshot and `target_sha256` against the rebuilt one, so a patch built against a different base or a corrupted download is rejected rather than installed.
+
+- **Bare patch**: a zstd-compressed raw `BSDIFF40` patch with no metadata. Accepted, but carries no hash binding, so the published `hash` checksum is the only integrity check available.
+
+**Behaviour:**
+
+- The client keeps the last downloaded snapshot alongside the registry index as the base for the next update, and reuses it across syncs.
+- A patch is optional. A registry that declares no `delta` is probed once at `<url>.zdelta`; finding nothing there is the normal case and is not reported, because a full download is the correct response to a registry that does not publish patches. A `delta` that is declared but unserved, or a patch that does not fit the snapshot held, is reported as a warning. In all three cases Zoi falls back to a full download, so no failed update can leave a registry unsyncable or half-applied.
+- Entry paths inside the snapshot are validated on extraction. Absolute paths and `..` components are rejected, so a crafted archive cannot write outside the registry directory.
+- A new tree is staged and swapped into place, and the previous tree is only removed once the new one is installed. An interrupted sync leaves the previous registry intact.
+- When `authorities` are configured and the snapshot publishes a `pgp` signature, the signature is verified before the snapshot is installed. The registry's PGP keys are imported from `repo.yaml` first so they are available in the keyring.
+- The SHA-256 of the installed snapshot is recorded in the registry index. A later sync that installs a byte-identical snapshot skips re-parsing every `.pkg.lua`.
 
 ---
 

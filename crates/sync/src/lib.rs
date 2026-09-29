@@ -2,6 +2,10 @@
 //!
 //! This crate handles cloning and updating package registries, rebuilding the
 //! local `SQLite` metadata cache, and synchronizing external Git repositories.
+//!
+//! Registry content can arrive either as a Git clone or as a zstd-compressed
+//! `.zrepo` snapshot. See the [`zrepo`] module for the snapshot transport and
+//! its incremental `.zdelta` updates.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -20,6 +24,8 @@ use zoi_core::{config, offline, pgp, types, utils as core_utils};
 use zoi_db as db;
 use zoi_install::util as install_util;
 use zoi_lua::parser as lua_parser;
+
+pub mod zrepo;
 
 /// Rebuilds the `SQLite` metadata database from the raw registry files.
 ///
@@ -785,32 +791,25 @@ fn try_sync_at_path(
     }
 }
 
-/// Imports PGP keys from the repo.yaml file in a repository.
-fn sync_pgp_keys_at_path(
-    db_path: &Path,
+/// Imports PGP keys from a parsed repository configuration.
+///
+/// A key that cannot be imported is reported but does not fail the sync: the
+/// key may simply already be present, and refusing to sync over that would
+/// make a registry unusable for reasons outside the user's control.
+fn sync_pgp_keys(
+    repo_config: &types::RepoConfig,
     verbose: bool,
     pb: Option<&ProgressBar>
-) -> Result<()> {
+) {
     if verbose {
         println!("\n{}", "Syncing PGP keys from repository...".green());
     }
-    if !db_path.join("repo.yaml").exists() {
-        if verbose {
-            println!(
-                "{}",
-                "repo.yaml not found, skipping PGP key sync.".yellow()
-            );
-        }
-        return Ok(());
-    }
-
-    let repo_config = config::read_repo_config(db_path)?;
 
     if repo_config.pgp.is_empty() {
         if verbose {
             println!("No PGP keys defined in repo.yaml.");
         }
-        return Ok(());
+        return;
     }
 
     if let Some(p) = pb {
@@ -819,7 +818,7 @@ fn sync_pgp_keys_at_path(
         p.set_message(format!("PGP Keys {}", repo_config.name.cyan()));
     }
 
-    for key_info in repo_config.pgp {
+    for key_info in &repo_config.pgp {
         let key_source = &key_info.key;
         let key_name = &key_info.name;
 
@@ -857,7 +856,26 @@ fn sync_pgp_keys_at_path(
             p.inc(1);
         }
     }
+}
 
+/// Imports PGP keys from the repo.yaml file in a repository.
+fn sync_pgp_keys_at_path(
+    db_path: &Path,
+    verbose: bool,
+    pb: Option<&ProgressBar>
+) -> Result<()> {
+    if !db_path.join("repo.yaml").exists() {
+        if verbose {
+            println!(
+                "{}",
+                "repo.yaml not found, skipping PGP key sync.".yellow()
+            );
+        }
+        return Ok(());
+    }
+
+    let repo_config = config::read_repo_config(db_path)?;
+    sync_pgp_keys(&repo_config, verbose, pb);
     Ok(())
 }
 
@@ -909,6 +927,18 @@ fn parse_full_repo_url(url: &str) -> Option<(String, String)> {
 /// Attempts to fetch the repo.yaml file directly from common Git providers
 /// without cloning.
 fn fetch_repo_yaml_content(url: &str) -> Result<String> {
+    // A URL that already points at a YAML document is fetched verbatim, which
+    // is how non-Git registries publish their manifest.
+    if is_repo_yaml_url(url) {
+        let client = core_utils::get_http_client().ok();
+        if let Some(c) = client
+            && let Ok(response) = c.get(url).send()
+            && response.status().is_success()
+        {
+            return Ok(response.text()?);
+        }
+    }
+
     let (provider, repo_path) = parse_full_repo_url(url).ok_or_else(|| {
         anyhow!("Unsupported git provider or URL format for direct fetch.")
     })?;
@@ -942,6 +972,63 @@ fn fetch_repo_yaml_content(url: &str) -> Result<String> {
         "Could not find 'repo.yaml' in repo '{repo_path}' on branches main or \
          master."
     ))
+}
+
+/// Returns true when `url` looks like it points directly at a `repo.yaml`
+/// document rather than at a Git repository.
+///
+/// Only URLs whose path ends in a YAML extension qualify. Without that guard a
+/// plain repository URL such as `https://github.com/org/repo` would be
+/// requested verbatim and return an HTML page instead of YAML.
+pub fn is_repo_yaml_url(url: &str) -> bool {
+    let url = url.split(['?', '#']).next().unwrap_or(url);
+    let path = url
+        .split("://")
+        .nth(1)
+        .and_then(|rest| rest.find('/').map(|i| &rest[i..]));
+    path.is_some_and(|p| {
+        Path::new(p)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("yaml"))
+            || Path::new(p)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("yml"))
+    })
+}
+
+/// Fetches and parses `repo.yaml` from an HTTP(S) URL.
+///
+/// This is the entry point for registries that are published as documents
+/// rather than cloned as Git repositories. The document names the handle and
+/// describes where the content lives, either as a `.zrepo` snapshot or as a
+/// set of `git:` links.
+///
+/// # Errors
+///
+/// Returns an error if the URL cannot be fetched or the YAML is invalid.
+pub fn fetch_repo_config_over_http(url: &str) -> Result<types::RepoConfig> {
+    if offline::is_offline() {
+        return Err(anyhow!("Cannot fetch '{url}': Zoi is offline."));
+    }
+
+    let client = core_utils::get_http_client()?;
+    let response = client.get(url).send()?;
+    if !response.status().is_success() {
+        return Err(anyhow!(
+            "Failed to fetch '{url}': server responded {}",
+            response.status()
+        ));
+    }
+
+    let content = response.text()?;
+    let repo_config: types::RepoConfig = serde_yaml::from_str(&content)
+        .map_err(|e| anyhow!("Invalid repo.yaml at '{url}': {e}"))?;
+
+    if repo_config.name.is_empty() {
+        return Err(anyhow!("repo.yaml at '{url}' has no 'name' field."));
+    }
+
+    Ok(repo_config)
 }
 
 /// Resolves the registry handle for a given URL, using direct fetch or cloning
@@ -986,21 +1073,255 @@ fn fetch_handle_for_url(url: &str, verbose: bool) -> Result<String> {
     }
 }
 
-/// Synchronizes a single registry (default or added) with its remote Git
-/// source.
+/// Resolves a registry's full identity from a URL that points at a `repo.yaml`
+/// document.
+///
+/// Used by `zoi registry add <url>` so the registry is recorded with its real
+/// handle and metadata instead of a URL that only gets resolved at sync time.
+///
+/// # Errors
+///
+/// Returns an error if the document cannot be fetched or parsed.
+pub fn resolve_registry_from_url(url: &str) -> Result<types::Registry> {
+    let repo_config = fetch_repo_config_over_http(url)?;
+
+    Ok(types::Registry {
+        handle: repo_config.name.clone(),
+        url: url.to_string(),
+        name: Some(repo_config.name),
+        description: if repo_config.description.is_empty() {
+            None
+        } else {
+            Some(repo_config.description)
+        },
+        advisory_prefix: repo_config.advisory_prefix,
+        authorities: None
+    })
+}
+
+/// How a registry's content tree was obtained during a sync.
+enum RegistrySource {
+    /// The content came from a zstd-compressed `.zrepo` snapshot whose SHA-256
+    /// is recorded so an unchanged snapshot can skip re-indexing.
+    Zrepo {
+        /// SHA-256 of the `.zrepo` file that is now installed.
+        hash: String
+    },
+    /// The content came from a Git clone. `pre_sync_head` is the commit that
+    /// was checked out before the sync, used to roll back if signature
+    /// verification fails.
+    Git {
+        /// The HEAD commit oid before this sync ran.
+        pre_sync_head: Option<git2::Oid>
+    },
+    /// Nothing was fetched because Zoi is offline and a usable copy is already
+    /// on disk. The existing tree is left exactly as it is.
+    Cached
+}
+
+/// Obtains the registry's content tree at `target_dir`, choosing between the
+/// `.zrepo` snapshot transport and the Git clone transport.
+///
+/// A registry configured by the URL of its `repo.yaml` document is resolved
+/// from that document first, because the document names both the handle and the
+/// transport. If it advertises `zrepo:` links the snapshot is used; otherwise
+/// its `git:` links are used, which keeps every existing registry working
+/// through exactly the same code path as before.
+///
+/// # Errors
+///
+/// Returns an error if the content cannot be obtained by any transport.
+fn fetch_registry_content(
+    reg: &mut types::Registry,
+    target_dir: &Path,
+    db_root: &Path,
+    verbose: bool,
+    fallback: bool,
+    m: Option<&MultiProgress>,
+    pb: Option<&ProgressBar>
+) -> Result<RegistrySource> {
+    // A `repo.yaml` URL is the canonical identity of a non-Git registry and
+    // the only place its `zrepo:` links can come from, so fetch it up front.
+    let published_config: Option<types::RepoConfig> =
+        if is_repo_yaml_url(&reg.url) && !offline::is_offline() {
+            match fetch_repo_config_over_http(&reg.url) {
+                Ok(rc) => Some(rc),
+                Err(e) => {
+                    if verbose {
+                        println!(
+                            "{} Could not refresh repo.yaml from {}: {}",
+                            "Warning:".yellow(),
+                            reg.url.yellow(),
+                            e
+                        );
+                    }
+                    // Fall back to the previously synced copy so an
+                    // unreachable manifest does not block the sync.
+                    config::read_repo_config(target_dir).ok()
+                }
+            }
+        } else {
+            None
+        };
+
+    if let Some(repo_config) = &published_config {
+        let zrepo_links = zrepo::candidate_links(repo_config);
+        if !zrepo_links.is_empty() {
+            if offline::is_offline() {
+                // Nothing can be fetched, so the previously synced tree is
+                // the best answer available. Returning here matters: falling
+                // through would send the sync down the Git path, which would
+                // then fail signature verification on a directory that is not
+                // a Git repository at all.
+                if !target_dir.exists() {
+                    return Err(anyhow!(
+                        "Cannot sync registry '{}': Zoi is offline and the \
+                         registry has not been downloaded yet.",
+                        reg.handle
+                    ));
+                }
+                if verbose {
+                    println!(
+                        "{}",
+                        "Zoi is offline. Skipping registry snapshot update."
+                            .yellow()
+                    );
+                }
+                return Ok(RegistrySource::Cached);
+            }
+
+            // Import the registry's PGP keys before the snapshot is fetched:
+            // verifying its signature requires them in the keyring.
+            sync_pgp_keys(repo_config, verbose, pb);
+
+            let authorities = reg.authorities.clone().unwrap_or_default();
+            if let Some(p) = pb {
+                p.set_message(format!(
+                    "Fetching snapshot for {}",
+                    reg.handle.cyan()
+                ));
+            }
+
+            match zrepo::sync_zrepo(
+                &zrepo_links,
+                db_root,
+                &reg.handle,
+                target_dir,
+                &authorities,
+                pb,
+                verbose
+            ) {
+                Ok(hash) => return Ok(RegistrySource::Zrepo { hash }),
+                Err(e) => {
+                    // A registry that publishes a broken or unreachable
+                    // snapshot is still usable through its Git repository, so
+                    // try that before giving up. The failure is always
+                    // reported: a silently downgraded sync would hide a broken
+                    // publishing pipeline.
+                    let git_urls: Vec<String> = repo_config
+                        .git
+                        .iter()
+                        .map(|link| link.url.clone())
+                        .collect();
+
+                    if !fallback || git_urls.is_empty() {
+                        return Err(e);
+                    }
+
+                    let msg = format!(
+                        "{} Could not fetch the registry snapshot: {}. \
+                         Falling back to the Git repository.",
+                        "Warning:".yellow(),
+                        e
+                    );
+                    if let Some(p) = pb {
+                        p.println(&msg);
+                    } else {
+                        eprintln!("{msg}");
+                    }
+                }
+            }
+        }
+    }
+
+    // Git transport. A published `repo.yaml` supplies the clone URLs; a plain
+    // Git URL registry clones itself.
+    let mut candidate_urls = vec![reg.url.clone()];
+
+    if let Some(repo_config) = &published_config {
+        candidate_urls.clear();
+        for git_link in &repo_config.git {
+            if !candidate_urls.contains(&git_link.url) {
+                candidate_urls.push(git_link.url.clone());
+            }
+        }
+        if candidate_urls.is_empty() {
+            return Err(anyhow!(
+                "Registry '{}' publishes neither 'zrepo' nor 'git' links in \
+                 its repo.yaml, so there is nothing to sync.",
+                reg.handle
+            ));
+        }
+    } else if fallback
+        && target_dir.exists()
+        && let Ok(repo_config) = config::read_repo_config(target_dir)
+    {
+        for git_link in
+            repo_config.git.iter().filter(|g| g.link_type == "mirror")
+        {
+            if git_link.url != reg.url
+                && !candidate_urls.contains(&git_link.url)
+            {
+                candidate_urls.push(git_link.url.clone());
+            }
+        }
+    }
+
+    // Captured before the pull so a failed signature check can roll back to
+    // the last known-good commit.
+    let pre_sync_head = match Repository::open(target_dir) {
+        Ok(repo) => repo.head().ok().and_then(|head| head.target()),
+        Err(_) => None
+    };
+
+    let mut last_error = None;
+    for url in candidate_urls {
+        if let Err(e) = try_sync_at_path(&url, target_dir, verbose, m, pb) {
+            let msg = format!("Sync with {} failed: {}", url.yellow(), e);
+            if let Some(p) = pb {
+                p.println(&msg);
+            } else if let Some(m_ref) = m {
+                let _ = m_ref.println(&msg);
+            } else {
+                eprintln!("{msg}");
+            }
+            last_error = Some(e);
+        } else {
+            if url != reg.url {
+                reg.url = url;
+            }
+            return Ok(RegistrySource::Git { pre_sync_head });
+        }
+    }
+
+    Err(last_error.unwrap_or_else(|| anyhow!("All sync candidates failed.")))
+}
+
+/// Synchronizes a single registry (default or added) with its remote source.
 ///
 /// Logic Flow:
-/// - Handle Resolution: If the handle is missing, it clones the repo to find
-///   it.
-/// - Mirror Fallback: If the primary Git URL fails, it automatically tries
-///   mirrors defined in the registry's `repo.yaml`.
-/// - Signature Verification: If `authorities` are configured, it verifies the
-///   signature of the latest commit to ensure the entire registry state is
-///   trusted.
+/// - Handle Resolution: If the handle is missing, it resolves it from the
+///   remote `repo.yaml`.
+/// - Transport Selection: A registry publishing `zrepo:` links is synced from
+///   its `.zrepo` snapshot (using a `.zdelta` patch when one is available);
+///   otherwise its Git repository is cloned or pulled, trying mirrors defined
+///   in the `repo.yaml` if the primary fails.
+/// - Signature Verification: Git registries verify the signature of the latest
+///   commit; `.zrepo` registries verify the signature of the snapshot.
 /// - Key Sync: Automatically imports PGP keys defined in the registry's
 ///   `repo.yaml`.
 /// - Indexing: Triggers `refresh_registry_db` to update the local `SQLite`
-///   cache.
+///   cache, skipped when the snapshot is byte-identical to the indexed one.
 fn sync_registry(
     mut reg: types::Registry,
     db_root: &Path,
@@ -1036,114 +1357,116 @@ fn sync_registry(
     }
 
     let target_dir = db_root.join(&reg.handle);
+    let pb_ref = pb.as_ref();
 
-    let mut candidate_urls = vec![reg.url.clone()];
-
-    if fallback
-        && target_dir.exists()
-        && let Ok(repo_config) = config::read_repo_config(&target_dir)
-    {
-        for git_link in
-            repo_config.git.iter().filter(|g| g.link_type == "mirror")
-        {
-            if git_link.url != reg.url
-                && !candidate_urls.contains(&git_link.url)
-            {
-                candidate_urls.push(git_link.url.clone());
-            }
-        }
-    }
-
-    let pre_sync_head = match Repository::open(&target_dir) {
-        Ok(repo) => match repo.head() {
-            Ok(head) => head.target(),
-            Err(_) => None
-        },
-        Err(_) => None
-    };
-
-    let mut sync_success = false;
-    let mut last_error = None;
-
-    for url in candidate_urls {
-        if let Err(e) =
-            try_sync_at_path(&url, &target_dir, verbose, m, pb.as_ref())
-        {
-            let msg = format!("Sync with {} failed: {}", url.yellow(), e);
+    let source = match fetch_registry_content(
+        &mut reg,
+        &target_dir,
+        db_root,
+        verbose,
+        fallback,
+        m,
+        pb_ref
+    ) {
+        Ok(source) => source,
+        Err(e) => {
             if let Some(p) = &pb {
-                p.println(&msg);
-            } else if let Some(m_ref) = m {
-                let _ = m_ref.println(&msg);
-            } else {
-                eprintln!("{msg}");
-            }
-            last_error = Some(e);
-        } else {
-            if url != reg.url {
-                reg.url = url;
-                reg_changed = true;
-            }
-            sync_success = true;
-            break;
-        }
-    }
-
-    let is_local = Path::new(&reg.url).is_dir();
-
-    if sync_success {
-        if !is_local
-            && let Some(authorities) = &reg.authorities
-            && let Err(e) =
-                verify_registry_signature(&target_dir, authorities, verbose)
-        {
-            let rollback_msg = if let Some(oid) = pre_sync_head {
-                if let Ok(repo) = Repository::open(&target_dir) {
-                    if let Ok(object) = repo.find_object(oid, None) {
-                        let mut checkout = CheckoutBuilder::new();
-                        checkout.force();
-                        if repo
-                            .reset(
-                                &object,
-                                ResetType::Hard,
-                                Some(&mut checkout)
-                            )
-                            .is_ok()
-                        {
-                            "Rolled back to previous signed commit.".to_string()
-                        } else {
-                            "Failed to rollback. Repository may be in an \
-                             inconsistent state."
-                                .to_string()
-                        }
-                    } else {
-                        "Could not find previous HEAD object.".to_string()
-                    }
-                } else {
-                    "Could not open repository for rollback.".to_string()
-                }
-            } else {
-                let _ = fs::remove_dir_all(&target_dir);
-                "Removed unsigned clone.".to_string()
-            };
-
-            let msg = format!(
-                "Security: Registry signature check failed for {}: {}. {}",
-                reg.url.red(),
-                e,
-                rollback_msg.yellow(),
-            );
-            if let Some(m_ref) = m {
-                m_ref.println(&msg)?;
-            } else {
-                eprintln!("{msg}");
+                p.abandon_with_message("Sync failed.".red().to_string());
             }
             return Err(e);
         }
+    };
 
-        if !is_local {
-            sync_pgp_keys_at_path(&target_dir, verbose, pb.as_ref())?;
+    let is_local = Path::new(&reg.url).is_dir();
+
+    // Offline with a usable copy already on disk: nothing was fetched, so
+    // there is nothing to verify, re-import, or re-index. Leave the registry
+    // exactly as it is.
+    if matches!(source, RegistrySource::Cached) {
+        if let Some(p) = pb {
+            p.finish_with_message(format!("Cached {}", reg.handle.cyan()));
         }
+        return Ok((reg, reg_changed));
+    }
 
+    if let RegistrySource::Git { pre_sync_head } = &source
+        && !is_local
+        && let Some(authorities) = &reg.authorities
+        && let Err(e) =
+            verify_registry_signature(&target_dir, authorities, verbose)
+    {
+        let rollback_msg = if let Some(oid) = pre_sync_head {
+            if let Ok(repo) = Repository::open(&target_dir) {
+                if let Ok(object) = repo.find_object(*oid, None) {
+                    let mut checkout = CheckoutBuilder::new();
+                    checkout.force();
+                    if repo
+                        .reset(&object, ResetType::Hard, Some(&mut checkout))
+                        .is_ok()
+                    {
+                        "Rolled back to previous signed commit.".to_string()
+                    } else {
+                        "Failed to rollback. Repository may be in an \
+                         inconsistent state."
+                            .to_string()
+                    }
+                } else {
+                    "Could not find previous HEAD object.".to_string()
+                }
+            } else {
+                "Could not open repository for rollback.".to_string()
+            }
+        } else {
+            let _ = fs::remove_dir_all(&target_dir);
+            "Removed unsigned clone.".to_string()
+        };
+
+        let msg = format!(
+            "Security: Registry signature check failed for {}: {}. {}",
+            reg.url.red(),
+            e,
+            rollback_msg.yellow(),
+        );
+        if let Some(m_ref) = m {
+            m_ref.println(&msg)?;
+        } else {
+            eprintln!("{msg}");
+        }
+        return Err(e);
+    }
+
+    if !is_local {
+        sync_pgp_keys_at_path(&target_dir, verbose, pb_ref)?;
+    }
+
+    // A `.zrepo` snapshot that is byte-identical to the one the local index
+    // was built from cannot change any metadata, so the expensive re-parse of
+    // every `.pkg.lua` is skipped.
+    let snapshot_unchanged = match &source {
+        RegistrySource::Zrepo { hash } => {
+            match db::open_connection(&reg.handle) {
+                Ok(conn) => {
+                    let indexed =
+                        db::get_meta(&conn, zrepo::ZREPO_HASH_META_KEY)
+                            .ok()
+                            .flatten();
+                    indexed.as_deref() == Some(hash.as_str())
+                }
+                Err(_) => false
+            }
+        }
+        RegistrySource::Git { .. } | RegistrySource::Cached => false
+    };
+
+    if snapshot_unchanged {
+        if verbose {
+            println!(
+                "{}",
+                "Registry snapshot is unchanged; keeping the existing index."
+                    .green()
+            );
+        }
+    } else {
         let mut db_downloaded = false;
         if !is_local
             && let Ok(repo_config) = config::read_repo_config(&target_dir)
@@ -1159,7 +1482,7 @@ fn sync_registry(
             );
 
             if let Ok(db_path) = db::get_db_path(&reg.handle) {
-                if let Some(p) = pb.as_ref() {
+                if let Some(p) = pb_ref {
                     p.set_message("Downloading pre-indexed DB...");
                 } else if verbose {
                     println!("Downloading pre-indexed DB from {db_url}...");
@@ -1172,7 +1495,7 @@ fn sync_registry(
                 if install_util::download_file_with_progress(
                     &db_url,
                     &temp_db_path,
-                    pb.as_ref(),
+                    pb_ref,
                     None
                 )
                 .is_ok()
@@ -1190,32 +1513,27 @@ fn sync_registry(
         }
 
         if !db_downloaded {
-            refresh_registry_db(
-                &reg.handle,
-                &target_dir,
-                m,
-                verbose,
-                pb.as_ref()
-            )?;
+            refresh_registry_db(&reg.handle, &target_dir, m, verbose, pb_ref)?;
         }
 
-        if let Ok(repo_config) = config::read_repo_config(&target_dir)
-            && repo_config.advisory_prefix != reg.advisory_prefix
+        // Record which snapshot the index now reflects, so the next sync can
+        // detect a no-op update.
+        if let RegistrySource::Zrepo { hash } = &source
+            && let Ok(conn) = db::open_connection(&reg.handle)
         {
-            reg.advisory_prefix = repo_config.advisory_prefix;
-            reg_changed = true;
+            let _ = db::set_meta(&conn, zrepo::ZREPO_HASH_META_KEY, hash);
         }
+    }
 
-        if let Some(p) = pb {
-            p.finish_with_message(format!("Synced {}", reg.handle.cyan()));
-        }
-    } else {
-        let e = last_error
-            .unwrap_or_else(|| anyhow!("All sync candidates failed."));
-        if let Some(p) = &pb {
-            p.abandon_with_message("Sync failed.".red().to_string());
-        }
-        return Err(e);
+    if let Ok(repo_config) = config::read_repo_config(&target_dir)
+        && repo_config.advisory_prefix != reg.advisory_prefix
+    {
+        reg.advisory_prefix = repo_config.advisory_prefix;
+        reg_changed = true;
+    }
+
+    if let Some(p) = pb {
+        p.finish_with_message(format!("Synced {}", reg.handle.cyan()));
     }
 
     Ok((reg, reg_changed))

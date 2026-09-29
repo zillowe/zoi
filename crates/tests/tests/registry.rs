@@ -152,3 +152,174 @@ repos:
 
     Ok(())
 }
+
+/// Builds a minimal but valid registry tree and returns its root.
+fn make_registry_tree(root: &std::path::Path, version: &str) -> Result<()> {
+    fs::create_dir_all(root.join("main/ripgrep"))?;
+    fs::write(
+        root.join("repo.yaml"),
+        "version: \"2\"\nname: snapshotreg\ndescription: Snapshot test \
+         registry\ngit: []\nrepos: []\n"
+    )?;
+    fs::write(
+        root.join("packages.json"),
+        "{\"version\":\"2\",\"packages\":{}}"
+    )?;
+    fs::write(
+        root.join("main/ripgrep/ripgrep.pkg.lua"),
+        format!(
+            "metadata({{name=\"ripgrep\",repo=\"main\",version=\"{version}\"\
+             }})\n"
+        )
+    )?;
+    Ok(())
+}
+
+#[test]
+fn test_registry_zrepo_builds_a_publishable_snapshot() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let tree = temp_dir.path().join("registry");
+    make_registry_tree(&tree, "14.1.0")?;
+
+    let output = temp_dir.path().join("snapshotreg.zrepo");
+    let stats = zoi_sync::zrepo::create_zrepo(&tree, &output, None)?;
+
+    assert!(output.exists(), "the .zrepo should be written");
+    assert_eq!(stats.file_count, 3, "all three registry files are included");
+
+    // The sidecars are what a client verifies the download against, and they
+    // are named after the full artifact so the `hash` URL in repo.yaml reads
+    // the same way it does for .zpa and .zdelta.
+    let hash =
+        fs::read_to_string(temp_dir.path().join("snapshotreg.zrepo.hash"))?;
+    assert_eq!(hash.trim(), stats.sha256);
+    assert!(temp_dir.path().join("snapshotreg.zrepo.size").exists());
+
+    // The payload must be a real zstd-compressed tar of the tree, since that is
+    // exactly what a client expects to download.
+    let raw = fs::read(&output)?;
+    let tar_bytes = zstd::stream::decode_all(&raw[..])?;
+    assert!(
+        tar_bytes.windows(5).any(|w| w == b"ustar"),
+        "the snapshot payload should be a tar archive"
+    );
+    let payload = String::from_utf8_lossy(&tar_bytes);
+    assert!(
+        payload.contains("snapshotreg"),
+        "repo.yaml should be inside"
+    );
+    assert!(
+        payload.contains("ripgrep.pkg.lua"),
+        "packages should be inside"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_registry_zdelta_updates_a_previous_snapshot() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let tree = temp_dir.path().join("registry");
+    make_registry_tree(&tree, "14.1.0")?;
+
+    // Bulk packages, of which only ripgrep changes. The patch is only worth
+    // publishing when the registry is substantially larger than the update, so
+    // the fixture has to be big enough for that to be a real claim.
+    for index in 0..200 {
+        let dir = tree.join(format!("main/tool-{index}"));
+        fs::create_dir_all(&dir)?;
+        fs::write(
+            dir.join(format!("tool-{index}.pkg.lua")),
+            format!(
+                "metadata({{name=\"tool-{index}\",repo=\"main\",version=\"1.0.\
+                 {index}\"}})\n"
+            )
+        )?;
+    }
+
+    let base = temp_dir.path().join("v1.zrepo");
+    zoi_sync::zrepo::create_zrepo(&tree, &base, None)?;
+
+    // Publish a new revision, then the patch that reaches it.
+    make_registry_tree(&tree, "14.1.1")?;
+    let published = temp_dir.path().join("v2.zrepo");
+    zoi_sync::zrepo::create_zrepo(&tree, &published, None)?;
+
+    let patch = temp_dir.path().join("v1.zrepo.zdelta");
+    let stats =
+        zoi_sync::zrepo::create_zrepo_delta(&base, &tree, &patch, None)?;
+
+    assert!(patch.exists(), "the .zdelta should be written");
+    assert!(
+        stats.patch_size < stats.full_download_size,
+        "a patch that is not smaller than a full download should not be worth \
+         publishing ({} vs {})",
+        stats.patch_size,
+        stats.full_download_size
+    );
+    assert!(
+        temp_dir.path().join("v1.zrepo.zdelta.hash").exists(),
+        "the patch should get a checksum sidecar too"
+    );
+
+    // The whole point: a client holding only v1 lands on exactly the v2 that
+    // was published, byte for byte.
+    let rebuilt = temp_dir.path().join("rebuilt.zrepo");
+    zoi_sync::zrepo::apply_delta(&base, &patch, &rebuilt)?;
+
+    assert_eq!(
+        fs::read(&rebuilt)?,
+        fs::read(&published)?,
+        "applying the published patch must reproduce the published snapshot"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_registry_zrepo_excludes_git_and_prior_snapshots() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let tree = temp_dir.path().join("registry");
+    make_registry_tree(&tree, "14.1.0")?;
+
+    // Output inside the tree must not end up inside the snapshot it produces,
+    // or every rebuild would nest the previous snapshot inside the next one.
+    fs::create_dir_all(tree.join(".git/objects"))?;
+    fs::write(tree.join(".git/HEAD"), "ref: refs/heads/main\n")?;
+    fs::write(tree.join("stale.zrepo"), "stale\n")?;
+
+    let output = temp_dir.path().join("out.zrepo");
+    let stats = zoi_sync::zrepo::create_zrepo(&tree, &output, None)?;
+    assert_eq!(stats.file_count, 3, "only registry content is published");
+
+    let tar_bytes = zstd::stream::decode_all(&fs::read(&output)?[..])?;
+    let payload = String::from_utf8_lossy(&tar_bytes);
+    assert!(!payload.contains(".git"), "git plumbing must be excluded");
+    assert!(
+        !payload.contains("stale"),
+        "a previous snapshot must be excluded"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_registry_zrepo_requires_a_registry_directory() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let not_a_registry = temp_dir.path().join("random");
+    fs::create_dir_all(&not_a_registry)?;
+    fs::write(not_a_registry.join("readme.md"), "hello\n")?;
+
+    let err = zoi_sync::zrepo::create_zrepo(
+        &not_a_registry,
+        &temp_dir.path().join("out.zrepo"),
+        None
+    )
+    .expect_err("a directory without repo.yaml must be rejected");
+
+    assert!(
+        err.to_string().contains("no repo.yaml"),
+        "unexpected error: {err}"
+    );
+    Ok(())
+}

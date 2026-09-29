@@ -39,6 +39,7 @@ ignored = [
     "zoi-purl",
     "zoi-resolver",
     "zoi-sandbox",
+    "zoi-sync",
     "zoi-telemetry",
     "zoi-transaction",
     "zoi-uninstall",
@@ -78,6 +79,7 @@ tar.workspace = true
 tempfile.workspace = true
 walkdir.workspace = true
 zip.workspace = true
+zbsdiff.workspace = true
 zstd.workspace = true
 rusqlite.workspace = true
 rustc-hash.workspace = true
@@ -94,6 +96,7 @@ zoi-plugins.workspace = true
 zoi-project.workspace = true
 zoi-purl.workspace = true
 zoi-resolver.workspace = true
+zoi-sync.workspace = true
 zoi-telemetry.workspace = true
 zoi-transaction.workspace = true
 zoi-uninstall.workspace = true

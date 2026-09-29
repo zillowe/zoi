@@ -893,26 +893,80 @@ pub fn add_added_registry(url_or_handle: &str) -> Result<()> {
             (None, url_or_handle.to_string(), None, None, None)
         };
 
-    if config.added_registries.iter().any(|r| r.url == url)
-        || config
-            .added_registries
-            .iter()
-            .any(|r| handle.as_deref().is_some_and(|h| r.handle == h))
-    {
+    push_added_registry(
+        &mut config,
+        Registry {
+            handle: handle.unwrap_or_default(),
+            url,
+            name,
+            description,
+            advisory_prefix: None,
+            authorities
+        },
+        url_or_handle
+    )?;
+
+    write_user_config(&config)
+}
+
+/// Adds a fully resolved registry to the configuration.
+///
+/// Unlike [`add_added_registry`], which can only fill in metadata for built-in
+/// registries, this accepts a registry whose `repo.yaml` has already been
+/// fetched and parsed, so a registry added by URL immediately records its real
+/// handle, name, description and advisory prefix.
+///
+/// # Errors
+///
+/// Returns an error if the registry already exists, its handle is empty, or
+/// the configuration cannot be written.
+pub fn add_resolved_registry(registry: Registry) -> Result<()> {
+    if registry.handle.is_empty() {
         return Err(anyhow!(
-            "Registry with URL or handle '{url_or_handle}' already exists."
+            "Cannot add registry from '{}': it declares no 'name' to use as a \
+             handle.",
+            registry.url
         ));
     }
 
-    config.added_registries.push(Registry {
-        handle: handle.unwrap_or_default(),
-        url,
-        name,
-        description,
-        advisory_prefix: None,
-        authorities
-    });
+    let mut config = read_config_from_path(&get_user_config_path()?)?;
+    let identity = registry.url.clone();
+    push_added_registry(&mut config, registry, &identity)?;
+
     write_user_config(&config)
+}
+
+/// Validates a registry and appends it to `config`, rejecting duplicates.
+///
+/// A registry is a duplicate if either its URL or its handle is already
+/// registered, so a registry cannot be added twice under two spellings of the
+/// same identity.
+///
+/// # Errors
+///
+/// Returns an error if the registry is already present.
+fn push_added_registry(
+    config: &mut Config,
+    registry: Registry,
+    identity: &str
+) -> Result<()> {
+    if config
+        .added_registries
+        .iter()
+        .any(|r| r.url == registry.url)
+        || (!registry.handle.is_empty()
+            && config
+                .added_registries
+                .iter()
+                .any(|r| r.handle == registry.handle))
+    {
+        return Err(anyhow!(
+            "Registry with URL or handle '{identity}' already exists."
+        ));
+    }
+
+    config.added_registries.push(registry);
+    Ok(())
 }
 
 /// Removes an added registry by its handle or URL.

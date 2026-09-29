@@ -177,7 +177,31 @@ pub fn add_registry(handle_or_url: &str) -> Result<()> {
         return Ok(());
     }
 
-    // Fallback: treat as a raw URL
+    // A URL that points at a `repo.yaml` document identifies the registry
+    // completely: resolve it now so the handle, name and description are
+    // recorded up front, and so the user learns immediately whether the URL is
+    // usable. Only the content is deferred to `zoi sync`.
+    if pkg::sync::is_repo_yaml_url(handle_or_url)
+        && let Ok(registry) =
+            pkg::sync::resolve_registry_from_url(handle_or_url)
+    {
+        pkg::config::add_resolved_registry(registry.clone())?;
+
+        let handle = registry.handle.cyan();
+        println!("Registry {handle} added.");
+        if let Some(name) = &registry.name {
+            println!("  Name: {name}");
+        }
+        if let Some(description) = &registry.description {
+            println!("  Description: {description}");
+        }
+        println!("  Source: {}", registry.url.cyan());
+        println!("It will be synced on the next 'zoi sync' run.");
+        return Ok(());
+    }
+
+    // Fallback: treat as a raw URL. Sync re-resolves the handle from the
+    // remote on the next run.
     pkg::config::add_added_registry(handle_or_url)?;
     let url_cyan = handle_or_url.cyan();
     println!("Registry '{url_cyan}' added.");

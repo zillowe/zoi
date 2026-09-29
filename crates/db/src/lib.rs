@@ -292,6 +292,18 @@ fn setup_schema(conn: &Connection) -> Result<()> {
         []
     )?;
 
+    // Arbitrary key/value state describing how the current index was
+    // produced. Sync uses this to record the hash of the `.zrepo` snapshot a
+    // registry was indexed from, so an unchanged snapshot does not trigger a
+    // full re-parse of every `.pkg.lua` file.
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS registry_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )",
+        []
+    )?;
+
     let mut fts_needs_rebuild = false;
     let fts_exists: bool = conn
         .query_row(
@@ -965,6 +977,39 @@ pub fn delete_package(
 pub fn clear_registry(conn: &Connection) -> Result<()> {
     conn.execute("DELETE FROM packages", [])?;
     conn.execute("DELETE FROM package_advisories", [])?;
+    Ok(())
+}
+
+/// Reads a metadata value recorded by a previous sync of this registry.
+///
+/// Returns `None` when the key is absent, so callers can treat "never
+/// synced" and "recorded as absent" the same way.
+///
+/// # Errors
+///
+/// Returns an error if the query fails.
+pub fn get_meta(conn: &Connection, key: &str) -> Result<Option<String>> {
+    let value: Option<String> = conn
+        .query_row(
+            "SELECT value FROM registry_meta WHERE key = ?1",
+            params![key],
+            |row| row.get(0)
+        )
+        .ok();
+    Ok(value)
+}
+
+/// Records a metadata value describing how the registry index was built.
+///
+/// # Errors
+///
+/// Returns an error if the database execution fails.
+pub fn set_meta(conn: &Connection, key: &str, value: &str) -> Result<()> {
+    conn.execute(
+        "INSERT INTO registry_meta (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![key, value]
+    )?;
     Ok(())
 }
 

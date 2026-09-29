@@ -1729,6 +1729,35 @@ pub struct DeltaLink {
     pub size: Option<String>
 }
 
+/// A link to a zstd-compressed registry database (`.zrepo`) in a repository
+/// configuration.
+///
+/// A `.zrepo` is a zstd-compressed tar of the whole registry tree (`repo.yaml`,
+/// `packages.json`, every `.pkg.lua` and `.sec.yaml`). It replaces a Git clone
+/// as the way a client obtains registry content, which is much cheaper to
+/// download for a fully materialized snapshot.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ZrepoLink {
+    /// The type of link (e.g. "main").
+    #[serde(rename = "type")]
+    pub link_type: String,
+    /// The URL of the `.zrepo` archive.
+    pub url: String,
+    /// Optional URL template for the incremental update patch. When omitted,
+    /// the delta is assumed to live at `<url>.zdelta`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delta: Option<String>,
+    /// Optional URL for PGP signature.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pgp: Option<String>,
+    /// Optional URL for checksum.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
+    /// Optional URL for size information.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<String>
+}
+
 /// A PGP public key in a repository configuration.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PgpKey {
@@ -1764,6 +1793,10 @@ pub struct RepoConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub advisory_prefix: Option<String>,
     /// The list of Git repositories associated with this repository.
+    ///
+    /// Optional, because a registry may be published as a `zrepo` snapshot
+    /// with no Git repository at all.
+    #[serde(default)]
     pub git: Vec<GitLink>,
     /// The list of package indices or archives.
     #[serde(default)]
@@ -1771,6 +1804,13 @@ pub struct RepoConfig {
     /// The list of delta patches.
     #[serde(default)]
     pub delta: Vec<DeltaLink>,
+    /// The list of zstd-compressed registry database archives.
+    ///
+    /// When present, clients fetch the registry content from a `.zrepo`
+    /// snapshot (optionally updated via a `.zdelta` patch) instead of cloning
+    /// the Git repository named in `git`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub zrepo: Vec<ZrepoLink>,
     /// Optional URL to a pre-compiled database.
     #[serde(default)]
     pub db: Option<String>,
@@ -1778,6 +1818,7 @@ pub struct RepoConfig {
     #[serde(default)]
     pub pgp: Vec<PgpKey>,
     /// The list of sub-repositories.
+    #[serde(default)]
     pub repos: Vec<RepoEntry>
 }
 

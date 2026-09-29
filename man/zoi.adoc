@@ -249,6 +249,9 @@ details. *files* _ID_:: List files modified by a transaction. *undo*,
 
 *sync*, *sy* [_SUBCOMMAND_] [_OPTIONS_]::
   Download or update the package database from the remote repository.
+Registry content is fetched from a zstd-compressed `.zrepo` snapshot when the
+registry publishes one in its `repo.yaml`, updating it with a `.zdelta` patch
+when available, and from a Git clone otherwise.
 +
 *-v*, *--verbose*:: Show underlying git output. *--fallback*:: Use
 fallback behavior. *--no-pm*:: Skip the native package-manager check.
@@ -256,10 +259,11 @@ fallback behavior. *--no-pm*:: Skip the native package-manager check.
 from zoi.lua. *--frozen*:: With *--local*, use zoi.lock.
 *--scope*=_user|system_:: Sync scope (conflicts with *--local*).
 +
-Registry management subcommands: *add* _URL_:: Add a registry.
-*remove* _HANDLE_:: Remove a registry. *list*, *ls*:: List configured
-registries. *set* _URL_:: Set the default registry URL (accepts
-`default`, `github`, `gitlab`, `codeberg`, or a URL).
+Registry management subcommands: *add* _URL_:: Add a registry. A URL to a
+`repo.yaml` document is resolved immediately to its handle and metadata;
+built-in handles are also accepted. *remove* _HANDLE_:: Remove a registry.
+*list*, *ls*:: List configured registries. *set* _URL_:: Set the default
+registry URL (accepts `default`, `github`, `gitlab`, `codeberg`, or a URL).
 
 *upgrade*, *ug* [_OPTIONS_]::
   Upgrade the Zoi binary itself to the latest release, using a delta
@@ -415,6 +419,17 @@ instead of writing.
 
 *add-advisory*, *sec* [_PACKAGE_] [*-r*, *--repo*=_TIER_]::
   Add a security advisory for a package.
+
+*zrepo*, *snapshot* [_PATH_] [*-o*, *--output*=_FILE_] [*--sign*=_KEY_]::
+  Build a zstd-compressed `.zrepo` snapshot of the registry (default path:
+  current directory). Writes `.hash` and `.size` sidecars alongside it, and
+  `.sig` when *--sign* is given. The output is reproducible, so an unchanged
+  registry always yields identical bytes.
+
+*zdelta*, *snapshot-delta* _OLD_ [_PATH_] [*-o*, *--output*=_FILE_] [*--sign*=_KEY_]::
+  Build a `.zdelta` update patch taking clients from the `.zrepo` snapshot
+  _OLD_ to the current state of the registry. Publish it at the `delta` URL in
+  the `zrepo` section, or at `<zrepo url>.zdelta` if none is declared.
 
 == Environments and projects
 

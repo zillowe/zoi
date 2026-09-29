@@ -7,7 +7,7 @@ Zoi registries are the backbone of the ecosystem, providing the package definiti
 
 ## Core Commands
 
-The `zoi registry` suite simplifies the tedious tasks of scaffolding packages, managing vulnerability IDs, and generating the JSON metadata indexes required by Zoi clients.
+The `zoi registry` suite simplifies the tedious tasks of scaffolding packages, managing vulnerability IDs, generating the JSON metadata indexes required by Zoi clients, and publishing the registry as a compressed snapshot with incremental updates.
 
 ### `zoi registry init [path]`
 
@@ -77,6 +77,38 @@ Performs a comprehensive sanity check on the registry.
 ```sh
 zoi registry check
 ```
+
+### `zoi registry zrepo [path]`
+
+(alias: `snapshot`)
+
+Builds a zstd-compressed `.zrepo` snapshot of the registry - a single file that clients download in place of cloning the Git repository. The snapshot contains the whole registry tree, so everything downstream behaves exactly as it does for a Git registry.
+
+- **Reproducible:** The same registry always produces byte-identical output, which is what makes incremental updates possible.
+- **Sidecars:** Writes a `.hash` and a `.size` file next to the snapshot, plus a `.sig` when `--sign` is given.
+- **Exclusions:** Git plumbing and previously built snapshots are left out.
+
+```sh
+zoi registry zrepo . -o main.zrepo
+zoi registry zrepo . -o main.zrepo --sign your-key-id
+```
+
+### `zoi registry zdelta <old.zrepo> [path]`
+
+(alias: `snapshot-delta`)
+
+Builds a `.zdelta` update patch that takes a client from an older `.zrepo` snapshot up to the current state of the registry. Only the differences are transferred, so a client that synced recently fetches a few hundred bytes instead of the whole snapshot.
+
+- **Verified:** The patch records the hash of both the base and the resulting snapshot, so a client can prove the patch applies to exactly the snapshot it holds.
+- **Reported:** Prints the patch size, the full download size, and the difference, warning if the patch would not be worth publishing.
+
+```sh
+# Build the snapshot, then the patch that updates the previous release
+zoi registry zrepo . -o main.zrepo
+zoi registry zdelta ../previous/main.zrepo . -o main.zrepo.zdelta
+```
+
+Add the resulting URLs to the `zrepo` section of `repo.yaml` so clients can find them. See [Snapshot Registries](/docs/zds/zoi/repositories#snapshot-registries-zrepo) for the full configuration reference.
 
 ---
 

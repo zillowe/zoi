@@ -15,13 +15,15 @@ This page explains Zoi's official repositories and mirrors, and how package repo
 
 The package database is the core git repository that Zoi clones to its user data directory under `zoi/pkgs/db`. This repository contains all the package definitions organized into tiers. While you can manage which repositories inside the database are active using `zoi repo`, you can also change which package database registry Zoi uses via `zoi sync`.
 
+A registry can publish its content either as a Git repository or as a single zstd-compressed snapshot called a `.zrepo` file, with optional `.zdelta` updates between snapshots. See [Snapshot Registries](/docs/zds/zoi/repositories#snapshot-registries-zrepo).
+
 Official and supported registries are shipped as built-in definitions embedded in the Zoi binary (see [Specifications](/docs/zds/zoi/specs#1-built-in-registry-definition)). You can reference them by their handle instead of a full URL, and Zoi derives the git URL and metadata automatically.
 
 | Command                          | Description                                                                                  |
 | -------------------------------- | -------------------------------------------------------------------------------------------- |
 | `zoi sync set <handle-or-url>`   | Sets the registry used as the default. You can pass a built-in handle, the `default` keyword, or a custom URL. |
 | `zoi sync list`                  | Displays the configured registries (set and added) plus available built-in registries that are not yet added. |
-| `zoi sync add <handle-or-url>`   | Adds a registry to be synced, resolving built-in handles automatically.                      |
+| `zoi sync add <handle-or-url>`   | Adds a registry to be synced, resolving built-in handles automatically. A URL to a `repo.yaml` document is resolved immediately.                      |
 | `zoi sync remove <handle>`       | Removes a configured registry by its handle.                                                 |
 | `zoi sync --force`               | Rebuilds all registry databases from scratch by removing existing caches and re-cloning.     |
 | `zoi sync --local`               | Sync registries to the project's `.zoi/pkgs/db/` using revisions from `zoi.lua`.             |
@@ -245,9 +247,140 @@ Here are the fields available in `repo.yaml`:
 | `git`             | `list` of `GitLink` | A list of git repository URLs. The `type` can be `main` for the primary repository or `mirror` for fallbacks.                                                        |
 | `pkg`             | `list` of `PkgLink` | (Optional) A list of URLs for pre-built package registries. Zoi will try to download pre-built packages from here before building from source.                       |
 | `delta`           | `list` of `DeltaLink` | (Optional) A list of URLs for delta patch registries. Zoi will use these for bandwidth-efficient upgrades when a previous version is cached.                         |
+| `zrepo`           | `list` of `ZrepoLink` | (Optional) A list of zstd-compressed registry snapshots (`.zrepo`). When present, Zoi syncs the registry from a snapshot instead of cloning the `git` repository. The `type` can be `main` for the primary snapshot or `mirror` for fallbacks. |
 | `db`              | `string`            | (Optional) URL for registry database metadata.                                                                                                                       |
 | `pgp`             | `list` of `PgpKey`  | (Optional) A list of PGP keys to import for package signature verification. The `key` can be a URL to the key file or a PGP fingerprint.                             |
 | `repos`           | `list` of `Repo`    | A list of the sub-repositories (or tiers) contained within the registry. `type` can be `official`, `community`, etc. `active` determines if it's enabled by default. |
+
+## Snapshot Registries (`.zrepo`)
+
+Instead of cloning a Git repository, a registry can publish a single zstd-compressed snapshot of its entire contents. This is often much cheaper than a Git negotiation: a client downloads one immutable file and skips the clone, the packfile negotiation, and the object database entirely.
+
+A `.zrepo` file is a zstd-compressed tar of the whole registry tree - `repo.yaml`, `packages.json`, and every `.pkg.lua` and `.sec.yaml`. Because the tree is the same one a Git clone would produce, everything downstream (the metadata index, `zoi search`, `zoi info`, PURL resolution) works exactly as it does for a Git registry.
+
+### Declaring a snapshot registry
+
+Add a `zrepo` section to `repo.yaml` listing where the snapshots live. Like the `git` section, the `type` is `main` for the primary snapshot and `mirror` for fallbacks:
+
+```yaml
+name: Zoidberg
+description: Official Zoi packages repository
+handle: zoidberg
+advisory_prefix: ZSA
+git:
+  - type: official
+    url: https://gitlab.com/zillowe/zillwen/zusty/zoidberg.git
+zrepo:
+  - type: main
+    url: https://packages.example.com/zoidberg/main.zrepo
+    delta: https://packages.example.com/zoidberg/main.zrepo.zdelta
+    pgp: https://packages.example.com/zoidberg/main.zrepo.sig
+    hash: https://packages.example.com/zoidberg/main.zrepo.sha256
+  - type: mirror
+    url: https://mirror.example.com/zoidberg/main.zrepo
+```
+
+Each `ZrepoLink` supports these fields:
+
+| Field   | Type     | Description                                                                                                     |
+| ------- | -------- | --------------------------------------------------------------------------------------------------------------- |
+| `type`  | `string` | `main` for the primary snapshot, `mirror` for a fallback.                                                         |
+| `url`   | `string` | The URL of the `.zrepo` file.                                                                                    |
+| `delta` | `string` | (Optional) URL of the incremental update patch. Defaults to `<url>.zdelta`.                                       |
+| `pgp`   | `string` | (Optional) URL of the detached PGP signature of the snapshot.                                                     |
+| `hash`  | `string` | (Optional) URL of the snapshot's checksum.                                                                       |
+| `size`  | `string` | (Optional) URL of the snapshot's size information.                                                               |
+
+If `delta` is omitted, Zoi looks for the update patch at `<url>.zdelta`.
+
+A `zrepo` registry needs no `git` section at all - the whole point of the snapshot is to replace the clone - so `git` and `repos` are both optional in a `repo.yaml`. A manifest declaring only `name`, `description`, and `zrepo` is valid.
+
+### Incremental updates
+
+Snapshots are immutable, so a sync that finds an unchanged registry has nothing to do. When a new snapshot is published, the registry also publishes a `.zdelta` patch alongside it, and Zoi applies that instead of downloading the whole file again.
+
+The patch is a bsdiff diff computed over the *uncompressed tar* of the previous snapshot. Unchanged tar entries are byte-identical, so they diff to almost nothing, whereas diffing the compressed bytes would not compress well. The rebuilt tar is byte-for-byte the tar the registry author published, so a patched registry is indistinguishable from a freshly downloaded one.
+
+A patch is published in either of two shapes:
+
+- A **container**, which is a zstd-compressed tar holding a `meta.json` descriptor and a single patch entry. This is the recommended shape, because `meta.json` can bind the patch to its base and target:
+
+  ```json
+  {
+    "format": "zdelta.v1",
+    "type": "zrepo",
+    "base_sha256": "<sha256 of the previous snapshot's tar>",
+    "target_sha256": "<sha256 of the new snapshot's tar>",
+    "patch": "data.bsdiff"
+  }
+  ```
+
+  Zoi verifies `base_sha256` against the cached snapshot and `target_sha256` against the rebuilt one, so a patch built against a different base, or a corrupted download, is rejected instead of being installed.
+
+- A **bare bsdiff patch**, which is just a zstd-compressed raw `BSDIFF40` patch with no metadata. This works, but carries no hash binding, so the published `hash` checksum is the only integrity check available.
+
+Updates are strictly an optimization. The `delta` field is entirely optional, and Zoi handles its absence in the way that suits the registry:
+
+- **`delta` not declared:** Zoi makes a single best-effort request for the conventional `<url>.zdelta` and quietly downloads the full snapshot if there is nothing there. This is the normal state of affairs for a registry that does not publish patches, so it is not reported as a problem. If a publisher starts shipping patches later, they are picked up automatically.
+- **`delta` declared but not served:** the registry promised a patch and did not deliver, so Zoi warns and falls back to a full download.
+- **Patch present but does not fit:** the client and the publisher disagree about registry state - a stale base, a truncated download, or a hash mismatch. Zoi warns and falls back to a full download, and the patch is discarded rather than installed.
+
+In every case the snapshot is obtained by a full download, so a registry that never ships a single `.zdelta` syncs exactly as well as one that does - just without the bandwidth saving. A registry that stops publishing patches is never left unsyncable, and no path through a failed update can leave a partially-applied registry behind.
+
+Zoi keeps the last snapshot it downloaded next to the registry index (as `<handle>.zrepo`) purely as the base for the next update, and reuses it across syncs.
+
+### Adding a registry by URL
+
+A registry published as a `repo.yaml` document can be added directly by its URL:
+
+```sh
+zoi sync add https://packages.example.com/zoidberg/repo.yaml
+```
+
+Zoi fetches the `repo.yaml`, resolves the registry's real handle, name, description and advisory prefix, and records them. Only the content is deferred: the snapshot itself is downloaded on the next `zoi sync`. If the URL is not reachable, or turns out to be a plain Git URL, the registry is still recorded and the handle is resolved during the next sync.
+
+A registry may also declare a `git` section alongside its `zrepo` section. When both are present, Zoi prefers the snapshot, because it is the cheaper transport. The Git repository remains a working fallback for clients that cannot fetch snapshots, and the `zdelta` chain covers the common case of a client that missed a release.
+
+### Verification
+
+Snapshot registries use the same `authorities` mechanism as Git registries. When authorities are configured and the snapshot publishes a `pgp` signature, Zoi verifies the signature against those authorities before installing anything, and the registry's PGP keys are imported from `repo.yaml` first so they are available in the keyring. See [Registry Verification](/docs/zds/zoi/repositories#registry-verification).
+
+A snapshot that fails verification is discarded, and a Git registry additionally rolls back to the last known-good signed commit.
+
+### Generating a snapshot
+
+Use `zoi registry zrepo` to build the snapshot from a registry checkout:
+
+```sh
+# Build main.zrepo from the registry in the current directory
+zoi registry zrepo . -o main.zrepo
+
+# Sign it with a key from your keyring, producing main.zrepo.sig
+zoi registry zrepo . -o main.zrepo --sign your-key-id
+```
+
+The snapshot is **reproducible**: entries are sorted by name, timestamps are fixed to the epoch, and ownership is zeroed. This is not cosmetic - it is what allows a patch to be published against a specific base and still land on exactly the published bytes. Git plumbing and previous snapshots are excluded automatically.
+
+Alongside the `.zrepo`, the command writes a `.hash` and a `.size` sidecar (and a `.sig` when signing), matching the convention already used for `.zpa` and `.zdelta` artifacts, so a registry can serve the same trio for its snapshot that it serves for packages.
+
+### Publishing an update
+
+When the registry changes, publish a new snapshot and the patch that reaches it from the previous one:
+
+```sh
+# After updating packages and re-running 'zoi registry generate-metadata'
+zoi registry zrepo . -o main.zrepo
+zoi registry zdelta ../previous/main.zrepo . -o main.zrepo.zdelta
+```
+
+`zdelta` takes the older snapshot as its base and diffs it against the current tree, writing the `base_sha256` and `target_sha256` that let a client prove the patch applies to exactly the snapshot it holds. It reports the patch size, the full download size, and the difference, and warns if the patch would not be smaller than a full download.
+
+The workflow a publisher follows is therefore:
+
+- Publish `main.zrepo` at the `url` in the `zrepo` section.
+- Publish `main.zrepo.zdelta` (the output of `zdelta`) at the `delta` URL, or at `<url>.zdelta` if no `delta` is declared.
+- Serve `main.zrepo.hash` at the `hash` URL, if declared.
+- Repeat both steps on every release. A client that missed a release falls back to a full download, so a forgotten patch costs bandwidth but never correctness.
 
 ## Registry Verification
 
