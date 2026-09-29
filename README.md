@@ -32,7 +32,7 @@
 
 <div align="center">
   <a href="https://zillowe.qzz.io/docs/zds/zoi"><strong>Docs</strong></a> •
-  <a href="https://discord.gg/P4R7yaA3hf"><strong>Discord</strong></a> •
+  <a href="https://matrix.to/#/#zillowe:matrix.org"><strong>Matrix</strong></a> •
   <a href="./SECURITY.md"><strong>Security</strong></a> •
   <a href="./CONTRIBUTING.md"><strong>Contributing</strong></a> •
   <a href="./CHANGELOG.md"><strong>Changelog</strong></a>
