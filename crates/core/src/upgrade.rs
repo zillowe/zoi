@@ -26,7 +26,60 @@ const GITLAB_PROJECT_ID: &str = "71087662";
 #[derive(Debug, Deserialize)]
 struct GitLabRelease {
     /// The tag name of the release.
-    tag_name: String
+    tag_name: String,
+    /// When the release was created, used to pick the newest match.
+    #[serde(default)]
+    created_at: String
+}
+
+/// Branch identifiers, as used in release tags and the `--branch` flag.
+///
+/// ZFVM defines the vocabulary in the `zfvm` crate. The list is duplicated
+/// here only so the error message can name the valid options without
+/// formatting a borrowed slice of the dependency.
+const BRANCH_NAMES: [&str; 4] = ["Prod", "Dev", "Spec", "Pub"];
+
+/// Projects a ZFVM version onto the `SemVer` string used for the bsdiff patch
+/// naming that `scripts/archive.sh` writes.
+///
+/// The status becomes a numeric pre-release ordinal and the build becomes
+/// build metadata, matching `scripts/archive.sh` and the `zfvm` crate. The
+/// branch does not participate: `archive.sh` builds these names from the tag
+/// alone, and any mismatch between the two sides silently disables delta
+/// upgrades in favour of full downloads.
+///
+/// # Errors
+///
+/// Returns an error when `number` is not a valid `SemVer` version, or when the
+/// projected string cannot be parsed back.
+fn zfvm_to_semver(number: &str, status: &str) -> Result<String> {
+    // - `stable` is not a ZFVM status. It is accepted here because tags
+    // - predating the ZFVM vocabulary may carry it, and rejecting it would
+    // - strand those installs on the full-download path.
+    let parsed_status = if status.eq_ignore_ascii_case("stable") {
+        zfvm::Status::Release
+    } else {
+        status
+            .parse::<zfvm::Status>()
+            .map_err(|e| anyhow!("Malformed ZFVM status '{status}': {e}"))?
+    };
+
+    let core = semver::Version::parse(number).map_err(|e| {
+        anyhow!("Malformed ZFVM version number '{number}': {e}")
+    })?;
+
+    let version =
+        zfvm::Version::new(zfvm::Branch::Prod, parsed_status, core, None)
+            .map_err(|e| anyhow!("Cannot build ZFVM version: {e}"))?;
+
+    // Round-trip through the parser so this function can never return a
+    // string the upgrade comparison would fail to parse.
+    let projected = version.to_semver();
+    semver::Version::parse(&projected).map_err(|e| {
+        anyhow!("ZFVM projection '{projected}' is not valid SemVer: {e}")
+    })?;
+
+    Ok(projected)
 }
 
 /// Fetches the latest tag from GitLab for a given branch prefix.
@@ -41,9 +94,13 @@ fn get_latest_tag(branch_prefix: &str) -> Result<String> {
         .build()?;
     let releases: Vec<GitLabRelease> = client.get(&api_url).send()?.json()?;
 
+    // - Releases are returned newest-first by the GitLab API, but the ordering
+    // - is not contractual. Sort by `created_at` so "latest" means latest even
+    // - if the API changes its default ordering.
     let latest_tag = releases
         .into_iter()
-        .find(|r| r.tag_name.starts_with(branch_prefix))
+        .filter(|r| r.tag_name.starts_with(branch_prefix))
+        .max_by(|a, b| a.created_at.cmp(&b.created_at))
         .map(|r| r.tag_name)
         .ok_or_else(|| {
             anyhow!("No release found with prefix '{branch_prefix}'")
@@ -339,23 +396,37 @@ pub fn run(
         );
     }
 
-    let current_version = if status.is_empty()
-        || status.eq_ignore_ascii_case("stable")
-        || status.eq_ignore_ascii_case("release")
-    {
-        number.to_string()
-    } else {
-        format!("{}-{}", number, status.to_lowercase())
-    };
+    // - The branch is deliberately excluded from both projections. Cargo
+    // - versions carry a branch suffix (`1.29.0-dev`) while ZFVM keeps branch
+    // - and status orthogonal, so the comparison runs on status and number
+    // - only. This matches the naming in `scripts/archive.sh`.
+    let current_version = zfvm_to_semver(number, status)?;
 
     let latest_tag = if let Some(tag_name) = tag {
         println!("Upgrading to specified tag: {}", tag_name.green());
         tag_name
     } else {
+        // - A custom `--branch` value must be a real ZFVM branch identifier,
+        // - otherwise the tag lookup silently finds nothing.
         let branch_prefix = if let Some(b) = custom_branch {
-            println!("Upgrading to latest release from branch: {}", b.green());
-            format!("{b}-")
-        } else if branch.eq_ignore_ascii_case("public") {
+            let canonical = BRANCH_NAMES
+                .iter()
+                .find(|known| known.eq_ignore_ascii_case(b.trim()))
+                .ok_or_else(|| {
+                    anyhow!(
+                        "Unknown branch '{}'. Expected one of: {}",
+                        b,
+                        BRANCH_NAMES.join(", ")
+                    )
+                })?;
+            println!(
+                "Upgrading to latest release from branch: {}",
+                canonical.green()
+            );
+            format!("{canonical}-")
+        } else if branch.eq_ignore_ascii_case("Pub")
+            || branch.eq_ignore_ascii_case("Public")
+        {
             "Pub-".to_string()
         } else {
             "Prod-".to_string()
@@ -363,32 +434,13 @@ pub fn run(
         get_latest_tag(&branch_prefix)?
     };
 
-    let parts: Vec<&str> = latest_tag.split('-').collect();
-    let latest_version_num = if parts.len() >= 3 {
-        parts
-            .get(2)
-            .copied()
-            .ok_or_else(|| anyhow!("Missing version number in tag parts"))?
-    } else {
-        parts
-            .last()
-            .ok_or(anyhow!("Could not get version number from tag"))?
-    };
-
-    let latest_version_str = if parts.len() >= 3 {
-        let prerelease = parts
-            .get(1)
-            .copied()
-            .ok_or_else(|| anyhow!("Missing prerelease label in tag parts"))?
-            .to_lowercase();
-        if prerelease == "release" || prerelease == "stable" {
-            latest_version_num.to_string()
-        } else {
-            format!("{latest_version_num}-{prerelease}")
-        }
-    } else {
-        latest_version_num.to_string()
-    };
+    // - Parse through the `zfvm` crate rather than splitting on `-`. A
+    // - positional split of `Prod-Pre-Alpha-0.1.0` yields status `pre` and
+    // - core `Alpha`, neither of which is a valid ZFVM value.
+    let latest = zfvm::symbolic::parse_long(&latest_tag)
+        .map_err(|e| anyhow!("Malformed release tag '{latest_tag}': {e}"))?;
+    let latest_version_str =
+        zfvm_to_semver(&latest.core().to_string(), latest.status().as_str())?;
 
     if !force
         && (Version::parse(&latest_version_str)?
@@ -442,4 +494,75 @@ pub fn run(
     println!("Replacing current executable...");
     self_replace::self_replace(&new_binary_path)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::zfvm_to_semver;
+
+    /// Projects a version the way `archive.sh` names its bsdiff patches.
+    fn project(number: &str, status: &str) -> String {
+        zfvm_to_semver(number, status).expect("fixture must project")
+    }
+
+    // ZFVM statuses are case-sensitive, so only the exact spelling `Release`
+    // projects to a bare version.
+    #[test]
+    fn release_status_projects_to_a_bare_version() {
+        assert_eq!(project("1.29.0", "Release"), "1.29.0");
+    }
+
+    // `stable` is not a ZFVM status. It predates the vocabulary and is
+    // accepted case-insensitively so those tags keep resolving.
+    #[test]
+    fn legacy_stable_status_projects_to_a_bare_version() {
+        assert_eq!(project("1.29.0", "stable"), "1.29.0");
+        assert_eq!(project("1.29.0", "Stable"), "1.29.0");
+        assert_eq!(project("1.29.0", "STABLE"), "1.29.0");
+    }
+
+    // Every other status becomes a numeric pre-release ordinal, matching the
+    // `zfvm` crate and `archive.sh`. A readable label would sort wrongly
+    // against the others.
+    #[test]
+    fn other_statuses_project_to_ordinals() {
+        assert_eq!(project("0.1.0", "Pre-Alpha"), "0.1.0-0");
+        assert_eq!(project("1.29.0", "Alpha"), "1.29.0-1");
+        assert_eq!(project("1.29.0", "Beta"), "1.29.0-2");
+        assert_eq!(project("1.29.0", "RC"), "1.29.0-3");
+    }
+
+    // Every status must survive the projection and still parse as SemVer,
+    // which is what the upgrade comparison and the bsdiff naming rely on.
+    #[test]
+    fn every_status_projects_to_parseable_semver() {
+        for status in ["Pre-Alpha", "Alpha", "Beta", "RC", "Release"] {
+            let number = if status == "Release" {
+                "1.29.0"
+            } else {
+                "0.1.0"
+            };
+            let projected = project(number, status);
+            assert!(
+                semver::Version::parse(&projected).is_ok(),
+                "{status} projected to unparseable {projected}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_unknown_status() {
+        assert!(zfvm_to_semver("1.29.0", "nightly").is_err());
+        assert!(zfvm_to_semver("1.29.0", "Prealpha").is_err());
+        // Case-sensitive: only the exact ZFVM spelling is accepted.
+        assert!(zfvm_to_semver("1.29.0", "release").is_err());
+        assert!(zfvm_to_semver("1.29.0", "beta").is_err());
+    }
+
+    #[test]
+    fn rejects_malformed_version_number() {
+        assert!(zfvm_to_semver("1.29", "Release").is_err());
+        assert!(zfvm_to_semver("1.29.0-rc.1", "Release").is_err());
+        assert!(zfvm_to_semver("", "Release").is_err());
+    }
 }

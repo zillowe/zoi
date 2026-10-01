@@ -5,6 +5,7 @@ use std::fs;
 use std::io::{Write, stdin, stdout};
 use std::path::Path;
 use std::process::Command;
+use std::str::FromStr;
 
 use anyhow::anyhow;
 use colored::Colorize;
@@ -18,31 +19,42 @@ pub fn print_info<T: Display>(key: &str, value: T) {
 }
 
 /// Formats a version summary with branch, status, and number.
+///
+/// The fields come from the `BRANCH`, `STATUS`, and `NUMBER` constants in
+/// `cli.rs`, so they are ZFVM identifiers rather than long-form names. Parsing
+/// through the `zfvm` crate validates them and yields the canonical spelling,
+/// which means a bad `bump.sh` run shows up as a visible fallback rather than
+/// a silently mangled label.
 pub fn format_version_summary(
     branch: &str,
     status: &str,
     number: &str
 ) -> String {
-    let branch_short = if branch == "Production" {
-        "Prod."
-    } else if branch == "Development" {
-        "Dev."
-    } else if branch == "Public" {
-        "Pub."
-    } else if branch == "Special" {
-        "Spec."
-    } else {
-        branch
+    let branch_display = match zfvm::Branch::from_str(branch) {
+        Ok(parsed) => parsed.as_str(),
+        // Long-form names are tolerated so an un-bumped build still renders
+        // something readable.
+        Err(_) => match branch {
+            "Production" => "Prod",
+            "Development" => "Dev",
+            "Special" => "Spec",
+            "Public" => "Pub",
+            other => other
+        }
     };
+
     format!(
         "{} {} {}",
-        branch_short.blue().bold().italic(),
+        format!("{branch_display}.").blue().bold().italic(),
         status,
         number,
     )
 }
 
 /// Formats a full version string including the commit hash.
+///
+/// This renders the ZFVM Canonical Form followed by the commit, which stands
+/// in for the `[Build]` component.
 pub fn format_version_full(
     branch: &str,
     status: &str,

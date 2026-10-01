@@ -12,12 +12,23 @@ use zoi_common::Runnable;
 use crate::pkg::lock;
 use crate::{cmd, utils};
 
-// Development, Special, Public or Production
-/// The release branch of the current build.
-const BRANCH: &str = "Development";
-/// The release status of the current build.
+/// The ZFVM branch identifier of the current build (Prod, Dev, Spec, Pub).
+///
+/// This is the identifier, not the long-form name: the ZFVM Canonical Form is
+/// `Prod Beta 1.2.3`, never `Production Beta 1.2.3`. Long-form names are for
+/// display only and are mapped in `utils::format_version_summary`.
+///
+/// Updated by `scripts/bump.sh`, not by hand.
+const BRANCH: &str = "Dev";
+
+/// The ZFVM status of the current build (Pre-Alpha, Alpha, Beta, RC, Release).
+///
+/// Updated by `scripts/bump.sh`, not by hand.
 const STATUS: &str = "Release";
-/// The version number of the current build.
+
+/// The core version of the current build, as `X.Y.Z`.
+///
+/// Updated by `scripts/bump.sh`, not by hand.
 const NUMBER: &str = "1.29.0";
 /// Help text for package source identifiers.
 const PKG_SOURCE_HELP: &str =

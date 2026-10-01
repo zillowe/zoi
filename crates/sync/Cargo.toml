@@ -29,7 +29,6 @@ tar.workspace = true
 tempfile.workspace = true
 walkdir.workspace = true
 zbsdiff.workspace = true
-zstd.workspace = true
 zoi-core.workspace = true
 zoi-db.workspace = true
 zoi-install.workspace = true

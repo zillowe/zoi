@@ -5084,6 +5084,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "zfvm"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d94809ad2a1d82060a6c4bcc2b824af0c9102d9ee928f03726ea88bd94663e8"
+dependencies = [
+ "semver",
+]
+
+[[package]]
 name = "zip"
 version = "8.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5156,6 +5165,7 @@ dependencies = [
  "winapi",
  "winreg",
  "yaml_serde",
+ "zfvm",
  "zoi-audit",
  "zoi-common",
  "zoi-core",
@@ -5219,6 +5229,7 @@ dependencies = [
  "walkdir",
  "yaml_serde",
  "zbsdiff",
+ "zfvm",
  "zip",
  "zstd",
 ]
@@ -5511,7 +5522,6 @@ dependencies = [
  "zoi-install",
  "zoi-lua",
  "zoi-project",
- "zstd",
 ]
 
 [[package]]

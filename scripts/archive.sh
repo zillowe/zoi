@@ -23,6 +23,58 @@ function check_command() {
     fi
 }
 
+# ZFVM release tags are Symbolic Form B: Branch-Status-Version, as produced
+# by `scripts/bump.sh` and consumed by the `zfvm` crate.
+#
+# The parsing and the SemVer projection here are delegated to `zfvm tag` and
+# `zfvm parse`, the CLI shipped by the `zfvm` crate, so the three places that
+# must agree - this script, `crates/core/src/upgrade.rs`, and the specification
+# - cannot drift apart. Where the projection differs between them, delta
+# upgrades silently fall back to full downloads rather than failing loudly.
+#
+# This is why the fields are never extracted with `cut -d'-'`: `Pre-Alpha`
+# contains a hyphen, so a positional split of `Prod-Pre-Alpha-0.1.0` yields
+# status `pre` with version `Alpha`, and neither is valid.
+ZFVM="${ZFVM:-zfvm}"
+
+function require_zfvm() {
+    if ! command -v "$ZFVM" &>/dev/null; then
+        echo -e "${RED}Error: '$ZFVM' not found in PATH.${NC}"
+        echo -e "${YELLOW}It ships with the zfvm crate: cargo install zfvm-cli${NC}"
+        exit 1
+    fi
+}
+
+# Extracts one field from a release tag. Reads the tag back through `zfvm tag`
+# rather than parsing it here.
+function zfvm_tag_field() {
+    local tag=$1
+    local field=$2
+
+    local parsed
+    parsed=$("$ZFVM" tag "$tag" 2>/dev/null) || return 1
+
+    case "$field" in
+        branch) printf '%s' "$(printf '%s\n' "$parsed" | awk -F'  *' '/^Branch/ {print $2}')" ;;
+        status) printf '%s' "$(printf '%s\n' "$parsed" | awk -F'  *' '/^Status/ {print $2}')" ;;
+        number) printf '%s' "$(printf '%s\n' "$parsed" | awk -F'  *' '/^Core/ {print $2}')" ;;
+        *) printf '%s' "" ;;
+    esac
+}
+
+# Projects a release tag onto the SemVer string used to name bsdiff patches.
+#
+# This must stay identical to `zfvm_to_semver` in
+# crates/core/src/upgrade.rs, because `zoi upgrade` reconstructs these exact
+# patch filenames when it looks for a delta. The status becomes a numeric
+# ordinal rather than a readable label: SemVer compares pre-release
+# identifiers numerically before lexically, so a readable `-pre-alpha` would
+# sort after `-beta` and the comparison would be wrong.
+function zfvm_tag_to_semver() {
+    local tag=$1
+    "$ZFVM" tag "$tag" 2>/dev/null | awk -F'  *' '/^SemVer/ {print $2}'
+}
+
 function sign_file() {
     local file_to_sign=$1
     echo -e "${CYAN}  -> Signing ${file_to_sign}...${NC}"
@@ -36,6 +88,8 @@ check_command "jq"
 check_command "gpg"
 check_command "zbsdiff"
 check_command "zbspatch"
+# Required for ZFVM tag parsing and SemVer projection. `cargo install zfvm-cli`.
+require_zfvm
 
 if [ ! -d "$COMPILED_DIR" ]; then
     echo -e "${RED}Error: Compiled directory '${COMPILED_DIR}' not found.${NC}"
@@ -61,20 +115,38 @@ API_URL="https://gitlab.com/api/v4/projects/${PROJECT_IDENTIFIER}/releases"
 
 echo -e "${CYAN}Trying API URL: ${API_URL}${NC}"
 
-if RESPONSE=$(curl --silent --show-error --fail "$API_URL" 2>&1); then
-    if [ -n "$RESPONSE" ] && [ "$RESPONSE" != "[]" ]; then
-        LATEST_TAG=$(echo "$RESPONSE" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
+# A `Releases:` tag on the pipeline is the input for delta generation below.
+if [ -n "${CI_COMMIT_TAG:-}" ]; then
+    RELEASES_JSON=$(curl --silent --show-error --fail "$API_URL" 2>&1) || RELEASES_JSON=""
+    if [ -z "$RELEASES_JSON" ] || [ "$RELEASES_JSON" == "[]" ]; then
+        echo -e "${YELLOW}No existing releases found. Delta patches will be skipped.${NC}"
     fi
 else
-    echo -e "${YELLOW}API call failed: $RESPONSE${NC}"
+    # Tagless pipelines still need a release tag to build release notes
+    # against, so fall back to the most recent release.
+    RELEASES_JSON=$(curl --silent --show-error --fail "$API_URL" 2>&1) || RELEASES_JSON=""
+    if [ -n "$RELEASES_JSON" ] && [ "$RELEASES_JSON" != "[]" ]; then
+        LATEST_TAG=$(echo "$RELEASES_JSON" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
+    fi
 fi
 
 PREV_TAG=""
 if [ -n "${CI_COMMIT_TAG:-}" ]; then
-    PREFIX="${CI_COMMIT_TAG%-*}"
-    PREV_TAG=$(echo "$RESPONSE" | jq -r "[.[] | select(.tag_name | startswith(\"${PREFIX}-\")) | .tag_name] | .[0] // empty" 2>/dev/null || echo "")
+    # Match on the branch only, so a delta patch is produced across status
+    # changes (`Prod-Beta-1.2.0` from `Prod-Release-1.1.0`), which is the
+    # common upgrade path. Matching on branch+status left `Pre-Alpha` builds
+    # with no predecessor to diff against.
+    BRANCH_PART=$(zfvm_tag_field "$CI_COMMIT_TAG" branch)
+    # - The current tag is excluded: on a re-run of the same tag it would
+    # - otherwise be selected as its own predecessor and produce a patch
+    # - from a release to itself.
+    PREV_TAG=$(echo "$RELEASES_JSON" | jq -r \
+        --arg prefix "$BRANCH_PART-" --arg current "$CI_COMMIT_TAG" \
+        '[.[] | select(.tag_name | startswith($prefix))
+          | select(.tag_name != $current) | .tag_name] | first // empty' \
+        2>/dev/null || echo "")
     if [ -n "$PREV_TAG" ]; then
-        echo -e "${CYAN}Detected previous tag for prefix ${PREFIX}: ${PREV_TAG}${NC}"
+        echo -e "${CYAN}Detected previous tag for prefix ${BRANCH_PART}: ${PREV_TAG}${NC}"
     fi
 fi
 
@@ -128,22 +200,16 @@ for binary_path in "$COMPILED_DIR"/*; do
     # Delta patch generation
     # Only generate patches for 'zoi', skipping 'zoi-mini' and 'zoid'
     if [[ "$binary_base" == "zoi" ]] && [ -n "${PREV_TAG:-}" ] && [ -n "${CI_COMMIT_TAG:-}" ]; then
-        # Extract status and version from tags
-        # Tag format: [Branch]-[Status]-[Version]
-        OLD_STATUS=$(echo "$PREV_TAG" | cut -d'-' -f2 | tr '[:upper:]' '[:lower:]')
-        OLD_NUM=$(echo "$PREV_TAG" | cut -d'-' -f3)
-        if [[ "$OLD_STATUS" == "release" || "$OLD_STATUS" == "stable" ]]; then
-            OLD_VERSION="$OLD_NUM"
-        else
-            OLD_VERSION="${OLD_NUM}-${OLD_STATUS}"
-        fi
+        # Both tags are ZFVM Symbolic Form B. The projection goes through
+        # the `zfvm` crate so it matches `zoi upgrade` exactly; see
+        # zfvm_tag_to_semver above for why that matters.
+        OLD_VERSION=$(zfvm_tag_to_semver "$PREV_TAG")
+        CURRENT_VERSION=$(zfvm_tag_to_semver "$CI_COMMIT_TAG")
 
-        CURRENT_STATUS=$(echo "$CI_COMMIT_TAG" | cut -d'-' -f2 | tr '[:upper:]' '[:lower:]')
-        CURRENT_NUM=$(echo "$CI_COMMIT_TAG" | cut -d'-' -f3)
-        if [[ "$CURRENT_STATUS" == "release" || "$CURRENT_STATUS" == "stable" ]]; then
-            CURRENT_VERSION="$CURRENT_NUM"
-        else
-            CURRENT_VERSION="${CURRENT_NUM}-${CURRENT_STATUS}"
+        if [ -z "$OLD_VERSION" ] || [ -z "$CURRENT_VERSION" ]; then
+            echo -e "${YELLOW}Could not project a tag to SemVer, skipping delta patches.${NC}"
+            rm -rf "$TMP_ARCHIVE_DIR"
+            continue
         fi
 
         OLD_EXT=".tar.zst"
@@ -178,7 +244,9 @@ done
 echo -e "${CYAN}🔐 Generating sha512 checksums...${NC}"
 (
     cd "$ARCHIVE_DIR" || exit 1
-    find . -maxdepth 1 -type f -not -name "checksums.txt" -not -name "*.asc" -exec sha512sum {} +
+    find . -maxdepth 1 -type f -not -name "checksums.txt" \
+        -not -name "checksums-256.txt" -not -name "*.asc" \
+        -exec sha512sum {} +
 ) >"$CHECKSUM_FILE"
 
 if [ -n "${CI_COMMIT_TAG:-}" ]; then
@@ -196,7 +264,9 @@ fi
 echo -e "${CYAN}🔐 Generating sha256 checksums...${NC}"
 (
     cd "$ARCHIVE_DIR" || exit 1
-    find . -maxdepth 1 -type f -not -name "checksums-sha256.txt" -not -name "*.asc" -exec sha256sum {} +
+    find . -maxdepth 1 -type f -not -name "checksums-256.txt" \
+        -not -name "checksums.txt" -not -name "*.asc" \
+        -exec sha256sum {} +
 ) >"$CHECKSUM_SHA256_FILE"
 
 if [ -n "${CI_COMMIT_TAG:-}" ]; then

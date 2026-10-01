@@ -28,6 +28,7 @@ clap_complete.workspace = true
 colored.workspace = true
 regex.workspace = true
 semver.workspace = true
+zfvm.workspace = true
 crossterm.workspace = true
 dirs.workspace = true
 fs2.workspace = true
