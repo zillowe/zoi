@@ -56,7 +56,7 @@ end
     let report = doctor::run(&pkg_path, Some("linux-amd64"), None)
         .expect("doctor should return report for invalid package");
 
-    assert!(!report.errors.is_empty());
+    assert_ne!(report.errors, [] as [String; 0]);
     assert!(
         report
             .errors

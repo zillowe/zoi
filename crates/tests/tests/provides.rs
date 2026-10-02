@@ -41,7 +41,11 @@ fn test_find_provides_logic() {
     .expect("unwrap failed");
 
     let results = db::find_provides(handle, "git").expect("unwrap failed");
-    assert!(!results.is_empty());
+    assert_ne!(
+        results.len(),
+        0,
+        "expected at least one result, got {results:?}"
+    );
     assert_eq!(
         results.first().expect("Value should exist in test").0.name,
         "git"

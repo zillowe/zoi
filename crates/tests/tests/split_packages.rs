@@ -71,7 +71,7 @@ fn resolver_install_node_has_sub_package_from_source() {
     )
     .expect("split pkg.lua source with sub should resolve");
 
-    assert!(non_zoi_deps.is_empty());
+    assert_eq!(non_zoi_deps, &[] as &[String]);
     assert_eq!(graph.nodes.len(), 1);
 
     let node = graph
@@ -106,7 +106,7 @@ fn resolver_install_node_base_has_no_sub_package() {
     )
     .expect("split pkg.lua source should resolve");
 
-    assert!(non_zoi_deps.is_empty());
+    assert_eq!(non_zoi_deps, &[] as &[String]);
     assert_eq!(graph.nodes.len(), 1);
 
     let node = graph

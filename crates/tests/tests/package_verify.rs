@@ -138,7 +138,11 @@ fn test_verify_installed_detects_modification() {
     );
 
     let statuses = verify::verify_installed(&manifest).expect("unwrap failed");
-    assert!(!statuses.is_empty());
+    assert_ne!(
+        statuses.len(),
+        0,
+        "expected at least one file status, got {statuses:?}"
+    );
     assert!(
         statuses
             .iter()

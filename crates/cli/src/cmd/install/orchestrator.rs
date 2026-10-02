@@ -1305,7 +1305,7 @@ mod tests {
             &["native:git".to_string()],
             false
         );
-        assert!(kept.is_empty());
+        assert_eq!(kept, &[] as &[String]);
     }
 
     #[test]
@@ -1345,7 +1345,7 @@ mod tests {
             &["zoi:helper".to_string()],
             true
         );
-        assert!(kept.is_empty());
+        assert_eq!(kept, &[] as &[String]);
     }
 
     #[test]

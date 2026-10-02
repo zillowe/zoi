@@ -27,9 +27,9 @@ fn zoidberg_is_embedded_and_marked_as_set() {
     assert_eq!(rg.handle, "zoidberg");
     assert_eq!(rg.registry_type, "official");
     assert!(rg.set, "the official registry should be the set registry");
-    assert!(!rg.name.is_empty());
-    assert!(!rg.git.is_empty());
-    assert!(!rg.branch.is_empty());
+    assert_ne!(rg.name, "");
+    assert_ne!(rg.git, "");
+    assert_ne!(rg.branch, "");
 }
 
 #[test]

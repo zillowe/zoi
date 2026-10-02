@@ -96,7 +96,7 @@ fn test_repo_zoi_lua_accepts_package_only_manifest() {
         lua_config::load_repo_zoi_lua(&path).expect("repo zoi.lua should load");
     let exports = exports.expect("package export should exist");
 
-    assert!(imports.is_empty());
+    assert_eq!(imports.len(), 0, "expected no imports, got {imports:?}");
     assert_eq!(exports.main.as_deref(), Some("./hello.pkg.lua"));
 }
 

@@ -489,7 +489,8 @@ zrepo:
         repo_config.git.is_empty(),
         "an omitted git section should default to empty"
     );
-    assert!(repo_config.repos.is_empty());
+    let repos = &repo_config.repos;
+    assert_eq!(repos.len(), 0, "expected no repo entries, got {repos:?}");
     assert_eq!(repo_config.name, "snapshotonly");
     assert_eq!(zrepo::candidate_links(&repo_config).len(), 1);
 }
@@ -509,9 +510,20 @@ zrepo:
 "#
     );
 
-    assert!(repo_config.pkg.is_empty());
-    assert!(repo_config.delta.is_empty());
-    assert!(repo_config.pgp.is_empty());
+    let pkg_links = &repo_config.pkg;
+    assert_eq!(
+        pkg_links.len(),
+        0,
+        "expected no pkg links, got {pkg_links:?}"
+    );
+    let delta_links = &repo_config.delta;
+    assert_eq!(
+        delta_links.len(),
+        0,
+        "expected no delta links, got {delta_links:?}"
+    );
+    let pgp_keys = &repo_config.pgp;
+    assert_eq!(pgp_keys.len(), 0, "expected no pgp keys, got {pgp_keys:?}");
     assert!(repo_config.db.is_none());
     assert!(repo_config.advisory_prefix.is_none());
 }

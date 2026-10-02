@@ -46,7 +46,7 @@ fn resolves_dependency_graph_for_local_pkg_lua_source_in_test_assets() {
     )
     .expect("local pkg.lua source should resolve");
 
-    assert!(non_zoi_deps.is_empty());
+    assert_eq!(non_zoi_deps, &[] as &[String]);
     assert_eq!(graph.nodes.len(), 1);
 
     let node = graph
@@ -81,7 +81,7 @@ fn resolves_dependency_graph_for_versioned_local_pkg_lua_source() {
     )
     .expect("versioned local pkg.lua source should resolve");
 
-    assert!(non_zoi_deps.is_empty());
+    assert_eq!(non_zoi_deps, &[] as &[String]);
     assert_eq!(graph.nodes.len(), 1);
 
     let node = graph
@@ -123,7 +123,7 @@ fn resolves_dependency_graph_for_local_pkg_lua_stable_channel() {
     )
     .expect("stable channel local pkg.lua source should resolve");
 
-    assert!(non_zoi_deps.is_empty());
+    assert_eq!(non_zoi_deps, &[] as &[String]);
     let node = graph
         .nodes
         .values()
@@ -154,7 +154,7 @@ fn resolves_dependency_graph_for_local_pkg_lua_alpha_channel() {
     )
     .expect("alpha channel local pkg.lua source should resolve");
 
-    assert!(non_zoi_deps.is_empty());
+    assert_eq!(non_zoi_deps, &[] as &[String]);
     let node = graph
         .nodes
         .values()
@@ -204,7 +204,7 @@ dependencies({ runtime = { 'zoi:./dependency' } })
     )
     .expect("relative package dependency should resolve");
 
-    assert!(non_zoi_deps.is_empty());
+    assert_eq!(non_zoi_deps, &[] as &[String]);
     assert_eq!(graph.nodes.len(), 2);
     assert!(
         graph

@@ -6,7 +6,7 @@ use zoi::pkg::types::{ComplexDependencyGroup, DependencyGroup};
 fn simple_dependency_group_has_no_optional_dependencies() {
     let group = DependencyGroup::Simple(vec!["core/pkg".to_string()]);
 
-    assert!(group.get_optional().is_empty());
+    assert_eq!(group.get_optional().as_slice(), [] as [String; 0]);
 }
 
 #[test]
