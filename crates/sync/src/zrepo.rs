@@ -365,7 +365,7 @@ pub struct ZrepoDeltaStats {
 fn sha256_bytes(data: &[u8]) -> String {
     zoi_core::hash::calculate_reader_hash(
         &mut Cursor::new(data),
-        zoi_core::hash::HashAlgorithm::Sha256,
+        zoi_core::hash::HashAlgorithm::Sha256
     )
     .map(|(_, digest)| digest)
     // Hashing an in-memory cursor cannot fail; keep the function infallible
