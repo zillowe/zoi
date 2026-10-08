@@ -42,6 +42,14 @@ pub fn create_manifest(
         b.sort();
     }
 
+    // Sorted so a package declaring two implementations of the same command
+    // registers them in a stable order. Sequence numbers, and therefore
+    // tie-breaking, stay deterministic across machines.
+    let mut alternatives = pkg.alternatives.clone();
+    if let Some(ref mut a) = alternatives {
+        a.sort_by(|x, y| x.name.cmp(&y.name).then_with(|| x.path.cmp(&y.path)));
+    }
+
     let mut conflicts = pkg.conflicts.clone();
     if let Some(ref mut c) = conflicts {
         c.sort();
@@ -99,6 +107,7 @@ pub fn create_manifest(
         reason,
         scope: pkg.scope,
         bins,
+        alternatives,
         conflicts,
         replaces,
         provides,

@@ -12,6 +12,7 @@ ARCH_NAME := env("ARCH_NAME", shell("uname -m"))
 WITH_BIN := env("WITH_BIN", "both")
 
 BINDIR := env("BINDIR", PREFIX + "/bin")
+MANDIR := env("MANDIR", PREFIX + "/share/man")
 DEBUGDIR := env("DEBUGDIR", "dist")
 DEV_BINDIR := DEBUGDIR + "/bin"
 DEV_MANDIR := DEBUGDIR + "/man"
@@ -119,10 +120,26 @@ install:
             if [ -d "/usr/lib/systemd/system" ]; then \
                 sudo install -m 644 "crates/daemon/zoid.service" "/usr/lib/systemd/system/zoid.service"; \
                 echo "Zoid systemd service installed."; \
+                echo "Run 'sudo systemctl enable --now zoid' to start it at boot."; \
             fi; \
         fi; \
     fi
     @echo "Make sure '{{ BINDIR }}' is in your PATH."
+
+# Install the rendered man pages to `MANDIR`
+install-man:
+    @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
+    @if ! command -v asciidoctor >/dev/null 2>&1; then echo "Error: 'asciidoctor' is not installed. It is required to render man pages."; exit 1; fi
+    @echo "Rendering man pages..."
+    @mkdir -p "{{ DEV_MANDIR }}"
+    @asciidoctor -b manpage -D "{{ DEV_MANDIR }}" man/*.adoc
+    @echo "Installing man pages to {{ MANDIR }}..."
+    @sudo install -d -m 755 "{{ MANDIR }}/man1" "{{ MANDIR }}/man3" "{{ MANDIR }}/man5" "{{ MANDIR }}/man8"
+    @sudo install -m 644 "{{ DEV_MANDIR }}/zoi.1" "{{ MANDIR }}/man1/zoi.1"
+    @sudo install -m 644 "{{ DEV_MANDIR }}/zoi-rs.3" "{{ MANDIR }}/man3/zoi-rs.3"
+    @sudo install -m 644 "{{ DEV_MANDIR }}/zoi-lua.5" "{{ MANDIR }}/man5/zoi-lua.5"
+    @sudo install -m 644 "{{ DEV_MANDIR }}/zoid.8" "{{ MANDIR }}/man8/zoid.8"
+    @echo "Man pages installed."
 
 # Uninstall Zoi binary
 uninstall:
@@ -132,10 +149,21 @@ uninstall:
     @rm -f "{{ BINDIR }}/{{ MINI_NAME }}{{ EXE_EXT }}"
     @rm -f "{{ BINDIR }}/{{ DAEMON_NAME }}{{ EXE_EXT }}"
     @if [ -f "/usr/lib/systemd/system/zoid.service" ]; then \
+        sudo systemctl disable --now zoid 2>/dev/null || true; \
         sudo rm -f "/usr/lib/systemd/system/zoid.service"; \
+        sudo rm -rf /run/zoid; \
         echo "Zoid systemd service removed."; \
     fi
     @echo "Binaries uninstalled."
+
+# Uninstall the rendered man pages from `MANDIR`
+uninstall-man:
+    @echo "Removing man pages from {{ MANDIR }}..."
+    @sudo rm -f "{{ MANDIR }}/man1/zoi.1"
+    @sudo rm -f "{{ MANDIR }}/man3/zoi-rs.3"
+    @sudo rm -f "{{ MANDIR }}/man5/zoi-lua.5"
+    @sudo rm -f "{{ MANDIR }}/man8/zoid.8"
+    @echo "Man pages removed."
 
 # Generate man pages from the asciidoc sources in man/
 man:

@@ -446,6 +446,22 @@ pub fn run(
             "remove",
             scope_override.unwrap_or_default()
         );
+
+        // Removing a kernel leaves its boot entry pointing at deleted files,
+        // and the module index references a tree that is gone.
+        let scope = scope_override.unwrap_or_default();
+        if scope == zoi_core::types::Scope::System {
+            let _ = zoi_system::kernel::sync_after_transaction(&modified_files);
+        }
+
+        // Dropping the package's alternative registrations is what lets two
+        // implementations of the same command coexist: removing one must fall
+        // back to the other, not leave a dangling link.
+        if let Ok(changed) =
+            zoi_core::alternatives::reconcile(&modified_packages)
+        {
+            crate::cmd::alt::announce_changes(&changed);
+        }
     }
 
     if let Err(e) = transaction::commit(&transaction.id) {

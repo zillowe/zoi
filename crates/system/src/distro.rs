@@ -7,6 +7,11 @@ use zoi_core::sysroot;
 
 use crate::generation::GenerationManager;
 
+/// Writes the `/etc/os-release` marker that identifies the target as `ZoiOS`.
+///
+/// # Errors
+///
+/// Returns an error if the os-release marker cannot be written.
 pub fn initialize_zoios_marker(
     target: &Path,
     hostname: Option<&str>,
@@ -35,6 +40,11 @@ pub fn initialize_zoios_marker(
     Ok(())
 }
 
+/// Records the first system generation once a target has been provisioned.
+///
+/// # Errors
+///
+/// Returns an error if the first generation record cannot be written.
 pub fn finalize_first_generation(
     target: &Path,
     packages: Vec<String>,

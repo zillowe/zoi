@@ -1,12 +1,72 @@
 [Unit]
 Description=ZoiOS Privileged System Daemon
-After=network.target
+Documentation=man:zoid(8)
+
+# The daemon itself needs no network at startup, but PackageKit clients expect
+# the bus to be up before they call it, and `zoi sync` from a transaction needs
+# the network. Ordering only costs a few milliseconds of boot.
+After=dbus.service network-online.target
+Wants=network-online.target
 
 [Service]
+# `Type=exec` rather than the default `simple` because it makes systemd wait
+# until execve(2) actually succeeded, so a missing or non-executable binary
+# fails the unit instead of being reported as started and then flapping.
+Type=exec
+
+# Foreground only. A double-forking daemon under systemd confuses supervision:
+# systemd would lose track of the process it started and `Type=exec` could not
+# report a startup failure.
 ExecStart=/usr/bin/zoid start --foreground
+
+ExecReload=/bin/kill -HUP $MAINPID
+
+# `Restart=always` rather than `on-failure`: the daemon is infrastructure for
+# the whole ZoiOS layer, and a clean exit is as unexpected as a crash.
 Restart=always
+RestartSec=2
+
+# StartLimit must allow more than the default five restarts in ten seconds, or a
+# persistent misconfiguration turns into the unit being disabled.
+StartLimitIntervalSec=60
+StartLimitBurst=10
+
 User=root
-RuntimeDirectory=zoi
+Group=root
+
+# Creates /run/zoid with the right ownership on start and, crucially, removes
+# it on stop. That is what guarantees no stale socket survives a crash and makes
+# the next start connect cleanly instead of failing on a leftover file.
+RuntimeDirectory=zoid
+RuntimeDirectoryMode=0755
+
+# The daemon spawns `zoi` for every PackageKit operation, which in turn spawns
+# package scripts. Those need a real environment.
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=LC_ALL=C
+
+# StandardInput=syslog would send the journal to the system log. zoid logs
+# through stdout/stderr and PackageKit progress through D-Bus, so this stays
+# connected to the journal.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zoid
+
+# Sensible hardening. The daemon must run package scripts, chroot into target
+# systems, call depmod and sbsign, and bind a D-Bus socket, so the capability
+# set cannot be tightened much further without breaking real work.
+NoNewPrivileges=no
+ProtectHome=no
+PrivateTmp=no
+ProtectSystem=no
+ProtectKernelTunables=no
+ProtectControlGroups=no
+RestrictSUIDSGID=no
+# A package script may legitimately need to start a service or run a shell.
+ProtectProcSubset=no
+
+# The daemon can be asked to quit so an administrator can use `zoi` directly
+# from a terminal; that is intentional, so no `RefuseManualStop`.
 
 [Install]
 WantedBy=multi-user.target

@@ -211,6 +211,18 @@ Defines the maximum number of ZoiOS system generations to keep in the store and 
 - **Note:** The current active generation is never pruned.
 - **Example:** `system_generations_limit: 10`
 
+### `kernel_retention`
+
+Defines how many previously installed kernels Zoi keeps bootable. Zoi removes a package's files when it is upgraded, which for a kernel means the previous image, initramfs and module tree disappear. Before that happens, Zoi preserves them under `/var/lib/zoi/kernels` and writes each one a boot entry, so a bad kernel update can be recovered from by selecting an earlier kernel at the next boot.
+
+- **Type:** `integer`
+- **Default:** `3`
+- **Value of 0:** Keeps only the installed kernel. A kernel update then has no fallback, so a kernel that fails to boot leaves no way in but the recovery media.
+- **Note:** The count includes the kernel currently installed, so the default of `3` leaves two previous kernels selectable. This matches what Fedora keeps in practice.
+- **Note:** Redundant copies are reclaimed automatically. If a version is installed again, its preserved copy is deleted rather than left to duplicate several hundred megabytes.
+- **Note:** A kernel update also needs an initramfs, which is regenerated with `dracut`, `mkinitcpio` or `booster` depending on what is installed.
+- **Example:** `kernel_retention: 2`
+
 ### `max_delta_steps`
 
 Defines the maximum number of sequential `.zdelta` patches Zoi will download and apply when upgrading a package. When the cached version is more than one release behind the target, Zoi tries each intermediate delta in order (for example `149 -> 150`, then `150 -> 151`) instead of downloading the full archive. If the upgrade spans more versions than this limit, or any delta step fails, Zoi falls back to downloading the full archive.
@@ -295,6 +307,7 @@ When a policy field is set to `true`, the corresponding configuration from the s
 - `advisory_enforcement_unoverridable`: If `true`, advisory enforcement policy cannot be overridden by lower-precedence configs.
 - `system_generations_limit_unoverridable`: If `true`, the `system_generations_limit` setting is locked.
 - `max_delta_steps_unoverridable`: If `true`, the `max_delta_steps` setting is locked.
+- `kernel_retention_unoverridable`: If `true`, the `kernel_retention` setting is locked.
 - `max_resolution_depth_unoverridable`: If `true`, the `max_resolution_depth` setting is locked.
 - `offline_mode_unoverridable`: If `true`, the `offline_mode` setting is locked.
 - `pkg_dirs_unoverridable`: If `true`, the `pkg_dirs` list is locked.

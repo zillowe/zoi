@@ -114,6 +114,45 @@ pub enum InstallScope {
     Project
 }
 
+/// Subcommands for `zoi alt`, which manages alternative implementations.
+///
+/// Separate from the main command enum because `Alt` carries its own
+/// subcommand tree, and clap needs the nested variant declared here.
+#[derive(Subcommand)]
+pub enum AltCommand {
+    /// List every registered alternative
+    #[command(alias = "ls")]
+    List {
+        /// Show each group's candidates and their owners
+        #[arg(short, long)]
+        verbose: bool
+    },
+    /// Show one alternative in detail
+    Get {
+        /// Name of the alternative, e.g. awk
+        name: String
+    },
+    /// Select an implementation for an alternative
+    Set {
+        /// Name of the alternative, e.g. awk
+        name: String,
+        /// Path of the implementation to select, e.g. /usr/bin/mawk
+        path: String
+    },
+    /// Return to selecting the highest-priority implementation
+    Auto {
+        /// Name of the alternative, e.g. awk
+        name: String
+    },
+    /// Remove one implementation from an alternative
+    Remove {
+        /// Name of the alternative, e.g. awk
+        name: String,
+        /// Path of the implementation to remove
+        path: String
+    }
+}
+
 /// The available subcommands for Zoi.
 #[derive(Subcommand)]
 enum Commands {
@@ -472,6 +511,15 @@ enum Commands {
         #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
         package: String
     },
+
+    /// Inspect and choose alternative implementations
+    ///
+    /// For commands with several interchangeable implementations, such as awk,
+    /// vi or editor. Packages register alternatives and Zoi keeps the canonical
+    /// path pointing at the one with the highest priority, which can be
+    /// overridden per system without reinstalling anything.
+    #[command(subcommand, name = "alt")]
+    Alt(AltCommand),
 
     /// Shows the history of package operations
     History {
@@ -917,6 +965,7 @@ fn command_name(command: &Commands) -> &'static str {
         Commands::Why { .. } => "why",
         Commands::Owner { .. } => "owner",
         Commands::Files { .. } => "files",
+        Commands::Alt(_) => "alt",
         Commands::History { .. } => "history",
         Commands::Search { .. } => "search",
         Commands::Service(_) => "service",
@@ -1222,6 +1271,7 @@ pub fn run() -> anyhow::Result<()> {
             }
             Commands::Why { package_name } => cmd::why::run(&package_name),
             Commands::Owner { path } => cmd::owner::run(&path),
+            Commands::Alt(ref args) => cmd::alt::run(args),
             Commands::Files { package } => cmd::files::run(&package),
             Commands::History {
                 verify,

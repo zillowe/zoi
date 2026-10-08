@@ -1,0 +1,167 @@
+= zoid(8)
+:doctype: manpage
+:manmanual: Zoi Manual
+:mansource: zoid
+
+== Name
+
+zoid - the ZoiOS privileged system daemon
+
+== Synopsis
+
+*zoid* *start* [--foreground] [--no-packagekit]
+
+*zoid* *stop*
+
+*zoid* --help*
+
+== Description
+
+*zoid* is the privileged component of ZoiOS. It exists so that the unprivileged
+*zoi*(1) CLI never has to run as root: operations that touch the system are
+handed to *zoid* over a Unix socket, and *zoid* performs them and reports back.
+
+It provides two interfaces:
+
+* A *Unix socket* at `/run/zoid/zoid.sock`, used by *zoi system* for the
+  declarative `system.lua` operations: applying a system configuration,
+  listing and rolling back system generations, and pinning generations.
+
+* A *PackageKit* D-Bus service on the system bus
+  (`org.freedesktop.PackageKit` at `/org/freedesktop/PackageKit`). This is the
+  cross-desktop standard interface, and it is what allows GNOME Software, KDE
+  Discover, *pkcon* and similar tools to install and remove packages on a
+  ZoiOS system. Clients create a transaction with `CreateTransaction`, which
+  returns an object path; every query and mutation is then a method on
+  `org.freedesktop.PackageKit.Transaction` at that path, and results arrive
+  asynchronously as signals.
+
+*zoid* is normally started by systemd at boot through
+`/usr/lib/systemd/system/zoid.service`.
+
+== Options
+
+*start*::
+  Start the daemon. With no further options the process forks into the
+  background and the parent exits.
+
+*--foreground*::
+  Do not fork. This is what the systemd unit uses, because a double-forking
+  daemon defeats process supervision: systemd could not observe an exec failure
+  or keep track of the process it started.
+
+*--no-packagekit*::
+  Do not claim the `org.freedesktop.PackageKit` bus name. The Unix socket and
+  every *zoi system* command keep working; only desktop package tools are
+  affected. Useful on a headless system where the bus name would otherwise sit
+  owned by a process nothing can use.
+
+*stop*::
+  Ask a running daemon to shut down. Falls back to sending `SIGTERM` to the pid
+  in `/run/zoid/zoid.pid` if the socket cannot be reached.
+
+*--help*::
+  Show usage and exit.
+
+== Kernel and boot handling
+
+*zoid* runs the full kernel pipeline after any transaction that touched kernel
+paths, so that a system-wide `zoi install linux` or `zoi update --all` leaves a
+bootable machine behind rather than only a changed filesystem. The pipeline is:
+
+- Rebuild the kernel module dependency index with `depmod`.
+- Regenerate the initramfs with whichever generator is installed: *dracut*,
+  *mkinitcpio* or *booster*.
+- Sign the kernel, initramfs and modules with *sbsign* when the firmware is
+  enforcing UEFI Secure Boot and a key is present under
+  `/etc/zoi/secure-boot`.
+- Write a boot entry per installed and retained kernel to *systemd-boot*,
+  *grub2* or *limine*, as configured by `bootloader.type` in `system.lua` or
+  detected from the filesystem.
+
+Several kernels are kept bootable at once. Previous kernels are retained under
+`/var/lib/zoi/kernels` before an upgrade removes them, so a bad kernel update
+can be recovered from by selecting an earlier entry at the next boot. The
+number kept is controlled by the `kernel_retention` setting, and defaults to
+three.
+
+== Declarative system state
+
+*zoid system apply* asks *zoid* to reconcile the machine with a `system.lua`.
+The daemon installs and removes packages so that the installed set matches the
+configuration exactly, applies the declared users and groups, enables the
+declared services, regenerates `/etc/fstab` from the declared filesystems,
+creates a new numbered generation linked to the package transaction, writes
+boot entries, and prunes old generations.
+
+Because a generation records the Zoi transaction that produced it,
+*zoi system rollback* can revert a system change by undoing those transactions
+in reverse order.
+
+Users and groups are written directly to `/etc/passwd`, `/etc/shadow`,
+`/etc/group` and `/etc/gshadow`. The reconciliation is idempotent: re-applying an
+unchanged `system.lua` performs no writes, so the command is safe to run on a
+schedule. An existing account keeps its uid, which is what stops a re-apply
+from orphaning the files in a home directory.
+
+== Files
+
+`/run/zoid/zoid.sock`::
+  Unix socket the CLI connects to. Created inside the unit's
+  `RuntimeDirectory`, so systemd removes it on stop and no stale socket can
+  survive a crash.
+
+`/run/zoid/zoid.pid`::
+  Process id of the running daemon.
+
+`/var/lib/zoi/generations/<id>/generation.json`::
+  One generation record: its id, creation time, package set, the Zoi transaction
+  that produced it, and whether it is pinned.
+
+`/var/lib/zoi/kernels/`::
+  Retained previous kernels, used as boot fallbacks.
+
+`/usr/lib/systemd/system/zoid.service`::
+  The systemd unit.
+
+== Signals
+
+*SIGHUP*::
+  Reload. Accepted so `systemctl reload zoid` is not an error; the daemon holds
+  no state that needs re-reading, since configuration is read fresh on every
+  request.
+
+== Exit status
+
+*zoid* exits non-zero when the daemon cannot start: no D-Bus system bus, the
+runtime directory cannot be created, or the socket cannot be bound. A failure to
+claim the PackageKit bus name is *not* fatal; it is reported as a warning and
+the daemon continues, because losing PackageKit costs desktop integration while
+refusing to start would cost the whole ZoiOS layer.
+
+== Examples
+
+Start in the foreground, as systemd does:
+
+  zoid start --foreground
+
+Stop a running daemon:
+
+  zoid stop
+
+Run without claiming the PackageKit name on a headless system:
+
+  zoid start --foreground --no-packagekit
+
+== See also
+
+*zoi*(1), *systemd*(1), *pkcon*(1)
+
+Full online documentation: https://zillowe.qzz.io/docs/zds/zoi
+
+Project repository and issue tracker:
+https://gitlab.com/zillowe/zillwen/zusty/zoi
+
+== Copying
+
+Copyright (C) Zillowe Foundation. Licensed under Apache-2.0.

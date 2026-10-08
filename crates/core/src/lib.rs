@@ -8,6 +8,7 @@
 //! - Sysroot and path utilities.
 
 /// Built-in package definitions and resources.
+pub mod alternatives;
 pub mod builtin;
 /// Cache management for archives and package definitions.
 pub mod cache;

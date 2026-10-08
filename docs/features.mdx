@@ -17,6 +17,11 @@ Zoi is packed with features designed to make package management and environment 
   - **Direct FHS Installation:** ZoiOS installs packages directly into the system root (`/usr/bin`, `/usr/lib`, etc.), ensuring 100% compatibility with standard Linux software while maintaining a versioned store for safety.
   - **Universal Distro Builder:** Bootstrap an entire ZoiOS distribution onto a manually partitioned and formatted disk or directory with a single command (`zoi system distro build`).
   - **Native Distro Chroot:** Enter any ZoiOS root directory with `zoi system distro chroot`, which automatically sets up a secure sandbox with `/dev`, `/proc`, and `/sys` mounted from the host.
+  - **Declarative Accounts:** `system.lua` declares users and groups, which are reconciled directly against `/etc/passwd`, `/etc/shadow`, `/etc/group` and `/etc/gshadow`. The reconciliation is idempotent and deterministic, so re-applying writes nothing and two machines end up with identical UIDs.
+  - **Automatic Kernel Pipeline:** Any transaction touching kernel paths rebuilds the module index with `depmod`, regenerates the initramfs with `dracut`, `mkinitcpio` or `booster`, signs for UEFI Secure Boot with `sbsign` when the firmware is enforcing it, and writes boot entries.
+  - **Multiple Bootable Kernels:** Previous kernels are preserved before an upgrade removes them, so a bad kernel update is recovered from by selecting an earlier kernel. Controlled by `kernel_retention`.
+  - **systemd-boot, GRUB 2 and Limine:** The bootloader is taken from `system.lua` or detected from the filesystem.
+  - **PackageKit D-Bus Service:** `zoid` implements `org.freedesktop.PackageKit`, the cross-desktop standard, so GNOME Software, KDE Discover and `pkcon` work on a ZoiOS system.
 
 - **Explicit Scope Control:** Restrict package installation to specific scopes (`user`, `system`, or `project`) using the `scopes` metadata field. Zoi automatically enforces these constraints during installation and updates.
 
@@ -61,6 +66,8 @@ Zoi is packed with features designed to make package management and environment 
 - **Service Management (`zoi service`):** Define background processes in `.pkg.lua` and manage them via Zoi using your system's native manager (`systemd`, `launchd`, or `sc.exe`).
 
 - **Reverse Search (`zoi provides`):** Instantly find which package provides a specific binary or file path across the entire registry.
+
+- **Alternatives (`zoi alt`):** Commands with several interchangeable implementations, such as `awk` or `vi`, are managed through a priority-based registry rather than by having every package fight over the same file. See [Alternatives](/docs/zds/zoi/guides/alternatives).
 
 - **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your current project (`zoi.lua`), global configuration, or legacy files (like `.nvmrc` and `.python-version`) via its extensible Lua plugin system. Replaces static symlinks with intelligent shims that resolve the correct version at runtime.
 
@@ -327,6 +334,27 @@ Manage Zoi extensions.
 - `remove <name>`: Remove an extension.
 
 ---
+
+### `zoi alt`
+
+Manage alternative implementations of interchangeable commands.
+
+```sh
+# List registered alternatives
+zoi alt list
+zoi alt list --verbose
+
+# Inspect one group
+zoi alt get awk
+
+# Choose an implementation, and keep the others installed
+zoi alt set awk /usr/bin/mawk
+
+# Return to the highest-priority implementation
+zoi alt auto awk
+```
+
+See [Alternatives](/docs/zds/zoi/guides/alternatives) for the full guide.
 
 ### `zoi files <package>`
 

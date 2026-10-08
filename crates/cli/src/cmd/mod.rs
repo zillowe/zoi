@@ -2,6 +2,7 @@
 
 /// The `about` command.
 pub mod about;
+pub mod alt;
 /// The `audit` command.
 pub mod audit;
 /// The `autoremove` command.

@@ -110,6 +110,7 @@ fn test_verify_installed_detects_modification() {
         },
         scope: types::Scope::User,
         bins: None,
+        alternatives: None,
         conflicts: None,
         replaces: None,
         provides: None,

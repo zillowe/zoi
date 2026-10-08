@@ -306,6 +306,22 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                     )?;
                 }
 
+                // Accounts. Done before the generation is finalised so a
+                // failure here aborts the build with the target still in a
+                // state the administrator can inspect and retry.
+                println!("{} Configuring accounts...", "::".bold().blue());
+                match zoi_system::account::apply_from_config(&config, dry_run) {
+                    Ok(report) if !dry_run => {
+                        zoi_system::account::print_report(&report);
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        return Err(anyhow!(
+                            "Failed to configure users/groups: {e}"
+                        ));
+                    }
+                }
+
                 // Finalize Generation
                 zoi_system::distro::finalize_first_generation(
                     target_path,

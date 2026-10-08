@@ -6,7 +6,14 @@ use zoi_install::service::{ServiceAction, manage_service};
 
 use crate::config::ServiceConfig;
 
-pub fn apply_services(services: &HashMap<String, ServiceConfig>) -> Result<()> {
+/// Enables or disables the given systemd units to match the configuration.
+///
+/// # Errors
+///
+/// Returns an error if any unit cannot be enabled or disabled.
+pub fn apply_services<S: std::hash::BuildHasher>(
+    services: &HashMap<String, ServiceConfig, S>
+) -> Result<()> {
     for (name, cfg) in services {
         let action_str = if cfg.enable { "enable" } else { "disable" };
         let action = if cfg.enable {
@@ -33,15 +40,15 @@ pub fn apply_services(services: &HashMap<String, ServiceConfig>) -> Result<()> {
         match cmd.status() {
             Ok(status) if !status.success() => {
                 eprintln!(
-                    "Warning: Failed to {} service {}: systemctl exited with \
-                     {}",
-                    action_str, name, status
+                    "Warning: Failed to {action_str} service {name}: \
+                     systemctl exited with {status}"
                 );
             }
-            Err(e) => eprintln!(
-                "Warning: Failed to {} service {}: {}",
-                action_str, name, e
-            ),
+            Err(e) => {
+                eprintln!(
+                    "Warning: Failed to {action_str} service {name}: {e}"
+                );
+            }
             _ => {}
         }
     }

@@ -442,6 +442,18 @@ pub fn read_config() -> Result<Config> {
             system_cfg.system_generations_limit;
     }
 
+    if project_val.get("kernel_retention").is_some()
+        && !system_policy.kernel_retention_unoverridable
+    {
+        merged_cfg.kernel_retention = project_cfg.kernel_retention;
+    } else if user_val.get("kernel_retention").is_some()
+        && !system_policy.kernel_retention_unoverridable
+    {
+        merged_cfg.kernel_retention = user_cfg.kernel_retention;
+    } else if system_val.get("kernel_retention").is_some() {
+        merged_cfg.kernel_retention = system_cfg.kernel_retention;
+    }
+
     if project_val.get("max_delta_steps").is_some()
         && !system_policy.max_delta_steps_unoverridable
     {

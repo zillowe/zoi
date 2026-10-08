@@ -128,6 +128,7 @@ repos:
         reason: types::InstallReason::Direct,
         scope: types::Scope::User,
         bins: Some(vec![bin_name.to_string()]),
+        alternatives: None,
         conflicts: None,
         replaces: None,
         provides: None,
@@ -153,6 +154,7 @@ repos:
         repo: "core".to_string(),
         version: Some(version.to_string()),
         bins: Some(vec![bin_name.to_string()]),
+        alternatives: None,
         ..Default::default()
     };
     db::update_package(

@@ -53,6 +53,7 @@ fn test_linux_service_lifecycle() {
         reason: types::InstallReason::Direct,
         scope: types::Scope::User,
         bins: None,
+        alternatives: None,
         conflicts: None,
         replaces: None,
         provides: None,

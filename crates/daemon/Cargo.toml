@@ -14,13 +14,21 @@ publish = false
 name = "zoid"
 path = "src/main.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 zoi.workspace = true
 zoi-core.workspace = true
 zoi-system.workspace = true
 zoi-transaction.workspace = true
+zoi-db.workspace = true
 zoi-resolver.workspace = true
 zoi-uninstall.workspace = true
 anyhow.workspace = true
 nix.workspace = true
 clap.workspace = true
+zbus.workspace = true
+async-io.workspace = true
+serde.workspace = true
+colored.workspace = true

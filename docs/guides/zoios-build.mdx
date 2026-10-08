@@ -60,51 +60,102 @@ filesystems({
         options = "noatime",
     },
 })
+
+-- Accounts. Created on the target, not the build host.
+groups({
+    wheel = {},
+    video = {},
+})
+
+users({
+    admin = {
+        groups = { "wheel", "video" },
+        shell = "/bin/bash",
+        -- Generate with: sudo zoi system secret hash 'your-password'
+        password_hash = "$argon2id$v=19$m=65536,t=3,p=4$...",
+    }
+})
 ```
 
 ## Step 2: Partition and Format the Target Disk
 
-Before Zoi can orchestrate the installation, you must partition and format your target disk manually.
+This part is deliberately manual. Partitioning a disk is destructive, and which
+layout you want depends on whether you need a separate `/boot`, LVM, LUKS, or a
+plain single partition. `zoi system distro build` refuses to guess.
 
-*Disclaimer: Replace `/dev/sdX` with your actual target device. Be extremely careful not to format your host machine's drive!*
+*Disclaimer: Replace `/dev/sdX` with your actual target device. Be extremely
+careful not to format your host machine's drive!*
 
-### Example Partitioning (UEFI)
-
-Use a tool like `parted` or `fdisk` to create:
-
-1. **EFI Partition** (e.g. `/dev/sdX1`, 512MB, format as `vfat`)
-2. **Root Partition** (e.g. `/dev/sdX2`, remainder of disk, format as `ext4`)
+A minimal UEFI layout, using `cfdisk` or any tool you prefer:
 
 ```bash
-# Example formatting
+sudo cfdisk /dev/sdX
+```
+
+Create two partitions in `cfdisk`:
+
+1. **EFI System Partition** - 512MiB, type `EFI System`
+2. **Linux filesystem** - the remainder of the disk
+
+Write the table and quit, then format both:
+
+```bash
 sudo mkfs.vfat -F 32 -n ZOI_BOOT /dev/sdX1
 sudo mkfs.ext4 -L ZOIOS_ROOT /dev/sdX2
 ```
+
+<Callout title="Filesystem choice">
+  ZoiOS needs hard links and Unix permissions, so `ext4`, `btrfs` or `xfs`. A
+  FAT-formatted ESP is fine for `/boot/efi` but cannot hold the root.
+</Callout>
+
+Then mount it. `distro build` operates on whatever is mounted at `--target`:
+
+```bash
+sudo mount /dev/sdX2 /mnt
+sudo mkdir -p /mnt/boot/efi
+sudo mount /dev/sdX1 /mnt/boot/efi
+```
+
+<Callout title="Preview first">
+  `zoi system distro build --dry-run` prints the full build plan, including the
+  filesystems and packages it will touch, without modifying anything.
+</Callout>
 
 ---
 
 ## Step 3: Run the Universal Distro Builder
 
-Now, simply run the builder. This command establishes the system marker and installs the base packages.
+Now run the builder against the mounted target. It validates that every package
+exists before touching anything, drops the ZoiOS marker, installs the base set,
+applies the declared users and groups, generates `/etc/fstab`, and records the
+first generation.
 
 ```bash
-# We mount the target root temporarily so Zoi knows where to install
-sudo mount /dev/sdX2 /mnt
-sudo mkdir -p /mnt/boot/efi
-sudo mount /dev/sdX1 /mnt/boot/efi
-
 # Orchestrate the entire build
 sudo zoi system distro build --target /mnt --config ./target-system.lua
+
+# Or preview it first
+sudo zoi system distro build --target /mnt --config ./target-system.lua --dry-run
 ```
 
 ### What happens under the hood?
 
 In this single step, Zoi:
 
-1. **Initializes Sysroot**: Drops the `/etc/os-release` marker (`ID=zoios`) so the disk is recognized as ZoiOS.
-2. **Bootstrap Installation**: Directly installs the entire base package set (`@parlex/linux`, `@parlex/glibc`, etc.) into the target Zoi store and then into the system root.
-3. **Builds the First Generation**: Creates a lightweight record of the installation and links it to the package transaction.
-4. **Generates fstab**: Writes `/etc/fstab` based on your `system.lua` configuration.
+1. **Pre-flight**: Validates that every package in `system.lua` exists in your registry, before touching the disk.
+2. **Initializes Sysroot**: Drops the `/etc/os-release` marker (`ID=zoios`) so the disk is recognized as ZoiOS.
+3. **Bootstrap Installation**: Directly installs the entire base package set into the target Zoi store and then into the system root.
+4. **Configures Accounts**: Reconciles the declared `users` and `groups` against the target's `/etc/passwd`, `/etc/shadow`, `/etc/group` and `/etc/gshadow`.
+5. **Generates fstab**: Writes `/etc/fstab` from the declared `filesystems`.
+6. **Builds the First Generation**: Creates a record of the installation and links it to the package transaction.
+
+<Callout title="What is not done yet">
+  The bootloader and initramfs are still installed by hand in Step 4, because the
+  target has no bootloader on it yet. Once the machine is running,
+  `zoi system apply` and any `zoi install`/`zoi update` that touches a kernel
+  handle the whole pipeline automatically.
+</Callout>
 
 ---
 

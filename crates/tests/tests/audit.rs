@@ -25,6 +25,7 @@ fn test_manifest(name: &str, version: &str) -> InstallManifest {
         reason: InstallReason::Direct,
         scope: Scope::User,
         bins: None,
+        alternatives: None,
         conflicts: None,
         replaces: None,
         provides: None,

@@ -1225,6 +1225,26 @@ impl<'a> Orchestrator<'a> {
                 "install",
                 scope_override.unwrap_or_default()
             );
+
+            // Reconcile the alternatives registry for whatever changed. Done by
+            // reconciliation rather than by recording an explicit registration,
+            // so it converges on the right state regardless of which path
+            // installed the package.
+            if let Ok(changed) =
+                zoi_core::alternatives::reconcile(&modified_packages)
+            {
+                crate::cmd::alt::announce_changes(&changed);
+            }
+
+            // Installing a kernel system-wide has to rebuild the initramfs and
+            // add a boot entry. This used to live only in the `zoid` daemon,
+            // which meant `zoi install linux` from a script left the machine
+            // unbootable.
+            let scope = scope_override.unwrap_or_default();
+            if scope == zoi_core::types::Scope::System {
+                let _ =
+                    zoi_system::kernel::sync_after_transaction(&modified_files);
+            }
         }
 
         if let Err(e) = transaction::commit(&transaction_id) {

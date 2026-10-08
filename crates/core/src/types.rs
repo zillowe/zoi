@@ -369,6 +369,41 @@ impl InstallManifest {
     }
 }
 
+/// Default priority for an alternative that does not declare one.
+///
+/// 100 matches Debian's default and sits neutrally in the range: anything a
+/// distribution considers its preferred implementation registers above it, and
+/// a deliberate local downgrade registers below.
+fn default_alternative_priority() -> i32 {
+    100
+}
+
+/// One implementation registered for an alternative command.
+///
+/// Declared in a package as, for example:
+///
+/// ```lua
+/// alternatives = {
+///   { name = "awk", path = "/usr/bin/gawk", link = "/usr/bin/awk", priority = 100 },
+/// }
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AlternativeEntry {
+    /// Name of the alternative group, e.g. `awk`.
+    ///
+    /// All implementations of one command share this name. The state directory
+    /// under `/var/lib/zoi/alternatives` is keyed by it, and
+    /// `/etc/alternatives/<name>` is the symlink clients resolve through.
+    pub name: String,
+    /// Absolute path of this implementation, e.g. `/usr/bin/gawk`.
+    pub path: String,
+    /// Absolute path of the link to create, e.g. `/usr/bin/awk`.
+    pub link: String,
+    /// Higher wins. Defaults to 100.
+    #[serde(default = "default_alternative_priority")]
+    pub priority: i32
+}
+
 /// The core package definition blueprint.
 ///
 /// This struct is the Rust representation of the `metadata({...})` block in a
@@ -451,6 +486,16 @@ pub struct Package {
     /// List of executable binaries provided by the package.
     #[serde(default)]
     pub bins: Option<Vec<String>>,
+    /// Alternative implementations this package registers.
+    ///
+    /// For commands that have several interchangeable implementations, where
+    /// the right choice is a system policy rather than something a user picks
+    /// at install time. `awk` and `vi` are the classic cases: the
+    /// distribution has to put *something* at `/usr/bin/awk`, and which
+    /// one that is should be changeable without reinstalling every
+    /// implementation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alternatives: Option<Vec<AlternativeEntry>>,
     /// List of packages this package is incompatible with.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conflicts: Option<Vec<String>>,
@@ -999,6 +1044,15 @@ pub struct InstallManifest {
     pub scope: Scope,
     /// List of linked binary names.
     pub bins: Option<Vec<String>>,
+    /// Alternative implementations this package registered.
+    ///
+    /// Recorded at install time so the alternatives state can be rebuilt from
+    /// the manifest alone. Rebuilding matters because it makes registration a
+    /// reconciliation rather than an incremental update, so install, upgrade
+    /// and uninstall all converge on the same correct state no matter
+    /// which order things happened in.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alternatives: Option<Vec<AlternativeEntry>>,
     /// List of packages this package conflicts with.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conflicts: Option<Vec<String>>,
@@ -1231,7 +1285,16 @@ pub struct Config {
     /// The maximum number of sequential `.zdelta` patches to apply when
     /// upgrading a package to a newer version.
     #[serde(default = "default_max_delta_steps")]
-    pub max_delta_steps: u32
+    pub max_delta_steps: u32,
+    /// The number of previously installed kernels to keep bootable.
+    ///
+    /// Zoi removes a package's old files when a package is upgraded, which for
+    /// a kernel means the previous image and module tree disappear. Keeping a
+    /// configurable number of them is what makes a bad kernel update
+    /// recoverable: the boot menu still offers the kernel you were running on
+    /// before. Set to `0` to keep only the installed kernel.
+    #[serde(default = "default_kernel_retention")]
+    pub kernel_retention: u32
 }
 
 /// Default system generations limit.
@@ -1241,6 +1304,14 @@ fn default_system_generations_limit() -> u32 {
 
 /// Default maximum delta steps.
 fn default_max_delta_steps() -> u32 {
+    3
+}
+
+/// Default number of retained kernels.
+///
+/// Three matches what Fedora ships, and is the smallest number that still
+/// leaves a working fallback after two consecutive bad updates.
+fn default_kernel_retention() -> u32 {
     3
 }
 
@@ -1272,7 +1343,8 @@ impl Default for Config {
             cache_mirrors: Vec::new(),
             versions: HashMap::new(),
             system_generations_limit: 4,
-            max_delta_steps: default_max_delta_steps()
+            max_delta_steps: default_max_delta_steps(),
+            kernel_retention: default_kernel_retention()
         }
     }
 }
@@ -1316,6 +1388,9 @@ pub struct Policy {
     /// Whether maximum delta steps settings are unoverridable.
     #[serde(default, skip_serializing_if = "is_false")]
     pub max_delta_steps_unoverridable: bool,
+    /// Whether kernel retention settings can be overridden.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub kernel_retention_unoverridable: bool,
     /// Whether offline mode settings are unoverridable.
     #[serde(default, skip_serializing_if = "is_false")]
     pub offline_mode_unoverridable: bool,

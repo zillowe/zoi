@@ -10,14 +10,19 @@ use base64::engine::general_purpose;
 use rand::{Rng, rng};
 use zoi_core::utils::get_user_state_dir;
 
+/// Secret prefix.
 const SECRET_PREFIX: &str = "ZOISEC:v1:";
 
 /// Generates a one-way password hash using Argon2 (modern standard).
+///
+/// # Errors
+///
+/// Returns an error if the hashing parameters are rejected.
 pub fn hash_password(password: &str) -> Result<String> {
     let argon2 = Argon2::default();
     let password_hash = argon2
         .hash_password(password.as_bytes())
-        .map_err(|e| anyhow!("Failed to hash password: {}", e))?
+        .map_err(|e| anyhow!("Failed to hash password: {e}"))?
         .to_string();
     Ok(password_hash)
 }
@@ -35,13 +40,14 @@ fn get_master_key() -> Result<[u8; 32]> {
 
         #[cfg(unix)]
         {
+            use std::io::Write;
             use std::os::unix::fs::OpenOptionsExt;
+
             let mut file = fs::OpenOptions::new()
                 .write(true)
                 .create_new(true)
                 .mode(0o600)
                 .open(&key_path)?;
-            use std::io::Write;
             file.write_all(&key)?;
         }
         #[cfg(not(unix))]
@@ -66,12 +72,22 @@ fn get_master_key() -> Result<[u8; 32]> {
 }
 
 /// Exports the master key as a base64-encoded string.
+///
+/// # Errors
+///
+/// Returns an error if no master key has been generated yet, or if it
+/// cannot be read.
 pub fn export_master_key() -> Result<String> {
     let key = get_master_key()?;
     Ok(general_purpose::STANDARD.encode(key))
 }
 
 /// Imports a base64-encoded master key.
+///
+/// # Errors
+///
+/// Returns an error if `encoded_key` is not valid base64, or if the key
+/// file cannot be written.
 pub fn import_master_key(encoded_key: &str) -> Result<()> {
     let key_bytes = general_purpose::STANDARD
         .decode(encoded_key)
@@ -108,6 +124,11 @@ pub fn import_master_key(encoded_key: &str) -> Result<()> {
 }
 
 /// Encrypts a string so only this Zoi installation can decrypt it.
+///
+/// # Errors
+///
+/// Returns an error if no master key has been generated yet, or if
+/// encryption fails.
 pub fn encrypt_secret(plaintext: &str) -> Result<String> {
     let key_bytes = get_master_key()?;
     let cipher = Aes256Gcm::new_from_slice(&key_bytes)?;
@@ -115,22 +136,27 @@ pub fn encrypt_secret(plaintext: &str) -> Result<String> {
     let mut nonce_bytes = [0u8; 12];
     rng().fill_bytes(&mut nonce_bytes);
     let nonce = Nonce::try_from(&nonce_bytes[..])
-        .map_err(|e| anyhow!("Invalid nonce: {}", e))?;
+        .map_err(|e| anyhow!("Invalid nonce: {e}"))?;
 
     let ciphertext = cipher
         .encrypt(&nonce, plaintext.as_bytes())
-        .map_err(|e| anyhow!("Encryption failed: {}", e))?;
+        .map_err(|e| anyhow!("Encryption failed: {e}"))?;
 
     let mut combined = Vec::new();
     combined.extend_from_slice(&nonce_bytes);
     combined.extend_from_slice(&ciphertext);
 
     let encoded = general_purpose::STANDARD.encode(combined);
-    Ok(format!("{}{}", SECRET_PREFIX, encoded))
+    Ok(format!("{SECRET_PREFIX}{encoded}"))
 }
 
 /// Decrypts a ZOISEC string. Returns the original plaintext or the input if
 /// it's not a secret.
+///
+/// # Errors
+///
+/// Returns an error if the input carries the secret prefix but cannot be
+/// decrypted, which means the master key has changed.
 pub fn decrypt_secret(input: &str) -> Result<String> {
     if !input.starts_with(SECRET_PREFIX) {
         return Ok(input.to_string());
@@ -139,7 +165,7 @@ pub fn decrypt_secret(input: &str) -> Result<String> {
     let encoded = &input[SECRET_PREFIX.len()..];
     let combined = general_purpose::STANDARD
         .decode(encoded)
-        .map_err(|e| anyhow!("Failed to decode base64 secret: {}", e))?;
+        .map_err(|e| anyhow!("Failed to decode base64 secret: {e}"))?;
 
     if combined.len() < 12 {
         return Err(anyhow!("Invalid secret length"));
@@ -150,13 +176,12 @@ pub fn decrypt_secret(input: &str) -> Result<String> {
 
     let (nonce_bytes, ciphertext) = combined.split_at(12);
     let nonce = Nonce::try_from(nonce_bytes)
-        .map_err(|e| anyhow!("Invalid nonce in secret: {}", e))?;
+        .map_err(|e| anyhow!("Invalid nonce in secret: {e}"))?;
 
     let plaintext_bytes = cipher.decrypt(&nonce, ciphertext).map_err(|e| {
         anyhow!(
-            "Decryption failed: {}. This secret might have been encrypted on \
-             a different machine.",
-            e
+            "Decryption failed: {e}. This secret might have been encrypted on \
+             a different machine."
         )
     })?;
 

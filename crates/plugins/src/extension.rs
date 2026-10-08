@@ -241,6 +241,7 @@ pub fn add(
         reason: types::InstallReason::Direct,
         scope: pkg.scope,
         bins: None,
+        alternatives: None,
         conflicts: None,
         replaces: None,
         provides: None,

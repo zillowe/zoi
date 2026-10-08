@@ -66,6 +66,7 @@ fn test_package_outdated_on_revision_bump() {
         reason: types::InstallReason::Direct,
         scope: types::Scope::User,
         bins: None,
+        alternatives: None,
         conflicts: None,
         replaces: None,
         provides: None,

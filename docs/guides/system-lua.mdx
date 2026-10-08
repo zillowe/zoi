@@ -47,6 +47,18 @@ bootloader({
 })
 ```
 
+Leaving `type` unset lets Zoi detect the bootloader from the filesystem, probing
+`systemd-boot` first, then GRUB 2, then Limine.
+
+`efi_dir` is only consulted for `limine`, whose entries use ESP-relative paths.
+`systemd-boot` writes to `/boot/loader/entries` and probes the ESP mount point
+(`/boot`, `/boot/efi`, `/efi`) itself, because the entries have to land on the
+filesystem the firmware actually reads.
+
+One boot entry is written per kernel, including kernels preserved as fallbacks by
+[`kernel_retention`](/docs/zds/zoi/config), so several remain selectable after an
+update.
+
 ---
 
 ### `packages(table)`
@@ -99,6 +111,17 @@ users({
 })
 ```
 
+Accounts are written directly to `/etc/passwd`, `/etc/shadow`, `/etc/group` and
+`/etc/gshadow`. The behaviour worth knowing:
+
+- **Idempotent.** Re-applying an unchanged `system.lua` performs no writes, so `zoi system apply` is safe to run on a schedule.
+- **Deterministic.** Users are processed in sorted order, so two machines applying the same configuration end up with identical UIDs.
+- **Existing UIDs are never reassigned.** Changing a UID under a populated home directory would orphan every file in it.
+- **Home directories are created from `/etc/skel`** with mode `0700`.
+- **An account with no `password_hash` is locked, not passwordless.** It cannot be logged into with a password, but root `su` and SSH key login still work.
+- **`ZOISEC:` values are decrypted automatically**, so an encrypted secret works directly as `password_hash`.
+- **A missing group reference warns rather than failing**, so one typo does not abort an apply.
+
 ---
 
 ### `groups(table)`
@@ -114,6 +137,14 @@ groups({
     docker = { gid = 999 }
 })
 ```
+
+Groups are reconciled before users, because a user's supplementary memberships
+have to resolve to real GIDs.
+
+Accounts the base packages already ship (`root`, `nobody`, and so on) are left
+alone. `system.lua` is the source of truth for whether a group *exists*, not for
+every attribute of it, because the packages that own those groups have deliberate
+GIDs and memberships that a declarative file would otherwise fight on every apply.
 
 ---
 
@@ -177,4 +208,7 @@ To apply your changes to the live system:
 sudo zoi system apply
 ```
 
-Zoi will resolve the packages, install them to the store, create a new **System Generation**, update the FHS view, and enable/disable services accordingly.
+Zoi will resolve the packages, install them to the store, create a new **System Generation**, update the FHS view, reconcile the declared users and groups, regenerate `/etc/fstab`, enable or disable services, run the kernel pipeline, and write bootloader entries.
+
+The apply is idempotent: running it twice with no change in between performs no
+writes, which is what makes it safe to schedule.

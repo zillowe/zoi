@@ -505,6 +505,13 @@ fn perform_transaction(
     let stages = graph.toposort()?;
     let mut new_manifest_option: Option<types::InstallManifest> = None;
     let m = MultiProgress::new();
+
+    // Preserve the current kernel before any file is removed. Must precede the
+    // install loop: upgrading the kernel package deletes the previous version,
+    // and with it the last copy of the kernel this machine booted from.
+    if old_manifest_ref.scope == types::Scope::System {
+        retain_kernels_before_upgrade();
+    }
     if plan_json {
         m.set_draw_target(indicatif::ProgressDrawTarget::hidden());
     }
@@ -584,6 +591,23 @@ fn perform_transaction(
                 "upgrade",
                 scope
             );
+
+            // A re-registered package may have gained, lost or changed the
+            // priority of an alternative, so the registry is reconciled rather
+            // than assumed current.
+            if let Ok(changed) =
+                zoi_core::alternatives::reconcile(&modified_packages)
+            {
+                crate::cmd::alt::announce_changes(&changed);
+            }
+
+            // A kernel upgrade has to rebuild the initramfs and refresh the
+            // bootloader menu, otherwise the machine ends up with a new kernel
+            // it cannot boot and no fallback entry.
+            if scope == zoi_core::types::Scope::System {
+                let _ =
+                    zoi_system::kernel::sync_after_transaction(&modified_files);
+            }
         }
 
         transaction::commit(&transaction.id)?;
@@ -1111,6 +1135,15 @@ fn run_update_all_logic(
                 }
             };
 
+            // Preserve the current kernel before anything removes it. This has
+            // to happen before the first package is installed, because
+            // upgrading the kernel package deletes the previous
+            // version's files, and with them the only copy of the kernel
+            // this machine is currently running.
+            if candidate.old_manifest.scope == types::Scope::System {
+                retain_kernels_before_upgrade();
+            }
+
             let mut new_manifest_option: Option<types::InstallManifest> = None;
             for stage in stages {
                 for pkg_id in stage {
@@ -1242,6 +1275,19 @@ fn run_update_all_logic(
             "upgrade",
             first_scope
         );
+
+        // `zoi update --all` is the rolling-release upgrade path for a ZoiOS
+        // system, so the kernel pipeline must run here too: a rolling distro
+        // whose kernel updates do not produce a boot entry is not upgradeable.
+        if first_scope == types::Scope::System {
+            let _ = zoi_system::kernel::sync_after_transaction(&modified_files);
+        }
+
+        if let Ok(changed) =
+            zoi_core::alternatives::reconcile(&modified_packages)
+        {
+            crate::cmd::alt::announce_changes(&changed);
+        }
     }
     transaction::commit(&transaction_id)?;
 
@@ -1368,6 +1414,46 @@ fn advisory_counts(
 
 /// Removes old versions of a package, keeping a limited number for potential
 /// rollbacks.
+/// Snapshots the installed kernels so an upgrade cannot leave the machine
+/// without a bootable fallback.
+///
+/// Retention is configured through `kernel_retention` and defaults to three
+/// kernels, matching Fedora's behaviour of keeping previous kernels selectable
+/// in the boot menu.
+///
+/// Called from both the single-package and the `update --all` paths, before any
+/// file is removed. Failures are warnings rather than errors: refusing to
+/// update a package because a kernel snapshot could not be taken would be worse
+/// than proceeding, and the user is told what was not preserved.
+fn retain_kernels_before_upgrade() {
+    let limit =
+        zoi_core::config::read_config().map_or(3, |c| c.kernel_retention);
+
+    if limit == 0 {
+        return;
+    }
+
+    match zoi_system::kernel::retain_current_kernels(limit) {
+        Ok(retained) if !retained.is_empty() => {
+            println!(
+                "{} Retaining kernel(s) as boot fallback: {}",
+                "::".bold().blue(),
+                retained.join(", ")
+            );
+        }
+        Ok(_) => {}
+        Err(e) => eprintln!(
+            "{}: Failed to retain the current kernel: {e}. The previous \
+             kernel may not be bootable after this update.",
+            "Warning".yellow().bold()
+        )
+    }
+}
+
+/// Removes store directories for versions the package no longer uses.
+///
+/// Only the versions that are not referenced by the newly installed manifest
+/// are removed, so a rollback source that is still wanted survives.
 fn cleanup_old_versions(
     package_name: &str,
     scope: types::Scope,

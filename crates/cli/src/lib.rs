@@ -19,8 +19,8 @@ pub use pkg::{local, mini_resolve};
 pub use zoi_common::SourceInstallOptions;
 pub use zoi_core::types::{self, Scope};
 pub use zoi_core::{
-    cache, config, hash, lock, offline, pgp, pin, pkgdir, recorder, sysroot,
-    upgrade
+    alternatives, cache, config, hash, lock, offline, pgp, pin, pkgdir,
+    recorder, sysroot, upgrade
 };
 pub use zoi_hooks as hooks;
 pub use zoi_lua as lua;

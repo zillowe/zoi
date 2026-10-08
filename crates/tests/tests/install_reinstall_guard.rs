@@ -28,6 +28,7 @@ fn sample_manifest(
         reason: zoi::pkg::types::InstallReason::Direct,
         scope: zoi::pkg::types::Scope::User,
         bins: None,
+        alternatives: None,
         conflicts: None,
         replaces: None,
         provides: None,

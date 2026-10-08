@@ -48,6 +48,7 @@ fn test_rollback_restores_shims() {
         reason: types::InstallReason::Direct,
         scope: types::Scope::User,
         bins: Some(vec!["test-cmd".to_string()]),
+        alternatives: None,
         conflicts: None,
         replaces: None,
         provides: None,

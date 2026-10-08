@@ -1,0 +1,140 @@
+---
+title: Alternatives
+description: Managing interchangeable command implementations such as awk, vi and editor.
+---
+
+Some commands have several interchangeable implementations and the system still
+has to put *something* at the canonical path. `awk` may be `gawk`, `mawk` or
+`busybox`. `vi` may be `vim`, `nvim` or `vi`. `editor` may be any of them.
+
+Zoi manages these through a priority-based **alternatives** registry, the same
+idea as Debian's `update-alternatives`.
+
+## Why not just let the last package win
+
+Without a registry, whichever implementation installs last owns `/usr/bin/awk`,
+and every other implementation either overwrites it or collides with it. Both are
+bad:
+
+- Changing the decision means reinstalling packages.
+- File conflicts between `gawk` and `mawk` become routine, and the loser either
+  wins silently or fails to install.
+
+With a registry, the real files stay where their packages put them. Only
+symlinks are written, and several implementations coexist without touching each
+other.
+
+## The layout
+
+```text
+/usr/bin/awk -> /etc/alternatives/awk -> /usr/bin/gawk
+```
+
+Two hops, deliberately:
+
+- Switching is a single rename rather than a rewrite of the canonical path.
+- `/usr/bin/awk` stays pointing at something stable even while a different
+  implementation is current.
+- `/etc/alternatives` is a location some software already probes.
+
+Registry state lives in `/var/lib/zoi/alternatives/<name>/state.json`. It is
+deliberately *not* inside the package store, because the store is destroyed by
+the very uninstall that retention has to survive.
+
+## Declaring an alternative
+
+A package registers its implementation in its `metadata` block:
+
+```lua
+metadata({
+  name = "mawk",
+  repo = "core",
+  version = "1.3.4",
+  description = "A fast, small awk implementation.",
+  maintainer = { name = "Zoi Team", email = "maintainers@zillowe.org" },
+
+  alternatives = {
+    { name = "awk", path = "${usrroot}/usr/bin/mawk", link = "${usrroot}/usr/bin/awk", priority = 50 },
+  },
+})
+```
+
+Each entry has four fields:
+
+- `name`: the group. Every implementation of one command shares it.
+- `path`: this implementation's path.
+- `link`: the canonical link to create.
+- `priority`: higher wins. Defaults to `100`.
+
+<Callout title="Use `alternatives` only for genuine contention">
+  For a package's own commands, use `bins`. Alternatives add indirection and are
+  only worthwhile when several packages plausibly provide the same canonical
+  name.
+</Callout>
+
+## Using it
+
+```sh
+# What is registered?
+zoi alt list
+zoi alt list --verbose
+
+# Inspect one group, with priorities and owners
+zoi alt get awk
+
+# Choose an implementation. The others stay installed.
+zoi alt set awk /usr/bin/mawk
+
+# Go back to the highest-priority implementation
+zoi alt auto awk
+
+# Correct a registration by hand
+zoi alt remove awk /usr/bin/busybox
+```
+
+## How a winner is chosen
+
+Highest priority wins. Ties go to the most recently registered implementation,
+because that is the one an administrator most likely just installed on purpose.
+
+A manual selection from `zoi alt set` is **sticky**. Installing a higher-priority
+package afterwards does not silently undo it. This is a deliberate choice: a
+system that quietly reverts a decision somebody made is harder to trust than one
+that keeps it. `zoi alt auto` returns to automatic selection.
+
+## Removing an implementation
+
+Removing the selected package falls back to the next highest priority:
+
+```sh
+zoi remove mawk
+# /usr/bin/awk now resolves to /usr/bin/gawk
+```
+
+Removing the *last* implementation removes the links entirely, rather than leaving
+a dangling `/usr/bin/awk`. A missing command produces an obvious error; a dangling
+symlink produces a confusing one.
+
+## How state is maintained
+
+Registration is a **reconciliation**, not an event. After every install, update or
+uninstall, Zoi compares what the packages' manifests declare against what is
+registered and fixes the difference.
+
+That design means:
+
+- Install, upgrade and uninstall all converge on the same correct state, no matter which code path ran or in what order.
+- An interrupted earlier run is corrected by the next one, rather than leaving state permanently skewed.
+- Registering twice is harmless, which matters because an upgrade re-runs the whole install path.
+- Removing an entry from a `.pkg.lua` and reinstalling correctly deactivates it.
+
+## Sysroot support
+
+Everything is sysroot-aware, so `zoi system distro build` populates the same
+registry inside the target tree that the installed system will use. That is what
+keeps a built image and a running machine consistent.
+
+## See also
+
+- [Creating Packages](/docs/zds/zoi/creating-packages)
+- [ZoiOS Management](/docs/zds/zoi/zoios)

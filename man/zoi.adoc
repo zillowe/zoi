@@ -211,6 +211,36 @@ using the PURL specification.
 *files* _PACKAGE_::
   List all files owned by an installed package.
 
+*alt* [list|get|set|auto|remove]::
+  Manage alternative implementations of interchangeable commands, such as awk,
+  vi or editor. A package registers an implementation by declaring an
+  *alternatives* block in its *.pkg.lua*, and Zoi keeps the canonical path
+  pointing at the one with the highest priority.
++
+  Only symlinks are written, so implementations coexist without a file conflict
+  and switching is instant. See the *Alternatives* guide for the full model.
++
+*alt list* [--verbose]::
+  List every registered alternative, showing the canonical link, the current
+  selection, whether it was chosen manually, and every registered implementation
+  with its priority.
++
+*alt get* _NAME_::
+  Show one alternative group in detail, listing each implementation with its
+  priority, owning package, and which one is current.
++
+*alt set* _NAME_ _PATH_::
+  Select a specific implementation. Other implementations stay installed and can
+  be selected later. The choice is sticky: installing a higher-priority package
+  afterwards will not silently undo it.
++
+*alt auto* _NAME_::
+  Drop a manual selection and return to choosing the highest-priority
+  implementation.
++
+*alt remove* _NAME_ _PATH_::
+  Remove one implementation from a group, for correcting a registration by hand.
+
 *owner*, *owns* _PATH_::
   Find which installed package owns a file.
 
@@ -615,7 +645,7 @@ https://gitlab.com/zillowe/zillwen/zusty/zoi.
 
 == See also
 
-*zoi-rs*(3), *zoi-lua*(5)
+*zoi-rs*(3), *zoi-lua*(5), *zoid*(8)
 
 Full online documentation: https://zillowe.qzz.io/docs/zds/zoi
 

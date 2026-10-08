@@ -68,7 +68,7 @@ use anyhow::Result;
 use colored::Colorize;
 pub use zoi_cli::{cli, cmd, pkg, project};
 pub use zoi_core::types::{self, Scope};
-pub use zoi_core::utils;
+pub use zoi_core::{alternatives, utils};
 
 /// Options for building a package from a `.pkg.lua` definition.
 #[derive(Debug, Clone)]

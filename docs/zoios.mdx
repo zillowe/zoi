@@ -121,6 +121,22 @@ Manage sensitive information like passwords, API keys, and ZoiSEC master keys.
   `ZOISEC` strings.
 </Callout>
 
+### `zoi system secret`
+
+Manage sensitive information like passwords, API keys, and ZoiSEC master keys.
+
+- **`zoi system secret hash <password>`**: Generates a one-way Argon2 hash of a password. Use this in your `system.lua` for user passwords.
+- **`zoi system secret encrypt <value>`**: Encrypts a string so only Zoi on this specific machine can decrypt it. It returns a `ZOISEC:v1:...` string.
+- **`zoi system secret decrypt <ZOISEC>`**: Decrypts a `ZOISEC` string back to plaintext.
+- **`zoi system secret export-key`**: Exports the machine-specific ZoiSEC master key as a base64 string. Use this to make your secrets portable to other machines.
+- **`zoi system secret import-key <key>`**: Imports a base64-encoded ZoiSEC master key.
+
+<Callout type="error" title="Security Warning">
+  The ZoiSEC master key is the root of trust for all your encrypted secrets.
+  Keep it safe! If someone obtains your master key, they can decrypt all your
+  `ZOISEC` strings.
+</Callout>
+
 ---
 
 ## Declarative Configuration
@@ -129,8 +145,6 @@ ZoiOS uses two primary Lua files to manage its state:
 
 - **[system.lua Reference](/docs/zds/zoi/guides/system-lua)**: Manage system-wide packages, users, bootloaders, and filesystems.
 - **[home.lua Reference](/docs/zds/zoi/guides/home-lua)**: Manage your personal user environment, dotfiles, and user-scoped packages.
-
-## Bootstrapping a System
 
 A functional ZoiOS system is defined by a `collection` package, typically **`@core/base`**. This package provides a foundational set of utilities (POSIX tools, C library, Shell) and allows you to choose your primary system components via interactive or declarative options.
 
@@ -168,6 +182,83 @@ ZoiOS uses a **Transaction-based** architecture:
 2. **Shared Pool:** Zoi packages use a "Shared Pool + Mapping" architecture. Files are stored in a central `pool/` directory within the archive and mapped to their final destinations (`/usr`, `/etc`, etc.) at install time based on the scope.
 3. **Generations:** A generation is a lightweight record (e.g. `/var/lib/zoi/generations/42/`) of the system state, linked to a specific Zoi package transaction.
 4. **Traditional Management**: Unlike NixOS, ZoiOS installs files directly into the system root (`usrroot`). Rollbacks are performed by sequentially reverting package transactions, providing a traditional FHS experience with declarative safety.
+
+## Bootloaders and Kernels
+
+A machine only boots if something tells the bootloader about the new kernel.
+ZoiOS runs that pipeline automatically, after any transaction that touched kernel
+paths:
+
+- Rebuild the kernel module dependency index with `depmod`.
+- Regenerate the initramfs with whichever generator is installed: `dracut`,
+  `mkinitcpio` or `booster`.
+- Sign the kernel, initramfs and modules with `sbsign` when the firmware is
+  enforcing UEFI Secure Boot and a key is present under `/etc/zoi/secure-boot`.
+- Write one boot entry per kernel, so several are selectable at the next boot.
+
+The bootloader is taken from `bootloader.type` in `system.lua`, or detected from
+the filesystem when unset:
+
+| Type           | Notes                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------- |
+| `systemd-boot` | One `.conf` per kernel in `/boot/loader/entries`. The ESP location is probed (`/boot`, `/boot/efi`, `/efi`).  |
+| `grub2`        | Writes a snippet into `/etc/grub.d` and runs `grub-mkconfig`. Reads the same per-kernel files.               |
+| `limine`       | Writes `/boot/limine.conf`, preserving any hand-written preamble. Runs `limine-install` when present.        |
+
+<Callout title="Several kernels stay bootable">
+  Zoi keeps previous kernels so a bad update is recoverable. Before an upgrade
+  removes the old kernel, its image, initramfs and module tree are preserved
+  under `/var/lib/zoi/kernels`, and each one gets its own boot entry. Selecting
+  an earlier kernel at the next boot is all that is needed to recover.
+
+  How many are kept is controlled by the [`kernel_retention`](/docs/zds/zoi/config) setting, and defaults to three.
+</Callout>
+
+Secure Boot signing needs a key pair placed at `/etc/zoi/secure-boot/DB.key` and
+`/etc/zoi/secure-boot/secure-boot.crt`. Signing only runs when the firmware is
+actually enforcing Secure Boot, so a machine without it is unaffected.
+
+## Users and Groups
+
+`system.lua` declares accounts, and `zoi system apply` reconciles them against
+the real account databases:
+
+```lua
+groups({
+    wheel = {},
+    docker = { gid = 998 },
+})
+
+users({
+    alice = {
+        groups = { "docker" },
+        shell = "/bin/zsh",
+        home = "/home/alice",
+        password_hash = "ZOISEC:v1:...",
+    },
+})
+```
+
+Accounts are written directly to `/etc/passwd`, `/etc/shadow`, `/etc/group` and
+`/etc/gshadow`, rather than by shelling out to `useradd`. That is what lets the
+same code path serve `zoi system apply` on a running machine and
+`zoi system distro build --target /mnt` against a disk that does not have an
+account database yet.
+
+The behaviour worth knowing:
+
+- **Idempotent.** Re-applying an unchanged `system.lua` performs no writes at all, so `zoi system apply` is safe to run on a schedule.
+- **Deterministic.** Users are processed in sorted order, so two machines applying the same configuration end up with identical UIDs.
+- **Existing UIDs are preserved.** Changing a UID underneath a populated home directory would orphan every file in it.
+- **Home directories come from `/etc/skel`** and are created mode `0700`.
+- **An account with no `password_hash` is locked**, not passwordless. It cannot be logged into with a password, but root `su` and SSH key login still work, which is what you want when the key material arrives later.
+- **`ZOISEC:` values are decrypted automatically**, so an encrypted secret can be used directly as `password_hash`.
+- **Missing group references warn rather than fail**, so one typo does not abort an apply.
+
+Accounts the base packages ship (`root`, `nobody`, and so on) are left alone.
+`system.lua` is the source of truth for whether a group *exists*, not for every
+attribute of it, because the packages that own those groups have deliberate GIDs
+and memberships.
 
 ## Packaging Conventions
 

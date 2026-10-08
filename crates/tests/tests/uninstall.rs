@@ -25,6 +25,7 @@ fn sample_manifest(name: &str, repo: &str) -> types::InstallManifest {
         reason: types::InstallReason::Direct,
         scope: types::Scope::User,
         bins: None,
+        alternatives: None,
         conflicts: None,
         replaces: None,
         provides: None,

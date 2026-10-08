@@ -59,6 +59,7 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `author`         | `table`   | A table with `name`, `email`, and `website` of the original software author.                                                                                                                                                                |
 | `license`        | `string`  | The [SPDX identifier](https://spdx.org/licenses/) for the software (e.g. `MIT`, `GPL-3.0-or-later`). See [Licensing](#licensing) below.                                                                                                                                |
 | `bins`           | `list`    | A list of binary names the package provides. Zoi will create symlinks for these in a directory on the user's `PATH`.                                                                                                                        |
+| `alternatives`   | `list`    | Implementations of an interchangeable command. See [Alternatives](#13-alternatives) below.                                                                                                                                                   |
 | `conflicts`      | `list`    | A list of other package names that this package conflicts with.                                                                                                                                                                             |
 | `provides`       | `list`    | A list of virtual package names this package provides. Other packages can depend on these.                                                                                                                                                  |
 | `replaces`       | `list`    | A list of packages that this package replaces. Zoi will offer to remove them upon installation.                                                                                                                                             |
@@ -782,6 +783,62 @@ end
 
 function uninstall() end
 ```
+
+## 13. Alternatives
+
+Some commands have several interchangeable implementations and the system still has to put *something* at the canonical path. `awk` may be `gawk`, `mawk` or `busybox`. `vi` may be `vim` or `nvim`.
+
+Without a mechanism, whichever package installs last wins, and the others fight it over the same file. Instead, a package *registers* its implementation and Zoi keeps the canonical path pointing at the one with the highest priority.
+
+```lua
+metadata({
+  name = "gawk",
+  repo = "core",
+  version = "5.2.2",
+  description = "The GNU awk interpreter.",
+  maintainer = { name = "Zoi Team", email = "maintainers@zillowe.org" },
+
+  alternatives = {
+    { name = "awk", path = "${usrroot}/usr/bin/gawk", link = "${usrroot}/usr/bin/awk", priority = 100 },
+  },
+})
+```
+
+Each entry has four fields:
+
+- `name`: the alternative group, e.g. `awk`. Every implementation of one command shares it.
+- `path`: the absolute path of this implementation.
+- `link`: the absolute path of the canonical link to create, e.g. `/usr/bin/awk`.
+- `priority`: higher wins. Defaults to `100` when omitted.
+
+Zoi maintains a two-hop symlink so switching is a single rename and the implementations never touch each other:
+
+```text
+/usr/bin/awk -> /etc/alternatives/awk -> /usr/bin/gawk
+```
+
+Registering is idempotent and is reconciled rather than recorded, so an upgrade, a reinstall or an interrupted earlier run all converge on the same state. Removing one implementation falls back to the next highest priority automatically, which is what lets `gawk` and `mawk` be installed side by side without a file conflict.
+
+An administrator changes the selection without reinstalling anything:
+
+```sh
+# See what is registered
+zoi alt list
+
+# Prefer mawk, keeping gawk installed
+zoi alt set awk /usr/bin/mawk
+
+# Return to the highest-priority implementation
+zoi alt auto awk
+```
+
+A manual selection is deliberately sticky: installing a higher-priority package later does not silently undo a decision someone made on purpose. Use `zoi alt auto` to go back to automatic.
+
+<Callout type="info">
+  Prefer `bins` for a package's *own* commands, and `alternatives` only when
+  several packages genuinely contend for one canonical path. Using
+  `alternatives` for your own binaries adds indirection with no benefit.
+</Callout>
 
 ## Next Steps
 
