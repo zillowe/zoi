@@ -55,10 +55,10 @@ function zfvm_tag_field() {
     parsed=$("$ZFVM" tag "$tag" 2>/dev/null) || return 1
 
     case "$field" in
-        branch) printf '%s' "$(printf '%s\n' "$parsed" | awk -F'  *' '/^Branch/ {print $2}')" ;;
-        status) printf '%s' "$(printf '%s\n' "$parsed" | awk -F'  *' '/^Status/ {print $2}')" ;;
-        number) printf '%s' "$(printf '%s\n' "$parsed" | awk -F'  *' '/^Core/ {print $2}')" ;;
-        *) printf '%s' "" ;;
+    branch) printf '%s' "$(printf '%s\n' "$parsed" | awk -F'  *' '/^Branch/ {print $2}')" ;;
+    status) printf '%s' "$(printf '%s\n' "$parsed" | awk -F'  *' '/^Status/ {print $2}')" ;;
+    number) printf '%s' "$(printf '%s\n' "$parsed" | awk -F'  *' '/^Core/ {print $2}')" ;;
+    *) printf '%s' "" ;;
     esac
 }
 
@@ -240,6 +240,50 @@ for binary_path in "$COMPILED_DIR"/*; do
 
     rm -rf "$TMP_ARCHIVE_DIR"
 done
+
+# Man pages are rendered once by `scripts/man.sh` and published alongside the
+# binaries, rather than each package definition rendering the AsciiDoc itself.
+#
+# They are only reachable from the release assets, so a package that installs
+# `zoi` as its own dependency would otherwise have to carry a Ruby toolchain
+# in its build closure just to produce a man page. Publishing them here means
+# the toolchain is needed once, in CI, and never on a user's machine.
+#
+# The LICENSE is published for the same reason. A package definition should
+# depend only on the release assets it can verify, not on a raw tag tree whose
+# contents change the moment a commit lands on the branch.
+#
+# Both are staged before the checksum pass below so they are covered by
+# `checksums.txt` and by its detached signature, which is what lets a package
+# verify a downloaded file against the same trust anchor as a binary.
+MAN_DIR="./scripts/release/man"
+
+publish_asset() {
+    local source=$1
+    local filename=$(basename "$source")
+
+    if [ ! -s "$source" ] || [ -s "$ARCHIVE_DIR/$filename" ]; then
+        return
+    fi
+
+    echo -e "${CYAN}     -> Copying and signing ${filename}...${NC}"
+    cp "$source" "$ARCHIVE_DIR/"
+    sign_file "$ARCHIVE_DIR/$filename"
+}
+
+if [ -d "$MAN_DIR" ]; then
+    echo -e "${CYAN}  -> Processing man pages...${NC}"
+    for man_path in "$MAN_DIR"/*; do
+        [ -f "$man_path" ] || continue
+        publish_asset "$man_path"
+    done
+else
+    echo -e "${YELLOW}No man pages found in ${MAN_DIR}; the release will not publish any.${NC}"
+    echo -e "${YELLOW}Run './scripts/man.sh' before this script to render them.${NC}"
+fi
+
+echo -e "${CYAN}  -> Processing LICENSE...${NC}"
+publish_asset "./LICENSE"
 
 echo -e "${CYAN}🔐 Generating sha512 checksums...${NC}"
 (

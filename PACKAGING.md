@@ -235,35 +235,38 @@ These should be included in the package.
 
 - **Man Pages:**
   The man page sources are AsciiDoc files in the `man/` directory
-  (`zoi.adoc`, `zoi-rs.adoc`, and `zoi-lua.adoc`).
-  They are rendered to man pages with `asciidoctor` using the manpage
-  backend. The rendered section is taken from the page title
-  (e.g. `zoi.adoc` renders `zoi.1`).
+  (`zoi.adoc`, `zoi-rs.adoc`, `zoi-lua.adoc`, and `zoid.adoc`).
+  The rendered section is taken from the page title, so `zoi.adoc`
+  renders `zoi.1`, `zoi-rs.adoc` renders `zoi-rs.3`, `zoi-lua.adoc`
+  renders `zoi-lua.5`, and `zoid.adoc` renders `zoid.8`.
 
-  To render all man pages (equivalent to `just man`):
+  Every release publishes the pre-rendered pages as signed release assets,
+  so fetch them from the release like any other asset.
 
-  ```sh
-  asciidoctor -b manpage -D dist/man man/*.adoc
+  The rendered pages and the `LICENSE` are attached to each release under
+  its `downloads` directory, and their digests appear in the release's
+  `checksums.txt` (sha512) and `checksums-256.txt` (sha256):
+
+  ```text
+  <release>/downloads/zoi.1
+  <release>/downloads/zoi-rs.3
+  <release>/downloads/zoi-lua.5
+  <release>/downloads/zoid.8
+  <release>/downloads/LICENSE
   ```
 
-  To render a single page:
+  Looking a digest up by unanchored substring is a trap: the manifest also
+  contains `zoi-linux-amd64.tar.zst` and its `.bsdiff` patch, and a search
+  for `zoi.1` or `LICENSE` will happily match an unrelated entry. Match the
+  asset name exactly.
 
-  ```sh
-  mkdir -p dist/man
-  asciidoctor -b manpage -D dist/man man/zoi.adoc
-  asciidoctor -b manpage -D dist/man man/zoi-rs.adoc
-  asciidoctor -b manpage -D dist/man man/zoi-lua.adoc
-  ```
+  Rendering them yourself would mean requiring `asciidoctor`
+  (or `rubygem-asciidoctor` on Fedora/RHEL), and with it a Ruby toolchain,
+  solely to reproduce files the release has already signed.
 
-  This produces `dist/man/zoi.1`, `dist/man/zoi-rs.3`, and
-  `dist/man/zoi-lua.5`. Install each page into the matching man directory
-  (e.g. `zoi.1` goes into `/usr/share/man/man1`, `zoi-rs.3` into
-  `/usr/share/man/man3`, and `zoi-lua.5` into `/usr/share/man/man5`).
-
-  Pre-built binary archives do not include man pages. Source-based packages
-  should render them from the `man/` directory at build time with
-  `asciidoctor`; require it as a build dependency (`rubygem-asciidoctor` on
-  Fedora/RHEL, `asciidoctor` on Arch Linux).
+  If you are working from a checkout rather than a release, render locally
+  with `./scripts/man.sh` (equivalent to `just man`), which writes
+  `scripts/release/man/`.
 
 ## Existing Packaging Files
 

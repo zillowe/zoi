@@ -15,11 +15,13 @@ Summary:        Advanced Package Manager & Environment Orchestrator
 License:        Apache-2.0
 URL:            https://gitlab.com/zillowe/zillwen/zusty/zoi
 Source0:        %{url}/-/archive/Prod-Release-%{version}/Prod-Release-%{version}.tar.gz
+Source1:        %{url}/-/releases/Prod-Release-%{version}/downloads/zoi.1
+Source2:        %{url}/-/releases/Prod-Release-%{version}/downloads/zoi-rs.3
+Source3:        %{url}/-/releases/Prod-Release-%{version}/downloads/zoi-lua.5
 
 BuildRequires:  cargo
 BuildRequires:  rust
 BuildRequires:  gcc
-BuildRequires:  rubygem-asciidoctor
 BuildRequires:  openssl-devel
 BuildRequires:  pkgconfig
 BuildRequires:  xz-devel
@@ -61,12 +63,9 @@ mkdir -p %{buildroot}%{_datadir}/fish/vendor_completions.d
 ./target/release/zoi generate-completions zsh > %{buildroot}%{_datadir}/zsh/site-functions/_zoi
 ./target/release/zoi generate-completions fish > %{buildroot}%{_datadir}/fish/vendor_completions.d/zoi.fish
 
-mkdir -p %{buildroot}%{_mandir}/man1
-mkdir -p %{buildroot}%{_mandir}/man3
-mkdir -p %{buildroot}%{_mandir}/man5
-asciidoctor -b manpage -D %{buildroot}%{_mandir}/man1 man/zoi.adoc
-asciidoctor -b manpage -D %{buildroot}%{_mandir}/man3 man/zoi-rs.adoc
-asciidoctor -b manpage -D %{buildroot}%{_mandir}/man5 man/zoi-lua.adoc
+install -D -m 644 %{SOURCE1} %{buildroot}%{_mandir}/man1/zoi.1
+install -D -m 644 %{SOURCE2} %{buildroot}%{_mandir}/man3/zoi-rs.3
+install -D -m 644 %{SOURCE3} %{buildroot}%{_mandir}/man5/zoi-lua.5
 
 %files
 %license LICENSE

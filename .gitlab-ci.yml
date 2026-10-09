@@ -276,7 +276,7 @@ package:archive:
     - package:rpm
   before_script:
     - apt-get update -y && apt-get install -y p7zip-full tar zstd curl git jq
-      unzip gnupg coreutils cargo
+      unzip gnupg coreutils cargo asciidoctor
     - cargo install zbsdiff-cli
     - export PATH="$PATH:$HOME/.cargo/bin"
   script:
@@ -286,6 +286,9 @@ package:archive:
       ls -lR ./scripts/release/
       echo "Importing GPG key..."
       echo "$GPG_PRIVATE_KEY_B32" | base32 -d | gpg --batch --import
+      echo "Rendering man pages..."
+      chmod +x ./scripts/man.sh
+      ./scripts/man.sh
       echo "Running archive script..."
       chmod +x ./scripts/archive.sh
       ./scripts/archive.sh
