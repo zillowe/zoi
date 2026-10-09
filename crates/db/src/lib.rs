@@ -946,6 +946,50 @@ pub fn has_other_owners(
     Ok(count > 0)
 }
 
+/// Returns the names of the packages that claim `path`, newest claim first.
+///
+/// `package_files` records what a package installs, so this is the global view
+/// of who owns a path. Install uses it to tell a file that another package
+/// owns apart from a stray file that happens to sit at the same path, which
+/// is the difference between "replace a file Zoi put there" and "clobber
+/// another package's file".
+///
+/// `current_package_id` is excluded so that reinstalling or upgrading a
+/// package does not report the package as its own competitor. Pass `None` when
+/// the package is not installed yet and therefore has no row to exclude.
+///
+/// # Errors
+///
+/// Returns an error if the query fails.
+pub fn get_other_owners(
+    conn: &Connection,
+    path: &str,
+    current_package_id: Option<i64>
+) -> Result<Vec<String>> {
+    // One statement with the exclusion folded into the WHERE clause rather
+    // than two round trips, because this runs once per incoming file and a
+    // system-scope package can contribute thousands of them.
+    let mut stmt = conn.prepare(
+        "SELECT p.name FROM package_files pf JOIN packages p ON p.id = \
+         pf.package_id WHERE pf.path = ?1 AND (?2 IS NULL OR pf.package_id != \
+         ?2)"
+    )?;
+
+    // The exclusion is bound once rather than branched on, because two
+    // closures in different match arms are distinct types and `MappedRows`
+    // is not generic over the closure.
+    let exclude_id = current_package_id;
+    let rows = stmt.query_map(params![path, exclude_id], |row| row.get(0))?;
+
+    let mut owners = Vec::new();
+    for row in rows {
+        owners.push(row?);
+    }
+    owners.sort();
+    owners.dedup();
+    Ok(owners)
+}
+
 /// Deletes a package from the database.
 ///
 /// # Errors

@@ -564,13 +564,37 @@ pub fn check_file_conflicts(
     nodes.par_iter().try_for_each(|node| {
         let sub_package_to_check = node.sub_package.as_deref();
 
+        // `installed_files` records placeholder-form paths such as
+        // `${usrroot}/usr/bin/zoi`, while the conflicts reported below are
+        // real filesystem paths. Comparing the two directly never matches, so
+        // a reinstall looked like a conflict against its own files. The
+        // recorded paths are expanded here so the comparison is like for like.
         let owned_files: HashSet<String> = installed_packages
             .iter()
             .find(|p| {
                 p.name == node.pkg.name
                     && p.sub_package.as_deref() == sub_package_to_check
             })
-            .map(|p| p.installed_files.iter().cloned().collect())
+            .map(|p| {
+                p.installed_files
+                    .iter()
+                    .filter_map(|f| {
+                        zoi_core::utils::expand_placeholders(
+                            f,
+                            &zoi_resolver::local::get_package_version_dir(
+                                p.scope,
+                                &p.registry_handle,
+                                &p.repo,
+                                &p.name,
+                                &p.version
+                            )
+                            .unwrap_or_default(),
+                            p.scope
+                        )
+                        .ok()
+                    })
+                    .collect()
+            })
             .unwrap_or_default();
 
         let mut conflicts_for_this_pkg = Vec::new();

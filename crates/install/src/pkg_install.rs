@@ -11,6 +11,7 @@ use walkdir::WalkDir;
 use zoi_core::hash::{HashAlgorithm, calculate_file_hash};
 use zoi_core::types;
 use zoi_core::utils::{self, copy_dir_all};
+use zoi_db as db;
 use zoi_resolver::local;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
@@ -91,41 +92,159 @@ fn create_completion_symlink(source: &Path, link: &Path) -> Result<()> {
     Ok(())
 }
 
+/// A destination path that an incoming file would overwrite, and who, if
+/// anyone, already claims it.
+struct FileConflict {
+    /// The absolute path the incoming file would be written to.
+    path: PathBuf,
+    /// The packages that already record this path in `package_files`.
+    ///
+    /// Empty means the path exists on disk but no installed package claims
+    /// it, which is a stray file rather than a package overlap.
+    owners: Vec<String>
+}
+
+/// Identifies the package being installed, so that the ownership lookup can
+/// exclude its own earlier claims.
+///
+/// A reinstall legitimately rewrites files the package already owns, and those
+/// must not be reported as conflicts against another package. Without the
+/// identity, every package would appear to conflict with itself.
+struct InstallingPackage<'a> {
+    /// Package name as recorded in the `packages` table.
+    name: &'a str,
+    /// Sub-package name for a split package, `None` otherwise.
+    sub_package: Option<&'a str>,
+    /// Repository tier the package was installed from.
+    repo: &'a str,
+    /// Registry handle the package belongs to.
+    registry: &'a str
+}
+
 /// Checks for file conflicts between a source directory and a destination
 /// directory, prompting the user for confirmation if conflicts are found.
+///
+/// The check consults the global `package_files` index rather than only the
+/// incoming package's own previous manifest. That distinction is what lets a
+/// clobber be reported as a clobber: an unowned file is a stray the user may
+/// reasonably want replaced, while a file another package owns is a conflict
+/// between two packages that should not be resolved silently by whoever
+/// installed last.
+///
+/// `owned_files` is the caller's existing footprint for this package. It is
+/// still needed because the ownership index is only populated once a package
+/// has been installed at least once, and it is also the only record for a
+/// package installed before this index existed.
 fn check_and_handle_file_conflicts(
     source_dir: &Path,
     dest_dir: &Path,
     owned_files: &HashSet<String>,
+    package: Option<&InstallingPackage<'_>>,
     yes: bool
 ) -> Result<()> {
-    let mut conflicting_files = Vec::new();
+    let mut stray_files = Vec::new();
+    let mut owned_by_others: Vec<FileConflict> = Vec::new();
+
+    // Resolved once rather than per file: this runs for every incoming file,
+    // and a system-scope package contributes thousands of them.
+    //
+    // A database that cannot be opened, or a package with no row yet, both
+    // degrade to "no owners known" rather than failing the install. Losing the
+    // ownership index turns a cross-package clobber back into the plain
+    // stray-file prompt, which is the behaviour this check had before, so the
+    // failure mode is a weaker check and never a broken install.
+    let (conn, current_pkg_id) = match package {
+        Some(pkg) => {
+            // `open_connection` keys the database file by registry handle, and
+            // an empty handle is how the local store is named.
+            let registry_key = if pkg.registry.is_empty() {
+                "local"
+            } else {
+                pkg.registry
+            };
+            match db::open_connection(registry_key) {
+                Ok(conn) => {
+                    let id = db::get_package_id(
+                        &conn,
+                        pkg.name,
+                        pkg.sub_package,
+                        pkg.repo,
+                        registry_key
+                    )
+                    .ok();
+                    (Some(conn), id)
+                }
+                Err(_) => (None, None)
+            }
+        }
+        None => (None, None)
+    };
 
     for entry in WalkDir::new(source_dir)
         .into_iter()
         .filter_map(std::result::Result::ok)
         .skip(1)
     {
-        if entry.file_type().is_file() {
-            let relative_path = entry.path().strip_prefix(source_dir)?;
-            let dest_path = dest_dir.join(relative_path);
-            if dest_path.exists()
-                && !owned_files
-                    .contains(&dest_path.to_string_lossy().to_string())
-            {
-                conflicting_files.push(dest_path);
-            }
+        if !entry.file_type().is_file() {
+            continue;
+        }
+
+        let relative_path = entry.path().strip_prefix(source_dir)?;
+        let dest_path = dest_dir.join(relative_path);
+
+        if !dest_path.exists() {
+            continue;
+        }
+
+        // `owned_files` stores placeholder-form paths such as
+        // `${usrroot}/usr/bin/zoi`, so the comparison has to be made against
+        // that same form rather than the expanded destination path. Comparing
+        // the expanded path against the stored form never matches, which made
+        // every reinstall look like a conflict against itself.
+        let expanded = zoi_core::utils::expand_placeholders(
+            &dest_path.to_string_lossy(),
+            Path::new(""),
+            types::Scope::System
+        );
+        let is_self_owned = expanded
+            .as_ref()
+            .is_ok_and(|p| owned_files.contains(p))
+            || owned_files.contains(&dest_path.to_string_lossy().to_string());
+
+        if is_self_owned {
+            continue;
+        }
+
+        let owners = conn
+            .as_ref()
+            .and_then(|c| {
+                db::get_other_owners(
+                    c,
+                    &dest_path.to_string_lossy(),
+                    current_pkg_id
+                )
+                .ok()
+            })
+            .unwrap_or_default();
+
+        if owners.is_empty() {
+            stray_files.push(dest_path);
+        } else {
+            owned_by_others.push(FileConflict {
+                path: dest_path,
+                owners
+            });
         }
     }
 
-    if !conflicting_files.is_empty() {
+    if !stray_files.is_empty() {
         println!();
         println!("{}", "File Conflict Detected:".red().bold());
         println!(
             "The following files that this package wants to install already \
              exist on your system:"
         );
-        for file in &conflicting_files {
+        for file in &stray_files {
             println!("- {}", file.display());
         }
         println!();
@@ -137,6 +256,35 @@ fn check_and_handle_file_conflicts(
         ) {
             return Err(anyhow!(
                 "Installation aborted by user due to file conflicts."
+            ));
+        }
+    }
+
+    if !owned_by_others.is_empty() {
+        println!();
+        println!("{}", "File Conflict With Another Package:".red().bold());
+        println!(
+            "The following files are owned by other installed packages. \
+             Installing this package would replace them, leaving the other \
+             package broken:"
+        );
+        for conflict in &owned_by_others {
+            println!(
+                "- {} (owned by {})",
+                conflict.path.display(),
+                conflict.owners.join(", ")
+            );
+        }
+        println!();
+
+        if !utils::ask_for_confirmation(
+            "Do you want to overwrite these files anyway? The packages listed \
+             above may stop working correctly.",
+            yes
+        ) {
+            return Err(anyhow!(
+                "Installation aborted by user due to file conflicts with \
+                 other packages."
             ));
         }
     }
@@ -403,6 +551,12 @@ pub fn run(
                     &usrroot_src,
                     &root_dest,
                     &owned_files,
+                    Some(&InstallingPackage {
+                        name: &metadata.name,
+                        sub_package: sub_opt,
+                        repo: &metadata.repo,
+                        registry: registry_handle
+                    }),
                     yes
                 )?;
                 copy_dir_all(&usrroot_src, &root_dest)?;
@@ -433,6 +587,12 @@ pub fn run(
                     &usrhome_src,
                     &home_dest,
                     &owned_files,
+                    Some(&InstallingPackage {
+                        name: &metadata.name,
+                        sub_package: sub_opt,
+                        repo: &metadata.repo,
+                        registry: registry_handle
+                    }),
                     yes
                 )?;
                 copy_dir_all(&usrhome_src, &home_dest)?;
