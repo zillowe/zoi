@@ -401,6 +401,26 @@ Verifies a file's integrity. Supported algorithms: `sha512`, `sha256`.
 
 Verifies a PGP detached signature.
 
-### `addPgpKey(url_or_path, name)`
+### `addPgpKey(source, name)`
 
 Adds a PGP key to Zoi's keyring for use in `verifySignature`.
+
+`source` may be a URL, a path to a key file, or a bare key fingerprint. A
+fingerprint is fetched from `keys.openpgp.org`, which is what a package
+definition wants when it pins a specific maintainer key rather than trusting
+whatever a name happens to resolve to. Both v4 (40 hex characters) and v5 (64)
+fingerprints are recognised, with or without the spaces `gpg --fingerprint`
+displays them in.
+
+Returns `false` rather than raising when the key cannot be fetched or is
+invalid, so a package can try several candidate keys:
+
+```lua
+for _, signer in ipairs(patch_signers) do
+  if addPgpKey(signer.fingerprint, signer.name)
+    and verifySignature("archive.tar.zst", "archive.tar.zst.sig", signer.name)
+  then
+    break
+  end
+end
+```

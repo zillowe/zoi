@@ -249,9 +249,33 @@ pub fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Reports whether `source` is a bare `OpenPGP` key fingerprint rather than a
+/// path or a URL.
+///
+/// A v4 fingerprint is 40 hex characters and a v5 fingerprint is 64, and both
+/// are frequently written in space-separated groups. The check is deliberately
+/// strict: it only matches those two exact shapes, so an unusual relative path
+/// is still treated as a path and produces the ordinary "file not found"
+/// error rather than being sent to a keyserver.
+fn is_key_fingerprint(source: &str) -> bool {
+    let compact: String =
+        source.chars().filter(|c| !c.is_whitespace()).collect();
+
+    if !compact.chars().all(|c| c.is_ascii_hexdigit()) {
+        return false;
+    }
+
+    matches!(compact.len(), 40 | 64)
+}
+
 /// Adds the `addPgpKey` function to the Lua global environment.
 ///
 /// This function allows package scripts to import trusted PGP keys.
+///
+/// The first argument may be a URL, a path to a key file, or a bare key
+/// fingerprint. A fingerprint is fetched from `keys.openpgp.org`, which is what
+/// a package definition wants when it pins a specific maintainer key rather
+/// than trusting whatever a name happens to resolve to.
 ///
 /// # Errors
 ///
@@ -282,6 +306,13 @@ pub fn add_add_pgp_key(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 
             let result = if source.starts_with("http") {
                 zoi_core::pgp::add_key_from_url(&source, &name, quiet)
+            } else if is_key_fingerprint(&source) {
+                // A bare fingerprint is fetched from the keyserver rather than
+                // looked up as a path. Without this branch a fingerprint falls
+                // through to `add_key_from_path` and fails with "Key file not
+                // found at: <fingerprint>", which is a confusing way to learn
+                // that the capability exists one layer down in `zoi_core`.
+                zoi_core::pgp::add_key_from_fingerprint(&source, &name, quiet)
             } else {
                 let p = Path::new(&source);
                 let actual_path = if p.exists() {
@@ -310,4 +341,68 @@ pub fn add_add_pgp_key(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
         })?;
     lua.globals().set("addPgpKey", add_pgp_key_fn)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_key_fingerprint;
+
+    #[test]
+    fn accepts_a_v4_fingerprint() {
+        // The format Arch's shadow PKGBUILD records in `validpgpkeys`.
+        assert!(is_key_fingerprint(
+            "66D0387DB85D320F8408166DB175CFA98F192AF2"
+        ));
+    }
+
+    #[test]
+    fn accepts_a_v5_fingerprint() {
+        assert!(is_key_fingerprint(
+            "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"
+        ));
+    }
+
+    #[test]
+    fn accepts_a_spaced_fingerprint() {
+        // GnuPG displays fingerprints in space-separated groups, and a
+        // maintainer pasting one out of `gpg --fingerprint` should not have to
+        // strip the spaces first.
+        assert!(is_key_fingerprint(
+            "66D0 387D B85D 320F 8408 166D B175 CFA9 8F19 2AF2"
+        ));
+    }
+
+    #[test]
+    fn is_case_insensitive() {
+        assert!(is_key_fingerprint(
+            "66d0387db85d320f8408166db175cfa98f192af2"
+        ));
+    }
+
+    #[test]
+    fn rejects_paths_and_urls() {
+        // These are the two forms that must keep routing to the existing
+        // branches rather than being sent to a keyserver.
+        assert!(!is_key_fingerprint("keys/some-key.asc"));
+        assert!(!is_key_fingerprint("https://example.com/keys/some-key.asc"));
+        assert!(!is_key_fingerprint("./key.asc"));
+    }
+
+    #[test]
+    fn rejects_wrong_lengths_and_non_hex() {
+        // Too short, too long, and hex-looking but containing a non-hex
+        // character all have to fall through to the path branch, because a
+        // malformed fingerprint should surface as "file not found" rather
+        // than as a keyserver request for nonsense.
+        assert!(!is_key_fingerprint(
+            "66D0387DB85D320F8408166DB175CFA98F192A"
+        ));
+        assert!(!is_key_fingerprint(
+            "66D0387DB85D320F8408166DB175CFA98F192AF266D0387DB85D320F8408166DB175"
+        ));
+        assert!(!is_key_fingerprint(
+            "66D0387DB85D320F8408166DB175CFA98F192AZZ"
+        ));
+        assert!(!is_key_fingerprint(""));
+    }
 }
