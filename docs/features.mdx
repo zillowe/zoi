@@ -421,7 +421,7 @@ If the package is installed in a different scope than requested, Zoi notes that 
 - `--scope <user|system|project>`: The scope to install the package to.
 - `--local`: Install packages to the current project (alias for `--scope=project`).
 - `--global`: Install packages globally for the current user (alias for `--scope=user`).
-- `--save`: Record the installed packages in the project's `zoi.lua`, so a later bare `zoi install` recreates the same environment. Only the packages you asked for are recorded, not their transitive dependencies. Requires a `zoi.lua` in the current directory, and cannot be combined with `--deps-only` or `--frozen`.
+- `--save`: Record the installed packages in the project's `zoi.lua`, so a later bare `zoi install` recreates the same environment. Only the packages you asked for are recorded, not their transitive dependencies. Only applies to project-scope installs, and requires a `zoi.lua` in the current directory. Cannot be combined with `--deps-only` or `--frozen`.
 - `--deps-only`: Install only the dependencies of the given packages, not the packages themselves.
 - `--build-deps-only`: Install only the build dependencies declared by the given packages. Works for any source type (local `.pkg.lua`, registry package, URL, or git).
 - `--type <TYPE>`: The type of package to build if building from source. Specifying a type other than `pre-compiled` or `pre-built` will force a local build.
@@ -791,7 +791,7 @@ If multiple installed packages match the same name, Zoi will prompt you to choos
 - `--scope <user|system|project>`: The scope to uninstall the package from.
 - `--local`: Uninstall packages from the current project.
 - `--global`: Uninstall packages globally for the current user.
-- `--save`: Remove the package from the project's `zoi.lua`.
+- `--save`: Remove the package from the project's `zoi.lua`. Only applies to project-scoped uninstalls. Works with both plain entries and keyed entries such as `["@core/fzf"] = { version = "0.44.1" }`. Removing a base package also removes its sub-package entries; removing `name:sub` removes only that sub-package.
 - `-s`, `--recursive`: Recursively remove dependencies that are no longer needed.
 - `--explain`: Show uninstall reasoning and reverse-dependency impact.
 - `--plan-json`: Emit machine-readable uninstall plan JSON.

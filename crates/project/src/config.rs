@@ -276,11 +276,11 @@ fn find_packages_block_open(lines: &[&str]) -> Option<usize> {
     })
 }
 
-/// Extracts the plain package spec from a `packages({...})` entry line.
+/// Extracts the package spec from a plain `packages({...})` entry line.
 ///
-/// Only simple string entries (e.g. `"@core/eza",`) are considered; keyed
-/// entries like `["@core/fzf"] = {...}` span multiple lines and are left
-/// untouched, mirroring how versioned maps were preserved.
+/// Only simple string entries (e.g. `"@core/eza",`) are considered. Keyed
+/// entries like `["@core/fzf"] = {...}` are handled separately by
+/// [`keyed_package_entry`], because they span multiple lines.
 fn plain_package_entry(line: &str) -> Option<String> {
     let trimmed = line.trim().trim_end_matches(',').trim();
     if !trimmed.starts_with('"') || trimmed.contains('=') {
@@ -291,6 +291,83 @@ fn plain_package_entry(line: &str) -> Option<String> {
         return None;
     }
     Some(inner.to_string())
+}
+
+/// Extracts the package spec from a keyed entry's opening line.
+///
+/// A keyed entry opens with the package spec as a quoted key, e.g.
+/// `["@core/fzf"] = {`, and its body continues until the matching close. Only
+/// the opening line carries the spec, so callers that need to match on the key
+/// must read this instead of [`plain_package_entry`].
+fn keyed_package_entry(line: &str) -> Option<String> {
+    let trimmed = line.trim().trim_end_matches(',').trim();
+    let rest = trimmed.strip_prefix('[')?;
+    let (key, after) = rest.split_once(']')?;
+    // A `= {` after the key is what makes this an entry rather than some other
+    // indexed construct in the block.
+    let after = after.trim();
+    if !(after.starts_with('=') && after[1..].trim_start().starts_with('{')) {
+        return None;
+    }
+    let key = key.trim();
+    let inner = key.strip_prefix('"')?.strip_suffix('"')?;
+    if inner.is_empty() {
+        return None;
+    }
+    Some(inner.to_string())
+}
+
+/// Extracts the package spec from a `packages({...})` entry, in either shape.
+fn any_package_entry(line: &str) -> Option<String> {
+    plain_package_entry(line).or_else(|| keyed_package_entry(line))
+}
+
+/// Compares two package specs for identity.
+///
+/// Specs are compared on the parsed name and sub-package rather than as raw
+/// strings, so `@core/eza:1.0.0` matches `@core/eza`. The sub-package is
+/// significant: `eza` and `eza:icons` are different installable things, and
+/// the loader keeps them as separate entries.
+fn same_package(a: &str, b: &str) -> bool {
+    match (
+        zoi_resolver::resolve::parse_source_string(a),
+        zoi_resolver::resolve::parse_source_string(b)
+    ) {
+        (Ok(a_req), Ok(b_req)) => {
+            a_req.name == b_req.name && a_req.sub_package == b_req.sub_package
+        }
+        // Unparseable specs (bare paths, for instance) fall back to an exact
+        // match rather than guessing.
+        _ => a == b
+    }
+}
+
+/// Decides whether an entry should be removed given what was uninstalled.
+///
+/// Uninstalling a base package removes every sub-package belonging to it,
+/// matching `zoi uninstall` on disk. Uninstalling `name:sub` removes only that
+/// sub-package and leaves both the base entry and its sibling sub-packages
+/// alone.
+fn entry_matches_removal(entry: &str, removal: &str) -> bool {
+    let Ok(entry_req) = zoi_resolver::resolve::parse_source_string(entry)
+    else {
+        return entry == removal;
+    };
+    let Ok(removal_req) = zoi_resolver::resolve::parse_source_string(removal)
+    else {
+        return entry == removal;
+    };
+
+    if entry_req.name != removal_req.name {
+        return false;
+    }
+
+    match removal_req.sub_package {
+        // A base-package uninstall cascades to its sub-packages.
+        None => true,
+        // A targeted sub-package uninstall only touches that sub-package.
+        Some(ref sub) => entry_req.sub_package.as_deref() == Some(sub.as_str())
+    }
 }
 
 /// Adds packages to the `packages({...})` block of the `zoi.lua`
@@ -311,13 +388,16 @@ pub fn add_packages_to_config(packages: &[String]) -> Result<()> {
     let content = fs::read_to_string(config_path)?;
     let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
 
+    // A package counts as present in either entry shape. Checking only plain
+    // string entries would add a duplicate next to an existing keyed entry,
+    // leaving the same package declared twice in a Lua table - where the
+    // later key silently wins.
+    let existing: Vec<String> =
+        lines.iter().filter_map(|l| any_package_entry(l)).collect();
+
     let mut missing: Vec<&String> = packages
         .iter()
-        .filter(|package| {
-            !lines
-                .iter()
-                .any(|line| plain_package_entry(line).as_ref() == Some(package))
-        })
+        .filter(|package| !existing.iter().any(|e| same_package(e, package)))
         .collect();
 
     if missing.is_empty() {
@@ -379,8 +459,15 @@ pub fn add_packages_to_config(packages: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// Removes plain package entries from the `packages({...})` block of the
-/// `zoi.lua` configuration file.
+/// Removes package entries from the `packages({...})` block of the `zoi.lua`
+/// configuration file.
+///
+/// Handles both entry shapes: plain string entries (`"@core/eza",`) and keyed
+/// entries (`["@core/fzf"] = { ... }`) whose body spans several lines.
+///
+/// Uninstalling a base package removes all of its sub-package entries, which
+/// mirrors what the uninstall does on disk. Uninstalling `name:sub` removes
+/// only that sub-package.
 ///
 /// # Errors
 ///
@@ -393,14 +480,6 @@ pub fn remove_packages_from_config(
     if !config_path.exists() {
         return Ok(());
     }
-
-    let packages_to_remove_names: Vec<_> = packages_to_remove
-        .iter()
-        .map(|p| {
-            zoi_resolver::resolve::parse_source_string(p)
-                .map_or_else(|_| p.clone(), |req| req.name)
-        })
-        .collect();
 
     let content = fs::read_to_string(config_path)?;
     let lines: Vec<&str> = content.lines().collect();
@@ -415,9 +494,25 @@ pub fn remove_packages_from_config(
                 && trimmed.contains('('))
     };
 
+    let is_inside_block = |idx: usize| {
+        open_idx.is_some_and(|open| {
+            idx > open
+                && !lines.get(open + 1..idx).is_some_and(|window| {
+                    window.iter().any(|l| is_block_end(l))
+                })
+        })
+    };
+
+    let should_remove = |entry: &str| {
+        packages_to_remove
+            .iter()
+            .any(|removal| entry_matches_removal(entry, removal))
+    };
+
     let mut kept = Vec::with_capacity(lines.len());
-    for (idx, line) in lines.iter().enumerate() {
-        if open_idx.is_some_and(|open| idx == open)
+    let mut idx = 0;
+    while let Some(line) = lines.get(idx).copied() {
+        if Some(idx) == open_idx
             && line.trim().contains('}')
             && !line.contains('=')
         {
@@ -430,13 +525,9 @@ pub fn remove_packages_from_config(
                 .split(',')
                 .map(str::trim)
                 .filter(|part| {
-                    let entry = part.trim_matches('"');
                     part.starts_with('"')
-                        && !entry.contains('"')
-                        && zoi_resolver::resolve::parse_source_string(entry)
-                            .is_ok_and(|req| {
-                                !packages_to_remove_names.contains(&req.name)
-                            })
+                        && !part.trim_matches('"').contains('"')
+                        && !should_remove(part.trim_matches('"'))
                 })
                 .collect();
             let indent_len = line.len() - line.trim_start_matches(' ').len();
@@ -445,23 +536,43 @@ pub fn remove_packages_from_config(
                 line.get(..indent_len).unwrap_or_default(),
                 remaining.join(", ")
             ));
+            idx += 1;
             continue;
         }
 
-        let in_block = open_idx.is_some_and(|open| {
-            idx > open
-                && !lines.get(open + 1..idx).is_some_and(|window| {
-                    window.iter().any(|l| is_block_end(l))
-                })
-        });
-        if in_block
-            && let Some(entry) = plain_package_entry(line)
-            && let Ok(req) = zoi_resolver::resolve::parse_source_string(&entry)
-            && packages_to_remove_names.contains(&req.name)
+        // A keyed entry opens with `["spec"] = {` and its body continues until
+        // the braces balance. The whole entry has to go, not just the opening
+        // line, so track the nesting depth and skip the body too.
+        if is_inside_block(idx)
+            && let Some(entry) = keyed_package_entry(line)
         {
+            if should_remove(&entry) {
+                let mut depth = 0i32;
+                while let Some(entry_line) = lines.get(idx) {
+                    depth += entry_line.matches('{').count() as i32;
+                    depth -= entry_line.matches('}').count() as i32;
+                    idx += 1;
+                    if depth <= 0 {
+                        break;
+                    }
+                }
+                continue;
+            }
+            kept.push((*line).to_string());
+            idx += 1;
             continue;
         }
+
+        if is_inside_block(idx)
+            && let Some(entry) = plain_package_entry(line)
+            && should_remove(&entry)
+        {
+            idx += 1;
+            continue;
+        }
+
         kept.push((*line).to_string());
+        idx += 1;
     }
 
     let mut new_content = kept.join("\n");

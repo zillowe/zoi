@@ -94,6 +94,47 @@ fn test_install_save_records_already_installed_package() {
     );
 }
 
+/// `--save` only makes sense for a project-scope install. Combining it with
+/// `--global` would otherwise install to user scope while writing the package
+/// into `zoi.lua`, leaving the project claiming a package it does not own.
+#[test]
+fn test_install_save_rejects_non_project_scope() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("Failed to create temp dir");
+    let root = tmp.path().to_path_buf();
+
+    ctx.set_current_dir(&root);
+    ctx.set_env_var("HOME", &root);
+    fs::write(
+        root.join("zoi.lua"),
+        "project({ name = \"test-project\" })\n"
+    )
+    .expect("unwrap failed");
+
+    let err = zoi::install_sources(
+        &["@core/eza".to_string()],
+        &zoi::SourceInstallOptions {
+            yes: true,
+            save: true,
+            scope_override: Some(zoi::Scope::User),
+            ..Default::default()
+        }
+    )
+    .expect_err("--save with a non-project scope should fail");
+
+    assert!(
+        err.to_string().contains("project-scope"),
+        "error should explain the scope mismatch, got: {err}"
+    );
+
+    let content =
+        fs::read_to_string(root.join("zoi.lua")).expect("unwrap failed");
+    assert!(
+        !content.contains("packages("),
+        "nothing should be recorded, got:\n{content}"
+    );
+}
+
 /// `--save` outside a project must fail loudly. Silently installing and
 /// dropping the user's intent is worse than an error, because the package
 /// would look recorded when it is not.
