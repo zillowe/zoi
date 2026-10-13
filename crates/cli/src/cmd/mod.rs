@@ -95,8 +95,6 @@ pub mod unpin;
 pub mod update;
 /// The `upgrade` command.
 pub mod upgrade;
-/// The `use_cmd` command.
-pub mod use_cmd;
 /// The `utils` command.
 pub mod utils;
 /// The `ux` command.

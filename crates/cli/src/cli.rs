@@ -399,18 +399,6 @@ enum Commands {
     #[command(aliases = ["i", "in", "add"])]
     Install(cmd::install::args::InstallArgs),
 
-    /// Add a tool to the current project or global configuration and install it
-    #[command(alias = "u")]
-    Use {
-        /// Package(s) to use (e.g. node@20)
-        #[arg(value_name = "ALL_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
-        packages: Vec<String>,
-
-        /// Add to global configuration instead of project
-        #[arg(short, long)]
-        global: bool
-    },
-
     /// Uninstalls one or more packages previously installed by Zoi
     #[command(
         aliases = ["un", "rm", "remove"],
@@ -955,7 +943,6 @@ fn command_name(command: &Commands) -> &'static str {
         Commands::Mark { .. } => "mark",
         Commands::Update { .. } => "update",
         Commands::Install(_) => "install",
-        Commands::Use { .. } => "use",
         Commands::Uninstall(_) => "uninstall",
         Commands::Run { .. } => "run",
         Commands::Env { .. } => "env",
@@ -1192,11 +1179,11 @@ pub fn run() -> anyhow::Result<()> {
                 purl
             } => cmd::show::run(&package_name, raw, purl),
             Commands::Pin { package, version } => {
-                cmd::pin::run(&package, &version)
+                cmd::pin::run(&package, &version, cli.yes)
             }
             Commands::Provides { term } => cmd::provides::run(&term),
             Commands::Tree { packages } => cmd::tree::run(&packages),
-            Commands::Unpin { package } => cmd::unpin::run(&package),
+            Commands::Unpin { package } => cmd::unpin::run(&package, cli.yes),
             Commands::Mark {
                 packages,
                 as_dependency,
@@ -1224,9 +1211,6 @@ pub fn run() -> anyhow::Result<()> {
             Commands::Install(args) => args
                 .run(cli.yes)
                 .map_err(|e| cmd::ux::with_failure_hint("install", e)),
-            Commands::Use { packages, global } => {
-                cmd::use_cmd::run(&packages, global)
-            }
             Commands::Uninstall(args) => args
                 .run(cli.yes)
                 .map_err(|e| cmd::ux::with_failure_hint("uninstall", e)),

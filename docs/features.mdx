@@ -421,7 +421,7 @@ If the package is installed in a different scope than requested, Zoi notes that 
 - `--scope <user|system|project>`: The scope to install the package to.
 - `--local`: Install packages to the current project (alias for `--scope=project`).
 - `--global`: Install packages globally for the current user (alias for `--scope=user`).
-- `--save`: Save the package to the project's `zoi.lua`.
+- `--save`: Record the installed packages in the project's `zoi.lua`, so a later bare `zoi install` recreates the same environment. Only the packages you asked for are recorded, not their transitive dependencies. Requires a `zoi.lua` in the current directory, and cannot be combined with `--deps-only` or `--frozen`.
 - `--deps-only`: Install only the dependencies of the given packages, not the packages themselves.
 - `--build-deps-only`: Install only the build dependencies declared by the given packages. Works for any source type (local `.pkg.lua`, registry package, URL, or git).
 - `--type <TYPE>`: The type of package to build if building from source. Specifying a type other than `pre-compiled` or `pre-built` will force a local build.
@@ -591,6 +591,13 @@ Manage PGP keys for package signature verification.
 ### `zoi pin <package> <version>`
 
 Pin a package to a specific version.
+
+This writes two stores, because they answer different questions:
+
+- `pinned.json` records "may this package be upgraded?", which keeps a general `zoi update` from moving it off the pinned version.
+- The `versions:` map in `config.yaml` records "which version should the shim launch?", keyed by binary name. It is the last fallback in shim resolution, after the `ZOI_<BIN>_VERSION` env var, plugin hooks, `zoi.lua`, and `.tool-versions`.
+
+Every binary the package declares in `metadata.bins` gets an entry; a package with no declared `bins` gets one keyed by its own name. `zoi unpin` clears both.
 
 **Arguments:**
 
@@ -795,6 +802,8 @@ If multiple installed packages match the same name, Zoi will prompt you to choos
 
 Unpin a package, allowing it to be updated.
 
+Clears both halves of a `zoi pin`: the `pinned.json` entry and the `versions:` entries in `config.yaml`. Only the keys belonging to this package are removed, so unpinning one package never disturbs another package's preference for a binary name they share.
+
 **Arguments:**
 
 - `<package>`: The name of the package to unpin.
@@ -819,23 +828,6 @@ When using `--all`, Zoi also prints explicit pinned/skipped summaries and adviso
 - `--explain`: Explain why each package is selected or skipped.
 - `--plan-json`: Emit machine-readable update plan JSON.
 - `--dry-run`: Do not actually perform the update, just show what would be done.
-
----
-
-### `zoi use <PACKAGES>...`
-
-(alias: `u`)
-
-Adds a tool to the current project or global configuration and installs it in one step.
-
-**Arguments:**
-
-- `<PACKAGES>...`: Package identifiers (e.g. `node@20`).
-
-**Options:**
-
-- `-g`, `--global`: Add to global configuration (user `versions` map) instead of the local project (`zoi.lua`).
-- `-y`, `--yes`: Automatically answer yes to prompts (including JIT installation prompts).
 
 ---
 

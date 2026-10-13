@@ -80,7 +80,8 @@ Quick snippets for common tasks.
 
 ```sh
 mkdir my-app && cd my-app
-zoi use node@20 rust              # Add and install tools
+echo 'project({ name = "my-app" })' > zoi.lua
+zoi install --save node@20 rust   # Add and install tools, recording them in zoi.lua
 zoi dev                           # Enter environment
 ```
 

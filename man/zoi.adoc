@@ -97,7 +97,10 @@ These options may appear before any command.
 *--scope*=_user|system|project_:: Installation scope.
 *--local*:: Alias for *--scope*=project. *--global*:: Alias for
 *--scope*=user.
-*--save*:: Save the package to zoi.lua.
+*--save*:: Record the installed packages in zoi.lua, so a later bare
+  `zoi install` recreates the same environment. Only the requested packages
+  are recorded, not transitive dependencies. Requires a zoi.lua in the current
+  directory.
 *--deps-only*:: Install only dependencies, not the packages themselves.
 *--build-deps-only*:: Install only build dependencies.
 *--type*=_TYPE_:: Build type when building from source.
@@ -134,10 +137,6 @@ impact and safety blocks. *--plan-json*:: Machine-readable plan (requires
 *-v*, *--verbose*:: Verbose output. *--interactive*:: Interactively pick
 updates (requires *--all*).
 
-*use*, *u* _PACKAGES_... [*-g*, *--global*]::
-  Add a tool to the current project configuration (or the global
-  configuration with *--global*) and install it.
-
 *downgrade*, *dg* _PACKAGE_::
   Install an older version of a package from the local store or archive
   cache. With no version given, offers an interactive selection.
@@ -146,10 +145,12 @@ updates (requires *--all*).
   Roll a package back to the previously installed version.
 
 *pin* _PACKAGE_ _VERSION_::
-  Pin a package to a specific version so updates skip it.
+  Pin a package to a specific version so updates skip it, and record that
+  version as the preferred global version for the binaries it provides.
 
 *unpin* _PACKAGE_::
-  Remove a version pin so the package can be updated again.
+  Remove a version pin so the package can be updated again. Clears both the
+  upgrade guard and the shim version preference.
 
 *mark*, *m* _PACKAGES_... (*--as-dependency* | *--asexplicit*)::
   Change the installation reason of a package. *--as-dependency*

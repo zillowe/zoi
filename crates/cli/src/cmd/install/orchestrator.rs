@@ -65,6 +65,54 @@ pub struct Orchestrator<'a> {
     options: InstallOptions<'a>
 }
 
+/// Records the requested packages in the project's `zoi.lua` for `--save`.
+///
+/// `installed` is every source the installer actually finished, which includes
+/// transitive dependencies. Only the packages the user asked for are recorded:
+/// writing the whole graph into `packages({...})` would pin every dependency
+/// into the project file and make the project no longer track updates.
+///
+/// Failures are warnings rather than errors, because by the time this runs the
+/// packages are installed and the transaction is committed, so there is
+/// nothing sensible to roll back to.
+fn save_sources_to_zoi_lua(requested: &[String], installed: &[String]) {
+    let requested_set: HashSet<&str> =
+        requested.iter().map(String::as_str).collect();
+    let mut to_save: Vec<String> = installed
+        .iter()
+        .filter(|src| requested_set.contains(src.as_str()))
+        .cloned()
+        .collect();
+
+    // Preserve the order the user typed them in, rather than the order the
+    // parallel install happened to finish in.
+    to_save.sort_by_key(|src| {
+        requested
+            .iter()
+            .position(|s| s == src)
+            .unwrap_or(usize::MAX)
+    });
+    to_save.dedup();
+
+    if to_save.is_empty() {
+        return;
+    }
+
+    if let Err(e) = project::config::add_packages_to_config(&to_save) {
+        eprintln!(
+            "{}: Failed to save packages to zoi.lua: {}",
+            "Warning".yellow().bold(),
+            e
+        );
+    } else {
+        println!(
+            "{} Saved to zoi.lua: {}",
+            "::".bold().blue(),
+            to_save.join(", ").dimmed()
+        );
+    }
+}
+
 /// Keeps only the external dependencies still required after pruning
 /// already-installed nodes.
 ///
@@ -173,6 +221,33 @@ impl<'a> Orchestrator<'a> {
             }
             scope_override = Some(types::Scope::Project);
             zoi_core::frozen::set_frozen(true);
+        }
+
+        // `--save` records the installed packages in the project's `zoi.lua`,
+        // so it only makes sense inside a project. Failing loudly beats
+        // installing successfully and then silently dropping the user's
+        // intent on the floor.
+        //
+        // Note `zoi create` does not scaffold a `zoi.lua` on its own (an app
+        // template only ships the files it explicitly stages), so it is not a
+        // remedy here - the user has to author or copy one.
+        if options.save && !std::path::Path::new("zoi.lua").exists() {
+            // Suggest a concrete, correct zoi.lua for this directory rather
+            // than a generic "run zoi init" that does not exist yet.
+            let dir_name = std::env::current_dir()
+                .ok()
+                .and_then(|d| {
+                    d.file_name().map(|n| n.to_string_lossy().to_string())
+                })
+                .filter(|n| !n.is_empty())
+                .unwrap_or_else(|| "my-project".to_string());
+            return Err(anyhow!(
+                "--save requires a 'zoi.lua' file in the current directory, \
+                 but none was found.\n\nCreate one to make this directory a \
+                 Zoi project:\n\n    echo 'project({{ name = \"{dir_name}\" \
+                 }})' > zoi.lua\n\nOr drop --save to install without \
+                 recording the package."
+            ));
         }
 
         let lockfile_exists = sources.is_empty()
@@ -521,6 +596,23 @@ impl<'a> Orchestrator<'a> {
 
         if graph.nodes.is_empty() && non_zoi_deps.is_empty() {
             println!("\nAll requested packages are already installed.");
+
+            // `--save` is still meaningful here. Installing a package into a
+            // project does not have to mean it is newly installed, and the
+            // common case is recording something already present elsewhere:
+            //
+            //     zoi install node@20        # installed in user scope
+            //     zoi install --save node@20 # now pin it into zoi.lua
+            //
+            // Returning early without saving would make that silently a no-op.
+            if options.save {
+                // Everything was skipped as already-installed, so every
+                // requested source counts as successfully present.
+                save_sources_to_zoi_lua(
+                    &sources_to_process,
+                    &sources_to_process
+                );
+            }
             return Ok(());
         }
 
@@ -1263,6 +1355,14 @@ impl<'a> Orchestrator<'a> {
                     .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
                 pm.trigger_hook_nonfatal("on_post_install", Some(&pkg_val));
             }
+        }
+
+        if options.save {
+            let installed = successfully_installed_sources
+                .lock()
+                .expect("Successfully installed sources mutex poisoned")
+                .clone();
+            save_sources_to_zoi_lua(&sources_to_process, &installed);
         }
 
         println!("\n{} Installation complete!", "Success:".green().bold());
