@@ -148,16 +148,8 @@ sequoia-openpgp = { version = "2.4.1", default-features = false, features = [
 serde = { version = "1.0.229", default-features = false, features = ["derive"] }
 serde_json = "1.0.154"
 serde_yaml = { package = "yaml_serde", version = "0.10.7" }
-sha2 = "0.11.0"
+sha2 = "0.11.1"
 zbsdiff = { version = "1.6.4", features = ["zdelta"] }
-# zbus drives its blocking object server from an internal executor, but signals
-# are declared `async` and emitted through `SignalEmitter`, which is async-only.
-# So `async-io` comes along as the runtime, and the daemon drives it explicitly
-# to emit signals from its worker threads.
-#
-# `blocking-api` gates `zbus::blocking`, which is how the daemon reaches its
-# object server synchronously. It also turns on the macro's blocking proxy
-# flavour; the interface macro still declares signals `async`.
 zbus = { version = "5.19.0", default-features = false, features = [
     "async-io",
     "blocking-api",
