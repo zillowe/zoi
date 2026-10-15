@@ -201,61 +201,30 @@ impl<'a> Orchestrator<'a> {
                      must remain unchanged."
                 ));
             }
-            if !std::path::Path::new("zoi.lua").exists() {
-                return Err(anyhow!(
-                    "--frozen requires a local zoi.lua in the current project."
-                ));
-            }
-            if !std::path::Path::new("zoi.lock").exists() {
-                return Err(anyhow!(
-                    "--frozen requires zoi.lock. Generate it first with a \
-                     normal project install."
-                ));
-            }
-            if let Some(scope) = scope_override
-                && scope != types::Scope::Project
-            {
-                return Err(anyhow!(
-                    "--frozen is only supported for project scope installs."
-                ));
-            }
-            scope_override = Some(types::Scope::Project);
-            zoi_core::frozen::set_frozen(true);
         }
 
         // `--save` records the installed packages in the project's `zoi.lua`,
         // so it only makes sense for a project-scope install. Failing loudly
         // beats installing successfully and then silently dropping the user's
         // intent on the floor.
-        //
-        // Note `zoi create` does not scaffold a `zoi.lua` on its own (an app
-        // template only ships the files it explicitly stages), so it is not a
-        // remedy here - the user has to author or copy one.
         if options.save {
+            // Check for the missing file first. Without a zoi.lua the scope
+            // falls back to User, so the scope check below would fire first and
+            // send the user to `--local`, only for them to hit the real problem
+            // on the next attempt.
+            if !std::path::Path::new("zoi.lua").exists() {
+                return Err(anyhow!(
+                    "--save records packages in this project's zoi.lua, but \
+                     no zoi.lua was found in the current directory.\n\nCreate \
+                     one with:\n\n    zoi init\n\nOr drop --save to install \
+                     without recording the package."
+                ));
+            }
             if scope_override != Some(types::Scope::Project) {
                 return Err(anyhow!(
                     "--save records packages in this project's zoi.lua, so it \
                      only applies to project-scope installs. Drop the scope \
                      override, or pass --local to install into the project."
-                ));
-            }
-            if !std::path::Path::new("zoi.lua").exists() {
-                // Suggest a concrete, correct zoi.lua for this directory
-                // rather than a generic "run zoi init" that does not exist
-                // yet.
-                let dir_name = std::env::current_dir()
-                    .ok()
-                    .and_then(|d| {
-                        d.file_name().map(|n| n.to_string_lossy().to_string())
-                    })
-                    .filter(|n| !n.is_empty())
-                    .unwrap_or_else(|| "my-project".to_string());
-                return Err(anyhow!(
-                    "--save requires a 'zoi.lua' file in the current \
-                     directory, but none was found.\n\nCreate one to make \
-                     this directory a Zoi project:\n\n    echo 'project({{ \
-                     name = \"{dir_name}\" }})' > zoi.lua\n\nOr drop --save \
-                     to install without recording the package."
                 ));
             }
         }

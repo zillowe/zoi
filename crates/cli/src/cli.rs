@@ -669,6 +669,13 @@ enum Commands {
         command: TelemetrySubcommand
     },
 
+    /// Create a zoi.lua project file in the current directory
+    Init {
+        /// Overwrite an existing zoi.lua
+        #[arg(short, long)]
+        force: bool
+    },
+
     /// Create an application using a package template
     Create {
         /// The package source identifier.
@@ -967,6 +974,7 @@ fn command_name(command: &Commands) -> &'static str {
         Commands::System { .. } => "system",
         Commands::Telemetry { .. } => "telemetry",
         Commands::Create { .. } => "create",
+        Commands::Init { .. } => "init",
         Commands::Downgrade { .. } => "downgrade",
         Commands::Extension(_) => "extension",
         Commands::Rollback { .. } => "rollback",
@@ -1390,6 +1398,7 @@ pub fn run() -> anyhow::Result<()> {
                 cli.yes,
                 Some(&plugin_manager)
             ),
+            Commands::Init { force } => cmd::init::run(cli.yes, force),
             Commands::Downgrade { package } => {
                 cmd::downgrade::run(&package, cli.yes, Some(&plugin_manager))
             }

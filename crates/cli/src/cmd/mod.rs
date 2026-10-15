@@ -39,6 +39,8 @@ pub mod history;
 pub mod home;
 /// The `info` command.
 pub mod info;
+/// The `init` command.
+pub mod init;
 /// The `install` command.
 pub mod install;
 /// The `installed_select` command.

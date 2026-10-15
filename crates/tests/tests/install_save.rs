@@ -160,8 +160,8 @@ fn test_install_save_outside_project_fails() {
 
     let msg = err.to_string();
     assert!(
-        msg.contains("--save requires a 'zoi.lua'"),
-        "error should explain the missing zoi.lua, got: {msg}"
+        msg.contains("zoi init"),
+        "error should point at 'zoi init', got: {msg}"
     );
 }
 

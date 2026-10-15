@@ -49,8 +49,15 @@ pub fn run(
 
     if local {
         scope_override = Some(types::Scope::Project);
-    } else if global || scope_override.is_none() {
+    } else if global {
         scope_override = Some(types::Scope::User);
+    } else if scope_override.is_none() {
+        // Match `install`, which resolves the default with
+        // `resolve_fallback_scope()`: a project directory defaults to the
+        // project scope, otherwise user. Previously this forced `User` even
+        // inside a project, which made `zoi uninstall --save <pkg>` fail
+        // without a redundant `--local`.
+        scope_override = Some(crate::pkg::utils::resolve_fallback_scope());
     }
 
     if save && scope_override != Some(types::Scope::Project) {

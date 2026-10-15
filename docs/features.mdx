@@ -150,6 +150,7 @@ Zoi is packed with features designed to make package management and environment 
   - `zoi files`: List all files owned by an installed package.
   - `zoi history`: View the audit log of past package operations (install, uninstall, upgrade).
   - `zoi info`: Display detected system information, including OS, architecture, and available package managers.
+  - `zoi init`: Create a `zoi.lua` project file in the current directory.
   - `zoi list`: List all installed packages, or all available packages from active repositories.
   - `zoi man`: Read package manuals directly in the terminal.
   - `zoi mark`: Change the installation reason of a package (explicit vs dependency).
@@ -393,6 +394,38 @@ Helper commands for various tasks.
 ### `zoi info`
 
 Displays detected operating system and architecture information.
+
+---
+
+### `zoi init`
+
+Creates a `zoi.lua` project file in the current directory, turning it into a
+Zoi project. This is the entry point for the project workflow:
+
+```sh
+mkdir my-app && cd my-app
+zoi init
+zoi install --save @zillowe/fzf eza
+zoi dev
+```
+
+The generated file declares the project and pre-creates an empty `packages({})`
+block, so `zoi install --save` has somewhere to record dependencies.
+
+The project name defaults to the current directory name. Characters that are
+unsafe in a Lua string literal or ambiguous as a flag are replaced, so a
+directory named oddly still produces a valid file.
+
+**Options:**
+
+- `-f`, `--force`: Overwrite an existing `zoi.lua`. Without it, `zoi init`
+  refuses to run rather than risk clobbering an existing project.
+
+Notes:
+
+- `zoi init` never creates the file implicitly elsewhere. `zoi install --save`
+  will not auto-initialize a directory, and `zoi create` does not emit a
+  `zoi.lua`, because an app template decides for itself what it ships.
 
 ---
 
@@ -791,6 +824,9 @@ If multiple installed packages match the same name, Zoi will prompt you to choos
 - `--scope <user|system|project>`: The scope to uninstall the package from.
 - `--local`: Uninstall packages from the current project.
 - `--global`: Uninstall packages globally for the current user.
+
+With no scope flag, the scope is resolved the same way `zoi install` resolves it: a directory containing a `zoi.lua` uses the project scope, otherwise the user scope.
+
 - `--save`: Remove the package from the project's `zoi.lua`. Only applies to project-scoped uninstalls. Works with both plain entries and keyed entries such as `["@core/fzf"] = { version = "0.44.1" }`. Removing a base package also removes its sub-package entries; removing `name:sub` removes only that sub-package.
 - `-s`, `--recursive`: Recursively remove dependencies that are no longer needed.
 - `--explain`: Show uninstall reasoning and reverse-dependency impact.

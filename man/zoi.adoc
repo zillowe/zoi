@@ -117,6 +117,9 @@ These options may appear before any command.
   Uninstall one or more previously installed packages, removing their files
   from the store and their binary shims.
 +
+With no scope flag, the scope is resolved as in *install*: a directory
+containing a _zoi.lua_ uses the project scope, otherwise the user scope.
++
 *--scope*=_user|system|project_:: Installation scope. *--local* and
 *--global* are aliases as in *install*.
 *--save*:: Also remove the package from zoi.lua. Project scope only. Handles
@@ -210,6 +213,15 @@ using the PURL specification.
 
 *info*::
   Display detected operating system and architecture information.
+
+*init* [*-f*, *--force*]::
+  Create a _zoi.lua_ project file in the current directory, declaring the
+  project and an empty `packages({...})` block for `zoi install --save` to
+  record into. The project name defaults to the current directory name, with
+  characters unsafe in a Lua string literal replaced.
++
+*-f*, *--force*:: Overwrite an existing zoi.lua. Without it, `init` refuses
+rather than risk clobbering an existing project.
 
 *files* _PACKAGE_::
   List all files owned by an installed package.
