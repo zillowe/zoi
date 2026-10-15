@@ -215,8 +215,27 @@ pub fn resolve_to_installed_bin(
 }
 
 /// Finds the version for a binary in a `.tool-versions` file.
+///
+/// asdf allows several tool/version pairs on one line
+/// (`node 20.1.0 ruby 3.2.1`), so the pairs are walked rather than only the
+/// first two tokens. Reading just the first pair silently ignored every tool
+/// after the first on a line, so those binaries fell through to `latest`
+/// instead of the pinned version.
 fn find_tool_versions_version(bin_name: &str) -> Result<Option<String>> {
-    let mut current_dir = env::current_dir()?;
+    find_tool_versions_version_from(bin_name, &env::current_dir()?)
+}
+
+/// Searches `start` and its parent directories for a `.tool-versions` entry for
+/// `bin_name`.
+///
+/// Taking the starting directory as an argument keeps this free of the
+/// process-wide working directory, so it can be tested without mutating global
+/// state.
+fn find_tool_versions_version_from(
+    bin_name: &str,
+    start: &std::path::Path
+) -> Result<Option<String>> {
+    let mut current_dir = start.to_path_buf();
     loop {
         let tool_versions_path = current_dir.join(".tool-versions");
         if tool_versions_path.exists() {
@@ -226,11 +245,14 @@ fn find_tool_versions_version(bin_name: &str) -> Result<Option<String>> {
                 if line.is_empty() || line.starts_with('#') {
                     continue;
                 }
-                let mut parts = line.split_whitespace();
-                if let (Some(p0), Some(p1)) = (parts.next(), parts.next())
-                    && p0 == bin_name
-                {
-                    return Ok(Some(p1.to_string()));
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                for pair in parts.chunks(2) {
+                    if let (Some(tool), Some(version)) =
+                        (pair.first(), pair.get(1))
+                        && *tool == bin_name
+                    {
+                        return Ok(Some((*version).to_string()));
+                    }
                 }
             }
         }
@@ -380,4 +402,38 @@ pub fn create_shim(link_path: &std::path::Path) -> Result<()> {
     let zoi_exe = env::current_exe()?;
     symlink_file(&zoi_exe, link_path)
         .map_err(|e| anyhow!("Failed to create shim: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::find_tool_versions_version_from;
+
+    /// Looks up `bin` in a scratch directory holding the given
+    /// `.tool-versions` contents.
+    fn lookup(contents: &str, bin: &str) -> Option<String> {
+        let dir = tempfile::tempdir().expect("temp dir should be created");
+        std::fs::write(dir.path().join(".tool-versions"), contents)
+            .expect("write should succeed");
+        find_tool_versions_version_from(bin, dir.path())
+            .expect("lookup should not fail")
+    }
+
+    /// asdf allows several tool/version pairs on one line. Every one of them
+    /// has to be findable, not just the first.
+    #[test]
+    fn tool_versions_reads_every_pair_on_a_line() {
+        let line = "node 20.1.0 ruby 3.2.1 python 3.12.0";
+        assert_eq!(lookup(line, "node").as_deref(), Some("20.1.0"));
+        assert_eq!(lookup(line, "ruby").as_deref(), Some("3.2.1"));
+        assert_eq!(lookup(line, "python").as_deref(), Some("3.12.0"));
+    }
+
+    /// One tool per line must keep working, and an absent tool must stay absent
+    /// rather than picking up a neighbour's version.
+    #[test]
+    fn tool_versions_handles_single_pairs_and_missing_tools() {
+        let multi = "node 18.0.0\npython 3.11.0\n";
+        assert_eq!(lookup(multi, "node").as_deref(), Some("18.0.0"));
+        assert_eq!(lookup(multi, "ruby"), None);
+    }
 }

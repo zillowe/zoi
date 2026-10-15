@@ -233,3 +233,55 @@ fn test_path_source_sub_entry_removes_selectively() {
         "base entry wrongly removed:\n{out}"
     );
 }
+
+/// A one-line `packages({ ... })` block must be treated as a real block. When
+/// it was skipped (because a keyed entry contains `=`), `add` appended a second
+/// `packages()` call, and since the last call wins in Lua the user's version
+/// pin was silently discarded. `remove` likewise reported success without
+/// removing anything.
+#[test]
+fn test_single_line_block_with_keyed_entry() {
+    let (_ctx, _tmp, root) = project(
+        "project({ name = \"p\" })\npackages({ [\"@c/a\"] = { version = \"1\" \
+         } })\n"
+    );
+
+    zoi::project::config::add_packages_to_config(&["@c/a".to_string()])
+        .expect("add should succeed");
+    let out = read(&root);
+    assert_eq!(
+        out.matches("packages(").count(),
+        1,
+        "add must not create a second packages() block:\n{out}"
+    );
+
+    zoi::project::config::remove_packages_from_config(&["@c/a".to_string()])
+        .expect("remove should succeed");
+    assert!(
+        !read(&root).contains("@c/a"),
+        "keyed entry should be removed:\n{}",
+        read(&root)
+    );
+}
+
+/// A keyed entry's options may contain commas of their own, so a single-line
+/// block has to split on top-level commas only or the entry gets torn apart.
+#[test]
+fn test_single_line_block_keeps_nested_commas_intact() {
+    let (_ctx, _tmp, root) = project(
+        "project({ name = \"p\" })\npackages({ \"@c/plain\", [\"@c/key\"] = { \
+         dependencies = { runtime = {\"a\", \"b\"} } } })\n"
+    );
+
+    zoi::project::config::remove_packages_from_config(&["@c/key".to_string()])
+        .expect("remove should succeed");
+    let out = read(&root);
+    assert!(
+        !out.contains("@c/key"),
+        "keyed entry should be removed:\n{out}"
+    );
+    assert!(out.contains("@c/plain"), "sibling should survive:\n{out}");
+
+    let cfg = zoi::project::config::load().expect("zoi.lua should load");
+    assert_eq!(cfg.pkgs, vec!["@c/plain".to_string()]);
+}

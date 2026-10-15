@@ -265,14 +265,14 @@ pub fn load_with_env<S: ::std::hash::BuildHasher>(
 
 /// Finds the line index that opens the top-level `packages({...})` block.
 ///
-/// Matches the opening line (e.g. `packages({`) as well as an empty
-/// single-line block (`packages({})`).
+/// Matches the opening line (e.g. `packages({`) as well as a single-line block
+/// (`packages({})` or `packages({ ["a"] = { version = "1" } })`). The `=` of a
+/// keyed entry must not disqualify the line, otherwise a one-line block with a
+/// version pin reads as "no block here" and gets duplicated on the next edit.
 fn find_packages_block_open(lines: &[&str]) -> Option<usize> {
     lines.iter().position(|line| {
         let trimmed = line.trim();
-        trimmed.starts_with("packages(")
-            && trimmed.contains('{')
-            && !trimmed.contains('=')
+        trimmed.starts_with("packages(") && trimmed.contains('{')
     })
 }
 
@@ -320,6 +320,82 @@ fn keyed_package_entry(line: &str) -> Option<String> {
 /// Extracts the package spec from a `packages({...})` entry, in either shape.
 fn any_package_entry(line: &str) -> Option<String> {
     plain_package_entry(line).or_else(|| keyed_package_entry(line))
+}
+
+/// Collects every package spec already declared in a `packages({...})` block.
+///
+/// Handles the multi-line shape (one entry per line) and the single-line shape
+/// (all entries on the `packages({...})` line) so that callers deduplicate
+/// against both.
+fn collect_existing_entries(lines: &[String]) -> Vec<String> {
+    let refs: Vec<&str> = lines.iter().map(String::as_str).collect();
+    let open_idx = find_packages_block_open(&refs);
+
+    let mut entries = Vec::new();
+    for (idx, line) in refs.iter().enumerate() {
+        match open_idx {
+            // The opening line of a single-line block carries every entry.
+            Some(open) if open == idx && line.contains('}') => {
+                let trimmed = line.trim();
+                let start = trimmed.find('{').map_or(0, |i| i + 1);
+                let end = trimmed.rfind('}').unwrap_or(trimmed.len());
+                if let Some(inner) = trimmed.get(start..end) {
+                    for part in split_top_level(inner) {
+                        if let Some(entry) = any_package_entry(part) {
+                            entries.push(entry);
+                        }
+                    }
+                }
+            }
+            // Otherwise the entry, if any, is the line itself.
+            _ => {
+                if let Some(entry) = any_package_entry(line) {
+                    entries.push(entry);
+                }
+            }
+        }
+    }
+    entries
+}
+
+/// Splits the inside of a single-line `packages({...})` block on its top-level
+/// commas.
+///
+/// A naive `split(',')` breaks a keyed entry, whose options legitimately
+/// contain commas of their own (`dependencies = { runtime = {"a", "b"} }`).
+/// Commas nested inside braces, brackets or quotes are therefore left alone.
+fn split_top_level(inner: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut depth = 0i32;
+    let mut quote: Option<char> = None;
+    let mut start = 0usize;
+
+    for (idx, ch) in inner.char_indices() {
+        if let Some(open) = quote {
+            if ch == open {
+                quote = None;
+            }
+            continue;
+        }
+        match ch {
+            '"' | '\'' => quote = Some(ch),
+            '{' | '[' => depth += 1,
+            '}' | ']' => depth -= 1,
+            ',' if depth == 0 => {
+                parts.push(inner.get(start..idx).unwrap_or_default());
+                start = idx + 1;
+            }
+            _ => {}
+        }
+    }
+    if let Some(tail) = inner.get(start..) {
+        parts.push(tail);
+    }
+    parts
+        .into_iter()
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .collect()
 }
 
 /// Compares two package specs for identity.
@@ -392,8 +468,10 @@ pub fn add_packages_to_config(packages: &[String]) -> Result<()> {
     // string entries would add a duplicate next to an existing keyed entry,
     // leaving the same package declared twice in a Lua table - where the
     // later key silently wins.
-    let existing: Vec<String> =
-        lines.iter().filter_map(|l| any_package_entry(l)).collect();
+    //
+    // A single-line block holds all its entries on one line, so the line
+    // itself is not an entry and its contents have to be read separately.
+    let existing: Vec<String> = collect_existing_entries(&lines);
 
     let mut missing: Vec<&String> = packages
         .iter()
@@ -512,22 +590,23 @@ pub fn remove_packages_from_config(
     let mut kept = Vec::with_capacity(lines.len());
     let mut idx = 0;
     while let Some(line) = lines.get(idx).copied() {
-        if Some(idx) == open_idx
-            && line.trim().contains('}')
-            && !line.contains('=')
-        {
-            // Single-line block: drop matching entries inline.
+        if Some(idx) == open_idx && line.trim().contains('}') {
+            // Single-line block: drop matching entries inline. Entries can be
+            // plain strings or keyed tables, and a keyed table's own options
+            // may contain commas, so split only on top-level ones.
             let trimmed = line.trim().to_string();
             let start = trimmed.find('{').map_or(0, |i| i + 1);
             let end = trimmed.rfind('}').unwrap_or(trimmed.len());
             let inner = trimmed.get(start..end).unwrap_or_default();
-            let remaining: Vec<&str> = inner
-                .split(',')
-                .map(str::trim)
+            let remaining: Vec<&str> = split_top_level(inner)
+                .into_iter()
                 .filter(|part| {
-                    part.starts_with('"')
-                        && !part.trim_matches('"').contains('"')
-                        && !should_remove(part.trim_matches('"'))
+                    match any_package_entry(part) {
+                        Some(entry) => !should_remove(&entry),
+                        // Not a package entry (a stray comment, say); leave it
+                        // alone rather than silently dropping it.
+                        None => true
+                    }
                 })
                 .collect();
             let indent_len = line.len() - line.trim_start_matches(' ').len();

@@ -201,6 +201,26 @@ impl<'a> Orchestrator<'a> {
                      must remain unchanged."
                 ));
             }
+            if !std::path::Path::new("zoi.lua").exists() {
+                return Err(anyhow!(
+                    "--frozen requires a local zoi.lua in the current project."
+                ));
+            }
+            if !std::path::Path::new("zoi.lock").exists() {
+                return Err(anyhow!(
+                    "--frozen requires zoi.lock. Generate it first with a \
+                     normal project install."
+                ));
+            }
+            if let Some(scope) = scope_override
+                && scope != types::Scope::Project
+            {
+                return Err(anyhow!(
+                    "--frozen is only supported for project scope installs."
+                ));
+            }
+            scope_override = Some(types::Scope::Project);
+            zoi_core::frozen::set_frozen(true);
         }
 
         // `--save` records the installed packages in the project's `zoi.lua`,
