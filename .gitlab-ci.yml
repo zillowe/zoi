@@ -231,7 +231,7 @@ package:deb:
     - dpkg --add-architecture arm64
     - apt-get update -yq
     - apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64 liblzma-dev:arm64 git clang libclang-dev
-    - cargo install cargo-deb
+    - cargo install cargo-deb --locked
   script:
     - chmod +x ./scripts/deb-package.sh
     - ./scripts/deb-package.sh
@@ -252,7 +252,7 @@ package:rpm:
     - dpkg --add-architecture arm64
     - apt-get update -yq
     - apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64 liblzma-dev:arm64 git clang libclang-dev
-    - cargo install cargo-generate-rpm
+    - cargo install cargo-generate-rpm --locked
   script:
     - chmod +x ./scripts/rpm-package.sh
     - ./scripts/rpm-package.sh
@@ -277,7 +277,8 @@ package:archive:
   before_script:
     - apt-get update -y && apt-get install -y p7zip-full tar zstd curl git jq
       unzip gnupg coreutils cargo asciidoctor
-    - cargo install zbsdiff-cli
+    - cargo install zbsdiff-cli --locked
+    - cargo install zfvm-cli --locked
     - export PATH="$PATH:$HOME/.cargo/bin"
   script:
     - |
