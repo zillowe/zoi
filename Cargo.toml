@@ -149,7 +149,7 @@ serde = { version = "1.0.229", default-features = false, features = ["derive"] }
 serde_json = "1.0.154"
 serde_yaml = { package = "yaml_serde", version = "0.10.7" }
 sha2 = "0.11.1"
-zbsdiff = { version = "1.6.4", features = ["zdelta"] }
+zbsdiff = { version = "1.6.5", features = ["zdelta"] }
 zbus = { version = "5.19.0", default-features = false, features = [
     "async-io",
     "blocking-api",
@@ -168,10 +168,10 @@ winapi = { version = "0.3.9", default-features = false, features = [
     "winnt",
 ] }
 xz2 = "0.1.7"
-zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.3", default-features = false, features = ["deflate"] }
 zstd = "0.14.2"
 ar = "0.9.0"
-sevenz-rust2 = "0.23.0"
+sevenz-rust2 = "0.24.0"
 phf = "0.14.0"
 rusqlite = { version = "0.40.2", default-features = false, features = [
     "bundled",

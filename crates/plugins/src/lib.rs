@@ -600,7 +600,18 @@ impl PluginManager {
                                     archive.by_index(i).map_err(|e| {
                                         mlua::Error::RuntimeError(e.to_string())
                                     })?;
-                                let path = PathBuf::from(file.name());
+                                let path = PathBuf::from(
+                                    // Since zip 9.0 reading an entry name is
+                                    // fallible, because it is decoded
+                                    // according to the entry's encoding flags.
+                                    file.name()
+                                        .map_err(|e| {
+                                            mlua::Error::RuntimeError(
+                                                e.to_string()
+                                            )
+                                        })?
+                                        .into_owned()
+                                );
                                 let Some(stripped_path) =
                                     safe_stripped_relative_path(
                                         &path, strip_val

@@ -414,7 +414,12 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
                 let file = archive
                     .by_index(i)
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                files.push(file.name().to_string());
+                // Since zip 9.0 a name is decoded according to the entry's
+                // encoding flags, so reading one is fallible.
+                let name = file
+                    .name()
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                files.push(name.into_owned());
             }
         } else if path.ends_with(".tar.gz")
             || path_obj
