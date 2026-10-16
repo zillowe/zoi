@@ -43,8 +43,11 @@ function lookup_digest() {
 function require_digest() {
   local digest
   digest=$(lookup_digest "$1" "$2") || {
-    echo "Error: no digest for '$2' in $1"
-    echo "The release did not publish it. Check that 'scripts/man.sh' ran and that 'scripts/archive.sh' picked the asset up."
+    # Written to stderr on purpose: stdout is captured by the command
+    # substitution that invokes this function, so a message printed there
+    # would be swallowed and the job would exit 1 with no explanation.
+    echo "Error: no digest for '$2' in $1" >&2
+    echo "The release did not publish it. Check that 'scripts/man.sh' ran and that 'scripts/archive.sh' picked the asset up." >&2
     exit 1
   }
   echo "$digest"

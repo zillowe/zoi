@@ -75,6 +75,27 @@ function zfvm_tag_to_semver() {
     "$ZFVM" tag "$tag" 2>/dev/null | awk -F'  *' '/^SemVer/ {print $2}'
 }
 
+# Appends a checksum line for the source archive under the name a client
+# will look it up by.
+#
+# `sha*sum` prints the path it was given. Handing it the `mktemp` path
+# directly and rewriting only the basename leaves the directory glued to the
+# front - `/tmp/Zoi-Prod-Release-1.29.0.tar.gz` instead of
+# `Zoi-Prod-Release-1.29.0.tar.gz` - and `scripts/packages.sh`, which looks
+# this entry up by bare name, then fails to find it. Printing the hash and the
+# target name from `awk` avoids re-parsing a filename we do not control.
+#
+# Arguments: <sha512sum|sha256sum> <file> <published name> <destination file>
+function append_source_archive_checksum() {
+    local sum_tool=$1
+    local file=$2
+    local published_name=$3
+    local destination=$4
+
+    "$sum_tool" "$file" | awk -v name="$published_name" '{ print $1 "  " name }' \
+        >>"$destination"
+}
+
 function sign_file() {
     local file_to_sign=$1
     echo -e "${CYAN}  -> Signing ${file_to_sign}...${NC}"
@@ -298,7 +319,8 @@ if [ -n "${CI_COMMIT_TAG:-}" ]; then
     SOURCE_ARCHIVE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/archive/${CI_COMMIT_TAG}/Zoi-${CI_COMMIT_TAG}.tar.gz"
     SOURCE_ARCHIVE_FILE=$(mktemp)
     if curl --fail -sL -o "$SOURCE_ARCHIVE_FILE" "$SOURCE_ARCHIVE_URL"; then
-        sha512sum "$SOURCE_ARCHIVE_FILE" | sed "s|$(basename "$SOURCE_ARCHIVE_FILE")|Zoi-${CI_COMMIT_TAG}.tar.gz|" >>"$CHECKSUM_FILE"
+        append_source_archive_checksum sha512sum "$SOURCE_ARCHIVE_FILE" \
+            "Zoi-${CI_COMMIT_TAG}.tar.gz" "$CHECKSUM_FILE"
     else
         echo -e "${YELLOW}Could not download source archive. Skipping its checksum.${NC}"
     fi
@@ -318,7 +340,8 @@ if [ -n "${CI_COMMIT_TAG:-}" ]; then
     SOURCE_ARCHIVE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/archive/${CI_COMMIT_TAG}/Zoi-${CI_COMMIT_TAG}.tar.gz"
     SOURCE_ARCHIVE_FILE=$(mktemp)
     if curl --fail -sL -o "$SOURCE_ARCHIVE_FILE" "$SOURCE_ARCHIVE_URL"; then
-        sha256sum "$SOURCE_ARCHIVE_FILE" | sed "s|$(basename "$SOURCE_ARCHIVE_FILE")|Zoi-${CI_COMMIT_TAG}.tar.gz|" >>"$CHECKSUM_SHA256_FILE"
+        append_source_archive_checksum sha256sum "$SOURCE_ARCHIVE_FILE" \
+            "Zoi-${CI_COMMIT_TAG}.tar.gz" "$CHECKSUM_SHA256_FILE"
     else
         echo -e "${YELLOW}Could not download source archive. Skipping its checksum.${NC}"
     fi
