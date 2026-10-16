@@ -26,12 +26,12 @@ To perform a reliable merge, Zoi maintains three versions of every tracked confi
 
 When you run `zoi update`, Zoi evaluates the state of your configuration:
 
-| Scenario | Logic | Result |
-| :--- | :--- | :--- |
-| **Unmodified** | Yours == Base | Zoi simply replaces the old file with the new upstream default (**Theirs**). |
-| **Upstream Unchanged** | Theirs == Base | Zoi keeps your modified file (**Yours**) as-is. |
-| **Clean Merge** | Both changed, no overlaps | Zoi automatically combines your changes with the upstream changes. |
-| **Conflict** | Both changed same lines | Zoi inserts standard merge markers (`<<<<<<<`, `=======`, `>>>>>>>`) and warns you. |
+| Scenario               | Logic                     | Result                                                                              |
+| :--------------------- | :------------------------ | :---------------------------------------------------------------------------------- |
+| **Unmodified**         | Yours == Base             | Zoi simply replaces the old file with the new upstream default (**Theirs**).        |
+| **Upstream Unchanged** | Theirs == Base            | Zoi keeps your modified file (**Yours**) as-is.                                     |
+| **Clean Merge**        | Both changed, no overlaps | Zoi automatically combines your changes with the upstream changes.                  |
+| **Conflict**           | Both changed same lines   | Zoi inserts standard merge markers (`<<<<<<<`, `=======`, `>>>>>>>`) and warns you. |
 
 ## Handling Conflicts
 

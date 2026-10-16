@@ -9,12 +9,12 @@ breaking layout change - existing `~/.zoi` data is not read automatically.
 
 ## User scope
 
-| Purpose | Linux and other Unix | macOS | Windows |
-| --- | --- | --- | --- |
-| Configuration | `$XDG_CONFIG_HOME/zoi`, otherwise `~/.config/zoi` | XDG override, otherwise the native configuration directory | XDG override, otherwise the native local configuration directory |
-| Package data, registries, keys, plugins, and LSP files | `$XDG_DATA_HOME/zoi`, otherwise `~/.local/share/zoi` | XDG override, otherwise `~/Library/Application Support/zoi` | XDG override, otherwise `%LOCALAPPDATA%\zoi` |
-| Downloads and other cache files | `$XDG_CACHE_HOME/zoi`, otherwise `~/.cache/zoi` | XDG override, otherwise `~/Library/Caches/zoi` | XDG override, otherwise the native cache directory |
-| Transactions, pins, audit history, telemetry, and user lockfiles | `$XDG_STATE_HOME/zoi`, otherwise `~/.local/state/zoi` | XDG override, otherwise `~/Library/Application Support/zoi` | XDG override, otherwise `%LOCALAPPDATA%\zoi` |
+| Purpose                                                          | Linux and other Unix                                  | macOS                                                       | Windows                                                          |
+| ---------------------------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------- |
+| Configuration                                                    | `$XDG_CONFIG_HOME/zoi`, otherwise `~/.config/zoi`     | XDG override, otherwise the native configuration directory  | XDG override, otherwise the native local configuration directory |
+| Package data, registries, keys, plugins, and LSP files           | `$XDG_DATA_HOME/zoi`, otherwise `~/.local/share/zoi`  | XDG override, otherwise `~/Library/Application Support/zoi` | XDG override, otherwise `%LOCALAPPDATA%\zoi`                     |
+| Downloads and other cache files                                  | `$XDG_CACHE_HOME/zoi`, otherwise `~/.cache/zoi`       | XDG override, otherwise `~/Library/Caches/zoi`              | XDG override, otherwise the native cache directory               |
+| Transactions, pins, audit history, telemetry, and user lockfiles | `$XDG_STATE_HOME/zoi`, otherwise `~/.local/state/zoi` | XDG override, otherwise `~/Library/Application Support/zoi` | XDG override, otherwise `%LOCALAPPDATA%\zoi`                     |
 
 ### Package store
 

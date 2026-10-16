@@ -16,13 +16,13 @@ Zoi Specification v2 is a major architectural overhaul that introduces breaking 
 
 ### Key Changes at a Glance
 
-| Feature            | Spec v1                     | Spec v2                                      |
-| :----------------- | :-------------------------- | :------------------------------------------- |
-| **Project Config** | `zoi.lua`                  | `zoi.lua` (all features, `zoi.lua` removed) |
-| **Lockfile**       | `zoi.lock` (v1)             | `zoi.lock` (v2, with directory hashes)       |
-| **Registry Sync**  | Global only                 | Global or Project-local (`.zoi/pkgs/db`)     |
-| **Package IDs**    | `package` or `repo/package` | Strictly `@repo/package`                     |
-| **Versioning**     | String-based                | Strict SemVer                                |
+| Feature            | Spec v1                     | Spec v2                                     |
+| :----------------- | :-------------------------- | :------------------------------------------ |
+| **Project Config** | `zoi.lua`                   | `zoi.lua` (all features, `zoi.lua` removed) |
+| **Lockfile**       | `zoi.lock` (v1)             | `zoi.lock` (v2, with directory hashes)      |
+| **Registry Sync**  | Global only                 | Global or Project-local (`.zoi/pkgs/db`)    |
+| **Package IDs**    | `package` or `repo/package` | Strictly `@repo/package`                    |
+| **Versioning**     | String-based                | Strict SemVer                               |
 
 ### 1. Migrating `zoi.lua` to `zoi.lua`
 

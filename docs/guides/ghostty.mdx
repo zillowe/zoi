@@ -25,21 +25,21 @@ The example adopts the rigorous authoritative standards required for the Zoidber
 
 Ghostty maps naturally to a split package with 13 sub-packages, offering granular control over what gets installed:
 
-| Sub-package                  | Origin         | Purpose                                                               |
-| ---------------------------- | -------------- | --------------------------------------------------------------------- |
-| `ghostty:main`               | PKGBUILD + RPM | **Primary Binary:** The terminal binary, desktop files, and icons.    |
-| `ghostty:lib`                | RPM spec       | **Runtime:** Shared library (`libghostty-vt.so`)                      |
-| `ghostty:dev`                | RPM spec       | **Development:** Headers and `.pc` file                               |
-| `ghostty:terminfo`           | both           | Terminfo entries, useful on hosts accessed over SSH                   |
-| `ghostty:bash-completion`    | RPM spec       | Bash completions + bash shell integration                             |
-| `ghostty:fish-completion`    | RPM spec       | Fish completions + fish shell integration                             |
-| `ghostty:zsh-completion`     | RPM spec       | Zsh completions + zsh shell integration                               |
-| `ghostty:nushell-completion` | RPM spec       | Nushell completions                                                   |
-| `ghostty:nautilus`           | both           | Optional GNOME Files integration                                      |
-| `ghostty:neovim`             | RPM spec       | Neovim syntax highlighting and compiler                               |
-| `ghostty:vim`                | RPM spec       | Vim syntax highlighting and compiler                                  |
-| `ghostty:docs`               | RPM spec       | **Documentation:** HTML documentation                                 |
-| `ghostty:lang`               | RPM spec       | Translation files (if present)                                        |
+| Sub-package                  | Origin         | Purpose                                                            |
+| ---------------------------- | -------------- | ------------------------------------------------------------------ |
+| `ghostty:main`               | PKGBUILD + RPM | **Primary Binary:** The terminal binary, desktop files, and icons. |
+| `ghostty:lib`                | RPM spec       | **Runtime:** Shared library (`libghostty-vt.so`)                   |
+| `ghostty:dev`                | RPM spec       | **Development:** Headers and `.pc` file                            |
+| `ghostty:terminfo`           | both           | Terminfo entries, useful on hosts accessed over SSH                |
+| `ghostty:bash-completion`    | RPM spec       | Bash completions + bash shell integration                          |
+| `ghostty:fish-completion`    | RPM spec       | Fish completions + fish shell integration                          |
+| `ghostty:zsh-completion`     | RPM spec       | Zsh completions + zsh shell integration                            |
+| `ghostty:nushell-completion` | RPM spec       | Nushell completions                                                |
+| `ghostty:nautilus`           | both           | Optional GNOME Files integration                                   |
+| `ghostty:neovim`             | RPM spec       | Neovim syntax highlighting and compiler                            |
+| `ghostty:vim`                | RPM spec       | Vim syntax highlighting and compiler                               |
+| `ghostty:docs`               | RPM spec       | **Documentation:** HTML documentation                              |
+| `ghostty:lang`               | RPM spec       | Translation files (if present)                                     |
 
 Installing `ghostty` installs the main terminal plus shared library and terminfo by default, while leaving optional components like shell completions, editor integrations, and Nautilus integration for explicit selection.
 

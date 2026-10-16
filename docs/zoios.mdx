@@ -7,7 +7,8 @@ ZoiOS (and its reference implementation, Parlex Linux) features a declarative sy
 
 <Callout type="warn">
   The commands on this page are **only available on ZoiOS-based systems**.
-  Generic Linux, macOS, and Windows installations of Zoi do not include these features.
+  Generic Linux, macOS, and Windows installations of Zoi do not include these
+  features.
 </Callout>
 
 ## The `zoi system` Command
@@ -199,9 +200,9 @@ paths:
 The bootloader is taken from `bootloader.type` in `system.lua`, or detected from
 the filesystem when unset:
 
-| Type           | Notes                                                                                                    |
-| -------------- | -------------------------------------------------------------------------------------------------------- |
-| `systemd-boot` | One `.conf` per kernel in `/boot/loader/entries`. The ESP location is probed (`/boot`, `/boot/efi`, `/efi`).  |
+| Type           | Notes                                                                                                        |
+| -------------- | ------------------------------------------------------------------------------------------------------------ |
+| `systemd-boot` | One `.conf` per kernel in `/boot/loader/entries`. The ESP location is probed (`/boot`, `/boot/efi`, `/efi`). |
 | `grub2`        | Writes a snippet into `/etc/grub.d` and runs `grub-mkconfig`. Reads the same per-kernel files.               |
 | `limine`       | Writes `/boot/limine.conf`, preserving any hand-written preamble. Runs `limine-install` when present.        |
 
@@ -211,7 +212,8 @@ the filesystem when unset:
   under `/var/lib/zoi/kernels`, and each one gets its own boot entry. Selecting
   an earlier kernel at the next boot is all that is needed to recover.
 
-  How many are kept is controlled by the [`kernel_retention`](/docs/zds/zoi/config) setting, and defaults to three.
+How many are kept is controlled by the [`kernel_retention`](/docs/zds/zoi/config) setting, and defaults to three.
+
 </Callout>
 
 Secure Boot signing needs a key pair placed at `/etc/zoi/secure-boot/DB.key` and
@@ -256,7 +258,7 @@ The behaviour worth knowing:
 - **Missing group references warn rather than fail**, so one typo does not abort an apply.
 
 Accounts the base packages ship (`root`, `nobody`, and so on) are left alone.
-`system.lua` is the source of truth for whether a group *exists*, not for every
+`system.lua` is the source of truth for whether a group _exists_, not for every
 attribute of it, because the packages that own those groups have deliberate GIDs
 and memberships.
 

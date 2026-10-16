@@ -4,7 +4,7 @@ description: Managing interchangeable command implementations such as awk, vi an
 ---
 
 Some commands have several interchangeable implementations and the system still
-has to put *something* at the canonical path. `awk` may be `gawk`, `mawk` or
+has to put _something_ at the canonical path. `awk` may be `gawk`, `mawk` or
 `busybox`. `vi` may be `vim`, `nvim` or `vi`. `editor` may be any of them.
 
 Zoi manages these through a priority-based **alternatives** registry, the same
@@ -38,7 +38,7 @@ Two hops, deliberately:
 - `/etc/alternatives` is a location some software already probes.
 
 Registry state lives in `/var/lib/zoi/alternatives/<name>/state.json`. It is
-deliberately *not* inside the package store, because the store is destroyed by
+deliberately _not_ inside the package store, because the store is destroyed by
 the very uninstall that retention has to survive.
 
 ## Declaring an alternative
@@ -111,7 +111,7 @@ zoi remove mawk
 # /usr/bin/awk now resolves to /usr/bin/gawk
 ```
 
-Removing the *last* implementation removes the links entirely, rather than leaving
+Removing the _last_ implementation removes the links entirely, rather than leaving
 a dangling `/usr/bin/awk`. A missing command produces an obvious error; a dangling
 symlink produces a confusing one.
 

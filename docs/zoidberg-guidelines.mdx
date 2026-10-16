@@ -13,8 +13,8 @@ Zoidberg is dedicated to providing high-quality free and open-source software.
 
 ### 1.1. Tier Scope
 
-* **`core` and `main` tiers**: These tiers **MUST** follow all guidelines in this document without exception. Software in these tiers **MUST** be Free Software (FOSS).
-* **`extra` tier**: Guidelines in this tier are relaxed. It is intended for niche, specialized, or less stable packages where strict adherence to all FHS or bundling policies is not always practical.
+- **`core` and `main` tiers**: These tiers **MUST** follow all guidelines in this document without exception. Software in these tiers **MUST** be Free Software (FOSS).
+- **`extra` tier**: Guidelines in this tier are relaxed. It is intended for niche, specialized, or less stable packages where strict adherence to all FHS or bundling policies is not always practical.
 
 ### 1.2. Free Software Requirement
 
@@ -24,8 +24,8 @@ All software in the `core` and `main` tiers **MUST** be under licenses determine
 
 The `license` field in `metadata()` **MUST** be populated with a valid [SPDX license identifier](https://spdx.org/licenses/) or expression.
 
-* **Complex Licenses:** Use `AND`, `OR`, and `WITH` operators to accurately reflect multi-licensed software (e.g. `MIT AND Apache-2.0`).
-* **Missing License Text:** If upstream fails to include a license file, the maintainer **SHOULD** contact upstream. If required by the license, a believed-correct copy of the license text **MUST** be included in the package via `zlicense()`.
+- **Complex Licenses:** Use `AND`, `OR`, and `WITH` operators to accurately reflect multi-licensed software (e.g. `MIT AND Apache-2.0`).
+- **Missing License Text:** If upstream fails to include a license file, the maintainer **SHOULD** contact upstream. If required by the license, a believed-correct copy of the license text **MUST** be included in the package via `zlicense()`.
 
 ---
 
@@ -37,23 +37,23 @@ Zoi uses an automated SAT solver that depends on strict, sortable versioning.
 
 The `version` field **MUST** match the upstream project version verbatim.
 
-* **No Prefixes:** Do not include `v` prefixes (e.g. use `1.2.3`, not `v1.2.3`).
-* **Leading Zeroes:** Do not trim leading zeroes if they are part of the upstream scheme.
+- **No Prefixes:** Do not include `v` prefixes (e.g. use `1.2.3`, not `v1.2.3`).
+- **Leading Zeroes:** Do not trim leading zeroes if they are part of the upstream scheme.
 
 ### 2.2. Downstream Revisions (`revision`)
 
 The `revision` field tracks changes to the Zoi package definition itself.
 
-* **Increments:** Increment the `revision` when fixing bugs in the Lua script, applying security patches, or updating dependencies while upstream remains the same.
-* **Resets:** The `revision` **MUST** be reset to `"1"` whenever the upstream `version` is updated.
+- **Increments:** Increment the `revision` when fixing bugs in the Lua script, applying security patches, or updating dependencies while upstream remains the same.
+- **Resets:** The `revision` **MUST** be reset to `"1"` whenever the upstream `version` is updated.
 
 ### 2.3. Snapshot Versioning
 
 For software taken from a source control system that is not a formal release, the following format **MUST** be used:
 `[LAST_VERSION]^[YYYYMMDD]g[COMMIT_HASH]`
 
-* **Example:** `1.0.0^20240320gabc123`
-* **Rationale:** This ensures that snapshots sort higher than the last release but lower than the next release.
+- **Example:** `1.0.0^20240320gabc123`
+- **Rationale:** This ensures that snapshots sort higher than the last release but lower than the next release.
 
 ---
 
@@ -63,23 +63,23 @@ For software taken from a source control system that is not a formal release, th
 
 Packages **MUST** make every effort to avoid bundling (vendoring) libraries that are already available in Zoi or as native system packages.
 
-* **Requirement:** If upstream supports building against system libraries, the package **MUST** be configured to do so.
-* **Deletion:** Bundled third-party source code **SHOULD** be removed in `prepare()` to ensure the build process uses system-provided dependencies.
+- **Requirement:** If upstream supports building against system libraries, the package **MUST** be configured to do so.
+- **Deletion:** Bundled third-party source code **SHOULD** be removed in `prepare()` to ensure the build process uses system-provided dependencies.
 
 ### 3.2. Pre-built Binaries in Source Builds
 
 For packages providing a `source` build type, all binaries and libraries **MUST** be built from the source code included in the build process.
 
-* **Prohibition:** Maintainers **MUST NOT** include pre-compiled `.o`, `.so`, or `.exe` files in a source build.
-* **Exception:** This rule does not apply to content files (e.g. `.png`, `.pdf`) or "bootstrap" binaries required to build a compiler, provided those binaries are themselves open-source and temporary.
+- **Prohibition:** Maintainers **MUST NOT** include pre-compiled `.o`, `.so`, or `.exe` files in a source build.
+- **Exception:** This rule does not apply to content files (e.g. `.png`, `.pdf`) or "bootstrap" binaries required to build a compiler, provided those binaries are themselves open-source and temporary.
 
 ### 3.3. Impermissible Content
 
 Zoidberg **SHALL NOT** host content that is:
 
-* Legally questionable (patent-encumbered formats in certain jurisdictions).
-* Offensive, discriminatory, or derogatory.
-* Proprietary binary blobs (excluding permissible firmware for `core` hardware support).
+- Legally questionable (patent-encumbered formats in certain jurisdictions).
+- Offensive, discriminatory, or derogatory.
+- Proprietary binary blobs (excluding permissible firmware for `core` hardware support).
 
 ---
 
@@ -87,15 +87,15 @@ Zoidberg **SHALL NOT** host content that is:
 
 To minimize the installation footprint and save bandwidth, large packages **MUST** be split into functional components using the following naming convention:
 
-| Suffix | Purpose |
-| :--- | :--- |
-| `:main` | **Primary Binary:** The main executable or CLI tool (if the package is split). |
-| `:lib` | **Runtime Libraries:** Shared objects (`.so`, `.dylib`) and versioned runtime files. |
-| `:dev` | **Development Files:** Headers (`.h`), static libraries (`.a`), and `pkg-config` files. |
-| `:docs` | **Documentation:** Large manuals, HTML documentation, and examples. |
+| Suffix  | Purpose                                                                                 |
+| :------ | :-------------------------------------------------------------------------------------- |
+| `:main` | **Primary Binary:** The main executable or CLI tool (if the package is split).          |
+| `:lib`  | **Runtime Libraries:** Shared objects (`.so`, `.dylib`) and versioned runtime files.    |
+| `:dev`  | **Development Files:** Headers (`.h`), static libraries (`.a`), and `pkg-config` files. |
+| `:docs` | **Documentation:** Large manuals, HTML documentation, and examples.                     |
 
-* **Dependency Chain:** The `:dev` sub-package **MUST** depend on the base package (or `:lib`) with an exact version match.
-* **Default Install:** The base package (or `main_subs`) **SHOULD** only include the files necessary for standard execution.
+- **Dependency Chain:** The `:dev` sub-package **MUST** depend on the base package (or `:lib`) with an exact version match.
+- **Default Install:** The base package (or `main_subs`) **SHOULD** only include the files necessary for standard execution.
 
 ---
 
@@ -105,14 +105,14 @@ To minimize the installation footprint and save bandwidth, large packages **MUST
 
 Every remote download performed in `prepare()` **MUST** be verified for integrity.
 
-* **Requirement:** Use `verifyHash()` or `UTILS.DOWNLOAD` with the `hash` parameter.
-* **Algorithms:** `sha512` is **REQUIRED** for all new packages. `sha256` is acceptable for legacy reasons.
+- **Requirement:** Use `verifyHash()` or `UTILS.DOWNLOAD` with the `hash` parameter.
+- **Algorithms:** `sha512` is **REQUIRED** for all new packages. `sha256` is acceptable for legacy reasons.
 
 ### 5.2. Chain of Trust (GPG)
 
 For packages in the `core` tier, maintainers **MUST** verify OpenPGP signatures of upstream sources whenever they are available.
 
-* **Method:** Use `addPgpKey()` to import the upstream key and `verifySignature()` to validate the downloaded source before extraction.
+- **Method:** Use `addPgpKey()` to import the upstream key and `verifySignature()` to validate the downloaded source before extraction.
 
 ---
 

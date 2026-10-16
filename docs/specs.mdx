@@ -153,7 +153,7 @@ Snapshots are configured in the `zrepo` section of `repo.yaml`, using the same `
 - `hash`: (Optional) URL of the snapshot's SHA-256 checksum.
 - `size`: (Optional) URL of the snapshot's size information.
 
-**Update patches:** a registry `.zdelta` is a bsdiff diff computed over the *uncompressed tar* of the previous snapshot. Tar stores each file in a contiguous, byte-stable block, so unchanged entries diff to almost nothing; diffing the compressed bytes would not compress well.
+**Update patches:** a registry `.zdelta` is a bsdiff diff computed over the _uncompressed tar_ of the previous snapshot. Tar stores each file in a contiguous, byte-stable block, so unchanged entries diff to almost nothing; diffing the compressed bytes would not compress well.
 
 A patch is published in one of two shapes:
 

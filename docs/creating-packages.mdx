@@ -49,7 +49,7 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `name`           | `string`  | **Required.** The name of the package.                                                                                                                                                                                                      |
 | `repo`           | `string`  | **Required.** The repository tier where the package belongs (e.g. `core`, `community`).                                                                                                                                                     |
 | `version`        | `string`  | The package version. Set either `version` or `versions`. Can be hardcoded or determined dynamically.                                                                                                                                        |
-| `epoch`          | `integer` | Forced version precedence (defaults to `0`). Useful when switching versioning schemes to ensure newer packages are always seen as upgrades.                                                                                                   |
+| `epoch`          | `integer` | Forced version precedence (defaults to `0`). Useful when switching versioning schemes to ensure newer packages are always seen as upgrades.                                                                                                 |
 | `revision`       | `string`  | The package revision (defaults to `"1"`). Increment this to trigger an update when the package definition changes but the upstream version remains the same.                                                                                |
 | `versions`       | `table`   | A map of channels to versions (e.g. `{ stable = "1.2.3", beta = "1.4.0" }`). Required if `version` is not set.                                                                                                                              |
 | `description`    | `string`  | **Required.** A short, one-line description of the package.                                                                                                                                                                                 |
@@ -57,15 +57,15 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `git`            | `string`  | The source code's git repository URL.                                                                                                                                                                                                       |
 | `maintainer`     | `table`   | **Required.** A table with `name`, `email`, and optionally `website` of the package maintainer.                                                                                                                                             |
 | `author`         | `table`   | A table with `name`, `email`, and `website` of the original software author.                                                                                                                                                                |
-| `license`        | `string`  | The [SPDX identifier](https://spdx.org/licenses/) for the software (e.g. `MIT`, `GPL-3.0-or-later`). See [Licensing](#licensing) below.                                                                                                                                |
+| `license`        | `string`  | The [SPDX identifier](https://spdx.org/licenses/) for the software (e.g. `MIT`, `GPL-3.0-or-later`). See [Licensing](#licensing) below.                                                                                                     |
 | `bins`           | `list`    | A list of binary names the package provides. Zoi will create symlinks for these in a directory on the user's `PATH`.                                                                                                                        |
-| `alternatives`   | `list`    | Implementations of an interchangeable command. See [Alternatives](#13-alternatives) below.                                                                                                                                                   |
+| `alternatives`   | `list`    | Implementations of an interchangeable command. See [Alternatives](#13-alternatives) below.                                                                                                                                                  |
 | `conflicts`      | `list`    | A list of other package names that this package conflicts with.                                                                                                                                                                             |
 | `provides`       | `list`    | A list of virtual package names this package provides. Other packages can depend on these.                                                                                                                                                  |
 | `replaces`       | `list`    | A list of packages that this package replaces. Zoi will offer to remove them upon installation.                                                                                                                                             |
-| `backup`         | `list`    | A list of configuration files to preserve during upgrades. Zoi will create `.zoinew` and `.zoisave` files for these. Supports placeholders like `${pkgstore}`, `${usrroot}`, `${usrhome}`, and `${applications}`. |
-| `zoios`          | `boolean` | Restricts installation to ZoiOS systems (`true`), non-ZoiOS systems (`false`), or both (`nil`/unset). |
-| `types`          | `list`    | **Required for buildable packages.** A list of supported build methods (e.g. `source`, `pre-compiled`). |
+| `backup`         | `list`    | A list of configuration files to preserve during upgrades. Zoi will create `.zoinew` and `.zoisave` files for these. Supports placeholders like `${pkgstore}`, `${usrroot}`, `${usrhome}`, and `${applications}`.                           |
+| `zoios`          | `boolean` | Restricts installation to ZoiOS systems (`true`), non-ZoiOS systems (`false`), or both (`nil`/unset).                                                                                                                                       |
+| `types`          | `list`    | **Required for buildable packages.** A list of supported build methods (e.g. `source`, `pre-compiled`).                                                                                                                                     |
 | `platforms`      | `list`    | A list of supported platforms (e.g. `linux`, `macos`, `windows`, `linux-amd64`). If specified, builds for other platforms will be skipped. Use `ci:<target>:<build>` (e.g. `ci:windows-amd64:linux`) for cross-compilation in CI pipelines. |
 | `ci`             | `table`   | CI runner configuration for build pipelines. See [CI Runner Support](#ci-runner-support) below.                                                                                                                                             |
 | `type`           | `string`  | The type of package. Can be `package` (default), `collection`, `app`, or `extension`. See [Package Types](#5-package-types).                                                                                                                |
@@ -93,7 +93,9 @@ The `license` field in Zoi metadata is used for both documentation and policy en
   - **`Unknown`**: Used when the license cannot be accurately determined.
 
 <Callout type="warn">
-  While Zoi supports `Proprietary` and `Unknown` licenses, the official Zoidberg `core` and `main` repositories only accept Free and Open Source Software (FOSS).
+  While Zoi supports `Proprietary` and `Unknown` licenses, the official Zoidberg
+  `core` and `main` repositories only accept Free and Open Source Software
+  (FOSS).
 </Callout>
 
 ---
@@ -188,46 +190,46 @@ When Zoi executes your script, it provides a rich environment of global variable
 
 ### Global Variables
 
-| Variable      | Type     | Description                                                                                                         |
-| ------------- | -------- | ------------------------------------------------------------------------------------------------------------------- |
-| `SYSTEM`      | `table`  | Contains system info: `OS`, `ARCH`, `DISTRO`, `DISTRO_VER`, `DE`, `SERVER`, `KERNEL_VER`, `CPU`, `GPU`, `MANAGER`.  |
+| Variable      | Type     | Description                                                                                                                                        |
+| ------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SYSTEM`      | `table`  | Contains system info: `OS`, `ARCH`, `DISTRO`, `DISTRO_VER`, `DE`, `SERVER`, `KERNEL_VER`, `CPU`, `GPU`, `MANAGER`.                                 |
 | `ZOI`         | `table`  | Contains Zoi-specific info: `VERSION` (the version being built), `scope` (the requested scope), `PATH.user`, `PATH.system`, and `PKG` (see below). |
-| `ZOI.PKG`     | `table`  | Contains absolute paths: `store`, `template`, `root`, `home`, `lua`.                                                |
-| `PKG`         | `table`  | A table containing all the fields you defined in your `metadata{...}` block.                                        |
-| `BUILD_DIR`   | `string` | The absolute path to the temporary build directory. Use this as the destination for all downloaded and built files. |
-| `STAGING_DIR` | `string` | The absolute path to the staging directory. Use this as the base for all `zcp` operations.                          |
-| `BUILD_TYPE`  | `string` | The build type specified by the user (e.g. `"source"`, `"pre-compiled"`).                                           |
-| `SUBPKG`      | `string` | For split packages, the name of the sub-package currently being processed. `nil` for non-split packages.            |
+| `ZOI.PKG`     | `table`  | Contains absolute paths: `store`, `template`, `root`, `home`, `lua`.                                                                               |
+| `PKG`         | `table`  | A table containing all the fields you defined in your `metadata{...}` block.                                                                       |
+| `BUILD_DIR`   | `string` | The absolute path to the temporary build directory. Use this as the destination for all downloaded and built files.                                |
+| `STAGING_DIR` | `string` | The absolute path to the staging directory. Use this as the base for all `zcp` operations.                                                         |
+| `BUILD_TYPE`  | `string` | The build type specified by the user (e.g. `"source"`, `"pre-compiled"`).                                                                          |
+| `SUBPKG`      | `string` | For split packages, the name of the sub-package currently being processed. `nil` for non-split packages.                                           |
 
 ### Helper Functions
 
-| Function                                  | Description                                                                                                                                                                                                                              |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cmd(command)`                            | Executes a shell command within the `BUILD_DIR` using a **persistent shell session** (state like `cd` and `export` persist between calls). Returns `stdout`, `stderr`, and `exit_code`. |
-| `zcp(source, dest)`                       | Copies files/directories to the `STAGING_DIR`. The `source` can be a path inside `BUILD_DIR`, an absolute path, or a path relative to the `.pkg.lua` file using `${pkgluadir}`. See [Staging Files with `zcp`](#staging-files-with-zcp). |
-| `zlicense(source)`                        | Stages a license file. Uses standard FHS paths (`/usr/share/licenses/...`) in system scope, or `${pkgstore}` otherwise.                                                                                                                  |
-| `zdoc(source)`                            | Stages a documentation file. Uses standard FHS paths (`/usr/share/doc/...`) in system scope, or `${pkgstore}/doc` otherwise.                                                                                                              |
-| `zman(source, section)`                  | Stages a manual page. Uses standard FHS paths (`/usr/share/man/man{section}/...`) in system scope, or `${pkgstore}/man/man{section}/` otherwise.                                                                                          |
-| `zsed(pattern, replacement, file)`        | Performs an in-place regex replacement on a file in `BUILD_DIR`.                                                                                                                                                                         |
-| `zpatch(patch_file, strip)`               | Applies a patch file to the `BUILD_DIR`.                                                                                                                                                                                                 |
-| `zln(target, link)`                       | Creates a symbolic link in the package.                                                                                                                                                                                                  |
-| `zchmod(path, mode)`                      | Sets the permissions of a file or directory in the package.                                                                                                                                                                              |
-| `zchown(path, owner, group)`              | Sets the ownership of a file or directory in the package.                                                                                                                                                                                |
-| `zmkdir(path)`                            | Creates a directory in the package.                                                                                                                                                                                                      |
-| `zrm(path)`                               | Used in `uninstall()` to remove files/directories. See [Target Paths for `zrm`](#target-paths-for-zrm).                                                                                                                                  |
-| `verifyHash(file, "algo-hash")`           | Verifies a file's checksum (e.g. `"sha512-..."`). Supported algos: sha512, sha256.                                                                                                                                                  |
-| `verifySignature(file, sig, key)`         | Verifies a PGP signature.                                                                                                                                                                                                                |
-| `addPgpKey(source, name)`                  | Adds a PGP key to Zoi's keyring for verification. Accepts a URL, a file path, or a bare key fingerprint (v4 or v5).                                                                                                                          |
-| `UTILS.EXTRACT(url_or_path, out_dir)`     | Downloads and extracts a `.zip`, `.tar.*`, `.7z`, `.rar`, `.deb`, `.dmg`, or `.pkg` archive.                                                                                                                                             |
-| `UTILS.MAKE_ARCHIVE(src, out, algo)`      | Creates an archive from a source file, directory, or a list of paths.                                                                                                                                                                     |
-| `UTILS.FETCH.url(url)`                    | Fetches a URL's content as a string.                                                                                                                                                                                                     |
-| `UTILS.FETCH.GITHUB.LATEST.release{...}`  | Fetches the latest release tag from a GitHub repository.                                                                                                                                                 |
-| `UTILS.FIND.file(dir, name)`              | Finds a file within the `BUILD_DIR`.                                                                                                                                                                     |
-| `UTILS.FILE(url, path)`                   | Downloads a file from a URL to a local path.                                                                                                                                                             |
-| `UTILS.DOWNLOAD(url, name, hash)`         | Downloads a file from a URL, using an optional filename, and automatically verifies it against an optional hash (e.g. `"sha512-..."`). Errors if verification fails.                                      |
-| `UTILS.FS.exists(path)`                   | Returns `true` if a file or directory exists at the given path.                                                                                                                                           |
+| Function                                 | Description                                                                                                                                                                                                                              |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cmd(command)`                           | Executes a shell command within the `BUILD_DIR` using a **persistent shell session** (state like `cd` and `export` persist between calls). Returns `stdout`, `stderr`, and `exit_code`.                                                  |
+| `zcp(source, dest)`                      | Copies files/directories to the `STAGING_DIR`. The `source` can be a path inside `BUILD_DIR`, an absolute path, or a path relative to the `.pkg.lua` file using `${pkgluadir}`. See [Staging Files with `zcp`](#staging-files-with-zcp). |
+| `zlicense(source)`                       | Stages a license file. Uses standard FHS paths (`/usr/share/licenses/...`) in system scope, or `${pkgstore}` otherwise.                                                                                                                  |
+| `zdoc(source)`                           | Stages a documentation file. Uses standard FHS paths (`/usr/share/doc/...`) in system scope, or `${pkgstore}/doc` otherwise.                                                                                                             |
+| `zman(source, section)`                  | Stages a manual page. Uses standard FHS paths (`/usr/share/man/man{section}/...`) in system scope, or `${pkgstore}/man/man{section}/` otherwise.                                                                                         |
+| `zsed(pattern, replacement, file)`       | Performs an in-place regex replacement on a file in `BUILD_DIR`.                                                                                                                                                                         |
+| `zpatch(patch_file, strip)`              | Applies a patch file to the `BUILD_DIR`.                                                                                                                                                                                                 |
+| `zln(target, link)`                      | Creates a symbolic link in the package.                                                                                                                                                                                                  |
+| `zchmod(path, mode)`                     | Sets the permissions of a file or directory in the package.                                                                                                                                                                              |
+| `zchown(path, owner, group)`             | Sets the ownership of a file or directory in the package.                                                                                                                                                                                |
+| `zmkdir(path)`                           | Creates a directory in the package.                                                                                                                                                                                                      |
+| `zrm(path)`                              | Used in `uninstall()` to remove files/directories. See [Target Paths for `zrm`](#target-paths-for-zrm).                                                                                                                                  |
+| `verifyHash(file, "algo-hash")`          | Verifies a file's checksum (e.g. `"sha512-..."`). Supported algos: sha512, sha256.                                                                                                                                                       |
+| `verifySignature(file, sig, key)`        | Verifies a PGP signature.                                                                                                                                                                                                                |
+| `addPgpKey(source, name)`                | Adds a PGP key to Zoi's keyring for verification. Accepts a URL, a file path, or a bare key fingerprint (v4 or v5).                                                                                                                      |
+| `UTILS.EXTRACT(url_or_path, out_dir)`    | Downloads and extracts a `.zip`, `.tar.*`, `.7z`, `.rar`, `.deb`, `.dmg`, or `.pkg` archive.                                                                                                                                             |
+| `UTILS.MAKE_ARCHIVE(src, out, algo)`     | Creates an archive from a source file, directory, or a list of paths.                                                                                                                                                                    |
+| `UTILS.FETCH.url(url)`                   | Fetches a URL's content as a string.                                                                                                                                                                                                     |
+| `UTILS.FETCH.GITHUB.LATEST.release{...}` | Fetches the latest release tag from a GitHub repository.                                                                                                                                                                                 |
+| `UTILS.FIND.file(dir, name)`             | Finds a file within the `BUILD_DIR`.                                                                                                                                                                                                     |
+| `UTILS.FILE(url, path)`                  | Downloads a file from a URL to a local path.                                                                                                                                                                                             |
+| `UTILS.DOWNLOAD(url, name, hash)`        | Downloads a file from a URL, using an optional filename, and automatically verifies it against an optional hash (e.g. `"sha512-..."`). Errors if verification fails.                                                                     |
+| `UTILS.FS.exists(path)`                  | Returns `true` if a file or directory exists at the given path.                                                                                                                                                                          |
 
-| `UTILS.PARSE.checksumFile(content, file)` | Parses a checksum from a string (e.g. the content of a `checksums.txt` file).                                                                                                                                                            |
+| `UTILS.PARSE.checksumFile(content, file)` | Parses a checksum from a string (e.g. the content of a `checksums.txt` file). |
 
 ### Staging Files with `zcp`
 
@@ -297,11 +299,11 @@ end
 
 The `zrm(path)` function, typically used in `uninstall()`, supports placeholders to safely reference paths outside the package store.
 
-| Variable      | Description                                                                                                     |
-| ------------- | --------------------------------------------------------------------------------------------------------------- |
-| `${pkgstore}` | The package's version directory in the Zoi store.                                                               |
-| `${usrroot}`  | The system's root (`/`). Zoi handles `sudo` escalation automatically if needed.                                 |
-| `${usrhome}`  | The user's home directory (`~`).                                                                                |
+| Variable      | Description                                                                     |
+| ------------- | ------------------------------------------------------------------------------- |
+| `${pkgstore}` | The package's version directory in the Zoi store.                               |
+| `${usrroot}`  | The system's root (`/`). Zoi handles `sudo` escalation automatically if needed. |
+| `${usrhome}`  | The user's home directory (`~`).                                                |
 
 ---
 
@@ -713,7 +715,7 @@ zoi package install /path/to/your-package-1.0.0-linux-amd64.zpa
 
 This example demonstrates many of the concepts above by packaging a simple "Hello, World!" program written in Zig.
 
-*For the full source code of this example, see the `hello` package in the [Zoidberg repository](https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/tree/main/zillowe/hello).*
+_For the full source code of this example, see the `hello` package in the [Zoidberg repository](https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/tree/main/zillowe/hello)._
 
 ### `hello.pkg.lua`
 
@@ -786,9 +788,9 @@ function uninstall() end
 
 ## 13. Alternatives
 
-Some commands have several interchangeable implementations and the system still has to put *something* at the canonical path. `awk` may be `gawk`, `mawk` or `busybox`. `vi` may be `vim` or `nvim`.
+Some commands have several interchangeable implementations and the system still has to put _something_ at the canonical path. `awk` may be `gawk`, `mawk` or `busybox`. `vi` may be `vim` or `nvim`.
 
-Without a mechanism, whichever package installs last wins, and the others fight it over the same file. Instead, a package *registers* its implementation and Zoi keeps the canonical path pointing at the one with the highest priority.
+Without a mechanism, whichever package installs last wins, and the others fight it over the same file. Instead, a package _registers_ its implementation and Zoi keeps the canonical path pointing at the one with the highest priority.
 
 ```lua
 metadata({

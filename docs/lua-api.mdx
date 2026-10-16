@@ -46,30 +46,32 @@ These variables are automatically available in your script's scope.
 
 These variables provide absolute paths related to the current package environment.
 
-| Variable           | Type     | Description                                                     |
-| :----------------- | :------- | :-------------------------------------------------------------- |
+| Variable           | Type     | Description                                                      |
+| :----------------- | :------- | :--------------------------------------------------------------- |
 | `ZOI.PKG.store`    | `string` | Absolute path of the package store in Zoi's user data directory. |
-| `ZOI.PKG.template` | `string` | Absolute path to the current directory (project template root). |
-| `ZOI.PKG.root`     | `string` | Absolute path to the system root (`/` or `C:\`).                |
-| `ZOI.PKG.home`     | `string` | Absolute path to the user's home directory.                     |
-| `ZOI.PKG.lua`      | `string` | Absolute path to the current `pkg.lua` script.                  |
+| `ZOI.PKG.template` | `string` | Absolute path to the current directory (project template root).  |
+| `ZOI.PKG.root`     | `string` | Absolute path to the system root (`/` or `C:\`).                 |
+| `ZOI.PKG.home`     | `string` | Absolute path to the user's home directory.                      |
+| `ZOI.PKG.lua`      | `string` | Absolute path to the current `pkg.lua` script.                   |
 
 ### The `LOCATION` Table
 
 The `LOCATION` table provides absolute paths that correspond **exactly** to the `${...}` placeholder variables used in build functions like `zcp`, `zln`, `zmkdir`, etc. These are the **staging directory paths** where files are placed during build, not the final install paths. This makes them directly usable in `cmd()` calls to achieve the same behavior as the placeholders.
 
-| Variable | Type | Description |
-| :----------------- | :------- | :------------------------------------------------------------------------------------------------------- |
-| `LOCATION.PKGSTORE` | `string` | Staging path for package store (`STAGING_DIR/data/pkgstore/`). Corresponds to `${pkgstore}`. |
-| `LOCATION.HOME` | `string` | Staging path for user home (`STAGING_DIR/data/usrhome/`). Corresponds to `${usrhome}`. |
-| `LOCATION.ROOT` | `string` | Staging path for system root (`STAGING_DIR/data/usrroot/`). Corresponds to `${usrroot}`. |
-| `LOCATION.TEMPLATE` | `string` | Staging path for createpkgdir (`STAGING_DIR/data/createpkgdir/`). Corresponds to `${createpkgdir}`. |
-| `LOCATION.PKGLUADIR` | `string` | Directory containing the current `pkg.lua` script. Corresponds to `${pkgluadir}`. |
-| `LOCATION.BUILDDIR` | `string` | Temporary build directory (`BUILD_DIR`). |
-| `LOCATION.STAGINGDIR` | `string` | Staging directory (`STAGING_DIR`). |
+| Variable              | Type     | Description                                                                                         |
+| :-------------------- | :------- | :-------------------------------------------------------------------------------------------------- |
+| `LOCATION.PKGSTORE`   | `string` | Staging path for package store (`STAGING_DIR/data/pkgstore/`). Corresponds to `${pkgstore}`.        |
+| `LOCATION.HOME`       | `string` | Staging path for user home (`STAGING_DIR/data/usrhome/`). Corresponds to `${usrhome}`.              |
+| `LOCATION.ROOT`       | `string` | Staging path for system root (`STAGING_DIR/data/usrroot/`). Corresponds to `${usrroot}`.            |
+| `LOCATION.TEMPLATE`   | `string` | Staging path for createpkgdir (`STAGING_DIR/data/createpkgdir/`). Corresponds to `${createpkgdir}`. |
+| `LOCATION.PKGLUADIR`  | `string` | Directory containing the current `pkg.lua` script. Corresponds to `${pkgluadir}`.                   |
+| `LOCATION.BUILDDIR`   | `string` | Temporary build directory (`BUILD_DIR`).                                                            |
+| `LOCATION.STAGINGDIR` | `string` | Staging directory (`STAGING_DIR`).                                                                  |
 
 <Callout>
-  During build, `${pkgstore}` in `zcp`/`zln` expands to `STAGING_DIR/data/pkgstore/`. `LOCATION.PKGSTORE` gives you that same path for use in `cmd()`.
+  During build, `${pkgstore}` in `zcp`/`zln` expands to
+  `STAGING_DIR/data/pkgstore/`. `LOCATION.PKGSTORE` gives you that same path for
+  use in `cmd()`.
 </Callout>
 
 ---
@@ -132,19 +134,19 @@ end
 <Callout>
   The `${...}` placeholders (like `${pkgstore}`, `${pkgluadir}`) only work in build functions like `zcp`, `zln`, `zmkdir`, `zchmod`, `zchown`, `zrm`, `zlicense`, `zdoc`, and `zshell`. They do **not** work in `cmd()` or raw Lua strings.
 
-  To use these paths in `cmd()` or custom Lua logic, use the `LOCATION` table, they map to the **same staging paths** as the placeholders:
+To use these paths in `cmd()` or custom Lua logic, use the `LOCATION` table, they map to the **same staging paths** as the placeholders:
 
-  ```lua
-  function build()
-      -- Install to STAGING_DIR/data/pkgstore (same as ${pkgstore} in zcp)
-      cmd("make DESTDIR=" .. LOCATION.PKGSTORE .. " install")
+```lua
+function build()
+    -- Install to STAGING_DIR/data/pkgstore (same as ${pkgstore} in zcp)
+    cmd("make DESTDIR=" .. LOCATION.PKGSTORE .. " install")
 
-      -- Or install to full staging root
-      cmd("make DESTDIR=" .. LOCATION.STAGINGDIR .. " install")
-  end
-  ```
+    -- Or install to full staging root
+    cmd("make DESTDIR=" .. LOCATION.STAGINGDIR .. " install")
+end
+```
 
-  After `package()` runs, the contents of `STAGING_DIR` become the package archive.
+After `package()` runs, the contents of `STAGING_DIR` become the package archive.
 
 </Callout>
 

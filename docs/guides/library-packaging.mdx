@@ -9,12 +9,12 @@ This guide covers the lifecycle of a library in Zoi: packaging it for distributi
 
 A typical library package uses three sub-packages to minimize the installation footprint for users who only need the runtime:
 
-| Sub-package   | Contents                                                  |
-| ------------- | --------------------------------------------------------- |
-| `mylib:main`  | **Main Tool:** Any accompanying CLI tools or utilities. |
-| `mylib:lib`   | **Runtime:** Shared objects (`.so`, `.dylib`, `.dll`) and versioned runtime files. |
-| `mylib:dev`   | **Development:** Headers (`.h`), `pkg-config` files, static libraries, and the unversioned `.so` symlink. |
-| `mylib:docs`  | **Documentation:** API manuals, examples, and HTML documentation. |
+| Sub-package  | Contents                                                                                                  |
+| ------------ | --------------------------------------------------------------------------------------------------------- |
+| `mylib:main` | **Main Tool:** Any accompanying CLI tools or utilities.                                                   |
+| `mylib:lib`  | **Runtime:** Shared objects (`.so`, `.dylib`, `.dll`) and versioned runtime files.                        |
+| `mylib:dev`  | **Development:** Headers (`.h`), `pkg-config` files, static libraries, and the unversioned `.so` symlink. |
+| `mylib:docs` | **Documentation:** API manuals, examples, and HTML documentation.                                         |
 
 Installing `mylib` (the base name) should install `lib` by default. The `dev` sub-package is pulled in only when another package needs to compile against the library.
 
@@ -281,10 +281,10 @@ dependencies({
 
 | Concern                     | Approach                                                 |
 | --------------------------- | -------------------------------------------------------- |
-| Runtime library             | `:lib` sub-package, `main_subs = { "lib" }`               |
-| Headers and link-time files | `:dev` sub-package, consumed via `"zoi:pkg:dev"`      |
-| Documentation               | `:docs` sub-package (optional)                             |
-| Static libraries            | `.a` in `:dev` sub-package                              |
+| Runtime library             | `:lib` sub-package, `main_subs = { "lib" }`              |
+| Headers and link-time files | `:dev` sub-package, consumed via `"zoi:pkg:dev"`         |
+| Documentation               | `:docs` sub-package (optional)                           |
+| Static libraries            | `.a` in `:dev` sub-package                               |
 | Cross-package dependency    | `"zoi:pkg"` in `dependencies{}`                          |
 | Version pinning             | `"zoi:pkg@^1.0"` syntax                                  |
 | Library discovery           | `CFLAGS`, `LDFLAGS`, `PKG_CONFIG_PATH` set automatically |

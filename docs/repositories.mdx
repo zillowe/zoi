@@ -19,16 +19,16 @@ A registry can publish its content either as a Git repository or as a single zst
 
 Official and supported registries are shipped as built-in definitions embedded in the Zoi binary (see [Specifications](/docs/zds/zoi/specs#1-built-in-registry-definition)). You can reference them by their handle instead of a full URL, and Zoi derives the git URL and metadata automatically.
 
-| Command                          | Description                                                                                  |
-| -------------------------------- | -------------------------------------------------------------------------------------------- |
-| `zoi sync set <handle-or-url>`   | Sets the registry used as the default. You can pass a built-in handle, the `default` keyword, or a custom URL. |
-| `zoi sync list`                  | Displays the configured registries (set and added) plus available built-in registries that are not yet added. |
-| `zoi sync add <handle-or-url>`   | Adds a registry to be synced, resolving built-in handles automatically. A URL to a `repo.yaml` document is resolved immediately.                      |
-| `zoi sync remove <handle>`       | Removes a configured registry by its handle.                                                 |
-| `zoi sync --force`               | Rebuilds all registry databases from scratch by removing existing caches and re-cloning.     |
-| `zoi sync --local`               | Sync registries to the project's `.zoi/pkgs/db/` using revisions from `zoi.lua`.             |
-| `zoi sync --local --frozen` | Sync registries using revisions pinned in `zoi.lock`.                                        |
-| `zoi sync --scope <user\|system>` | Explicitly target a specific metadata database location.                                     |
+| Command                           | Description                                                                                                                      |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `zoi sync set <handle-or-url>`    | Sets the registry used as the default. You can pass a built-in handle, the `default` keyword, or a custom URL.                   |
+| `zoi sync list`                   | Displays the configured registries (set and added) plus available built-in registries that are not yet added.                    |
+| `zoi sync add <handle-or-url>`    | Adds a registry to be synced, resolving built-in handles automatically. A URL to a `repo.yaml` document is resolved immediately. |
+| `zoi sync remove <handle>`        | Removes a configured registry by its handle.                                                                                     |
+| `zoi sync --force`                | Rebuilds all registry databases from scratch by removing existing caches and re-cloning.                                         |
+| `zoi sync --local`                | Sync registries to the project's `.zoi/pkgs/db/` using revisions from `zoi.lua`.                                                 |
+| `zoi sync --local --frozen`       | Sync registries using revisions pinned in `zoi.lock`.                                                                            |
+| `zoi sync --scope <user\|system>` | Explicitly target a specific metadata database location.                                                                         |
 
 ### Examples
 
@@ -97,7 +97,7 @@ The `zoi repo` command manages which repositories from the package database are 
 | `zoi repo add`                | Add an official repo by name or a git repo by URL (interactive if no args).                       |
 | `zoi repo rm <name>`          | Remove a repository from the active list.                                                         |
 | `zoi repo list` (alias: `ls`) | Show active repositories from config. Use `zoi repo list all` to show all available repositories. |
-| `zoi repo git ls`             | List cloned git repositories under the user data directory's `zoi/pkgs/git`.                     |
+| `zoi repo git ls`             | List cloned git repositories under the user data directory's `zoi/pkgs/git`.                      |
 | `zoi repo git rm <repo>`      | Remove a cloned git repository directory.                                                         |
 
 ### Examples
@@ -238,19 +238,19 @@ A Zoi package registry is defined by a `repo.yaml` file at its root. This file c
 
 Here are the fields available in `repo.yaml`:
 
-| Field             | Type                | Description                                                                                                                                                          |
-| ----------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`            | `string`            | The display name of the repository.                                                                                                                                  |
-| `handle`          | `string`            | Short identifier used as the registry handle (e.g. `zoidberg`). This is what users see in `@handle/repo/package` install syntax.                                    |
-| `description`     | `string`            | A short description of the repository.                                                                                                                               |
-| `advisory_prefix` | `string`            | (Optional) Prefix used for advisory identifiers imported from this registry.                                                                                         |
-| `git`             | `list` of `GitLink` | A list of git repository URLs. The `type` can be `main` for the primary repository or `mirror` for fallbacks.                                                        |
-| `pkg`             | `list` of `PkgLink` | (Optional) A list of URLs for pre-built package registries. Zoi will try to download pre-built packages from here before building from source.                       |
-| `delta`           | `list` of `DeltaLink` | (Optional) A list of URLs for delta patch registries. Zoi will use these for bandwidth-efficient upgrades when a previous version is cached.                         |
+| Field             | Type                  | Description                                                                                                                                                                                                                                    |
+| ----------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`            | `string`              | The display name of the repository.                                                                                                                                                                                                            |
+| `handle`          | `string`              | Short identifier used as the registry handle (e.g. `zoidberg`). This is what users see in `@handle/repo/package` install syntax.                                                                                                               |
+| `description`     | `string`              | A short description of the repository.                                                                                                                                                                                                         |
+| `advisory_prefix` | `string`              | (Optional) Prefix used for advisory identifiers imported from this registry.                                                                                                                                                                   |
+| `git`             | `list` of `GitLink`   | A list of git repository URLs. The `type` can be `main` for the primary repository or `mirror` for fallbacks.                                                                                                                                  |
+| `pkg`             | `list` of `PkgLink`   | (Optional) A list of URLs for pre-built package registries. Zoi will try to download pre-built packages from here before building from source.                                                                                                 |
+| `delta`           | `list` of `DeltaLink` | (Optional) A list of URLs for delta patch registries. Zoi will use these for bandwidth-efficient upgrades when a previous version is cached.                                                                                                   |
 | `zrepo`           | `list` of `ZrepoLink` | (Optional) A list of zstd-compressed registry snapshots (`.zrepo`). When present, Zoi syncs the registry from a snapshot instead of cloning the `git` repository. The `type` can be `main` for the primary snapshot or `mirror` for fallbacks. |
-| `db`              | `string`            | (Optional) URL for registry database metadata.                                                                                                                       |
-| `pgp`             | `list` of `PgpKey`  | (Optional) A list of PGP keys to import for package signature verification. The `key` can be a URL to the key file or a PGP fingerprint.                             |
-| `repos`           | `list` of `Repo`    | A list of the sub-repositories (or tiers) contained within the registry. `type` can be `official`, `community`, etc. `active` determines if it's enabled by default. |
+| `db`              | `string`              | (Optional) URL for registry database metadata.                                                                                                                                                                                                 |
+| `pgp`             | `list` of `PgpKey`    | (Optional) A list of PGP keys to import for package signature verification. The `key` can be a URL to the key file or a PGP fingerprint.                                                                                                       |
+| `repos`           | `list` of `Repo`      | A list of the sub-repositories (or tiers) contained within the registry. `type` can be `official`, `community`, etc. `active` determines if it's enabled by default.                                                                           |
 
 ## Snapshot Registries (`.zrepo`)
 
@@ -282,14 +282,14 @@ zrepo:
 
 Each `ZrepoLink` supports these fields:
 
-| Field   | Type     | Description                                                                                                     |
-| ------- | -------- | --------------------------------------------------------------------------------------------------------------- |
-| `type`  | `string` | `main` for the primary snapshot, `mirror` for a fallback.                                                         |
-| `url`   | `string` | The URL of the `.zrepo` file.                                                                                    |
-| `delta` | `string` | (Optional) URL of the incremental update patch. Defaults to `<url>.zdelta`.                                       |
-| `pgp`   | `string` | (Optional) URL of the detached PGP signature of the snapshot.                                                     |
-| `hash`  | `string` | (Optional) URL of the snapshot's checksum.                                                                       |
-| `size`  | `string` | (Optional) URL of the snapshot's size information.                                                               |
+| Field   | Type     | Description                                                                 |
+| ------- | -------- | --------------------------------------------------------------------------- |
+| `type`  | `string` | `main` for the primary snapshot, `mirror` for a fallback.                   |
+| `url`   | `string` | The URL of the `.zrepo` file.                                               |
+| `delta` | `string` | (Optional) URL of the incremental update patch. Defaults to `<url>.zdelta`. |
+| `pgp`   | `string` | (Optional) URL of the detached PGP signature of the snapshot.               |
+| `hash`  | `string` | (Optional) URL of the snapshot's checksum.                                  |
+| `size`  | `string` | (Optional) URL of the snapshot's size information.                          |
 
 If `delta` is omitted, Zoi looks for the update patch at `<url>.zdelta`.
 
@@ -299,7 +299,7 @@ A `zrepo` registry needs no `git` section at all - the whole point of the snapsh
 
 Snapshots are immutable, so a sync that finds an unchanged registry has nothing to do. When a new snapshot is published, the registry also publishes a `.zdelta` patch alongside it, and Zoi applies that instead of downloading the whole file again.
 
-The patch is a bsdiff diff computed over the *uncompressed tar* of the previous snapshot. Unchanged tar entries are byte-identical, so they diff to almost nothing, whereas diffing the compressed bytes would not compress well. The rebuilt tar is byte-for-byte the tar the registry author published, so a patched registry is indistinguishable from a freshly downloaded one.
+The patch is a bsdiff diff computed over the _uncompressed tar_ of the previous snapshot. Unchanged tar entries are byte-identical, so they diff to almost nothing, whereas diffing the compressed bytes would not compress well. The rebuilt tar is byte-for-byte the tar the registry author published, so a patched registry is indistinguishable from a freshly downloaded one.
 
 A patch is published in either of two shapes:
 

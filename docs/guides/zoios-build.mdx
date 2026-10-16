@@ -83,8 +83,8 @@ This part is deliberately manual. Partitioning a disk is destructive, and which
 layout you want depends on whether you need a separate `/boot`, LVM, LUKS, or a
 plain single partition. `zoi system distro build` refuses to guess.
 
-*Disclaimer: Replace `/dev/sdX` with your actual target device. Be extremely
-careful not to format your host machine's drive!*
+_Disclaimer: Replace `/dev/sdX` with your actual target device. Be extremely
+careful not to format your host machine's drive!_
 
 A minimal UEFI layout, using `cfdisk` or any tool you prefer:
 
@@ -151,10 +151,10 @@ In this single step, Zoi:
 6. **Builds the First Generation**: Creates a record of the installation and links it to the package transaction.
 
 <Callout title="What is not done yet">
-  The bootloader and initramfs are still installed by hand in Step 4, because the
-  target has no bootloader on it yet. Once the machine is running,
-  `zoi system apply` and any `zoi install`/`zoi update` that touches a kernel
-  handle the whole pipeline automatically.
+  The bootloader and initramfs are still installed by hand in Step 4, because
+  the target has no bootloader on it yet. Once the machine is running, `zoi
+  system apply` and any `zoi install`/`zoi update` that touches a kernel handle
+  the whole pipeline automatically.
 </Callout>
 
 ---
@@ -202,11 +202,17 @@ sudo zoi install @parlex/neovim @parlex/git --root /mnt
 ```
 
 <Callout title="Isolated State">
-  When using `--root`, Zoi is fully isolated. System package data is stored within the target's `/var/lib/zoi`; user state follows the target user's XDG or platform-native directories. By default, metadata is synced to the system-wide store (`/var/lib/zoi/pkgs/db`), ensuring the new OS is ready for use even without a pre-configured user home.
+  When using `--root`, Zoi is fully isolated. System package data is stored
+  within the target's `/var/lib/zoi`; user state follows the target user's XDG
+  or platform-native directories. By default, metadata is synced to the
+  system-wide store (`/var/lib/zoi/pkgs/db`), ensuring the new OS is ready for
+  use even without a pre-configured user home.
 </Callout>
 
 <Callout title="Pro Tip">
-  Using `zoi system distro chroot /mnt` is preferred over manual `chroot` because it leverages Zoi's sandbox engine to safely bridge your host's system devices into the target environment automatically.
+  Using `zoi system distro chroot /mnt` is preferred over manual `chroot`
+  because it leverages Zoi's sandbox engine to safely bridge your host's system
+  devices into the target environment automatically.
 </Callout>
 
 ## Step 5: Reboot
