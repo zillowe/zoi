@@ -23,6 +23,10 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 - [`5473cf97`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/5473cf975eac82071ca6895dc7d678ba95e238f4) *(sync)* Add .zrepo snapshot and .zdelta incremental update transport
 - [`4571aadc`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/4571aadc9822f4b66116c5de2f6fc00ae0a63858) *(project)* Add support for repository imports and package exports
 
+### 🔒 Security
+
+- [`222e460b`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/222e460bb0d9104cf77b09124260bccbabcc777d) *(core)* Implement strict path safety and input validation checks
+
 ### 🛡️ Dependencies
 
 - [`b858b647`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/b858b647a6e93426a4fe32090bff45cfc6761e07) Update zbsdiff to v1.6.6
