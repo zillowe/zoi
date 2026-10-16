@@ -170,10 +170,11 @@ fi
 cd ..
 
 echo "--- Fedora COPR ---"
-git clone "https://oauth2:${GITLAB_TOKEK_COPR}@gitlab.com/zillowe/packaging/copr.git" copr
+git clone "https://oauth2:${GITLAB_TOKEN_COPR}@gitlab.com/zillowe/packaging/copr.git" copr
 mkdir -p copr/zoi
 cp "$TMP_PACKAGES/rpm/zoi.spec" copr/zoi/
 cd copr/
+git config user.email "zillowez@gmail.com"
 if [[ -n $(git status --porcelain) ]]; then
   git add .
   git commit -m "Release(Zoi): $VERSION"
