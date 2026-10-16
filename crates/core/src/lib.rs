@@ -14,6 +14,8 @@ pub mod builtin;
 pub mod cache;
 /// Configuration management and policy enforcement.
 pub mod config;
+/// The `.zdelta` descriptor schema Zoi publishes and consumes.
+pub mod delta;
 /// Dependency resolution and management.
 pub mod dependency;
 /// Management of frozen/locked package states.

@@ -9,6 +9,7 @@ use anyhow::Result;
 use serde_json::json;
 use tempfile::tempdir;
 use zbsdiff::zdelta;
+use zoi_core::delta::{ZOIDELTA_FORMAT_ID, ZREPO_DELTA_TYPE};
 use zoi_core::types::RepoConfig;
 use zoi_sync::zrepo;
 
@@ -94,8 +95,8 @@ fn write_zrepo_delta(
         zdelta::diff_bytes(old_tar, new_tar).expect("diff should succeed");
 
     let mut meta = json!({
-        "format": zdelta::ZDELTA_FORMAT_ID,
-        "type": "zrepo",
+        "format": ZOIDELTA_FORMAT_ID,
+        "type": ZREPO_DELTA_TYPE,
         "base_sha256": sha256_hex(old_tar),
         "target_sha256": sha256_hex(new_tar),
     });

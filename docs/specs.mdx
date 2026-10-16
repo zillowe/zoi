@@ -161,7 +161,7 @@ A patch is published in one of two shapes:
 
   ```json
   {
-    "format": "zdelta.v1",
+    "format": "zoidelta.v1",
     "type": "zrepo",
     "base_sha256": "<sha256 of the previous snapshot's tar>",
     "target_sha256": "<sha256 of the new snapshot's tar>",
@@ -170,6 +170,8 @@ A patch is published in one of two shapes:
   ```
 
   Zoi verifies `base_sha256` against the cached snapshot and `target_sha256` against the rebuilt one, so a patch built against a different base or a corrupted download is rejected rather than installed.
+
+  `zoidelta.v1` identifies Zoi's descriptor schema, not the container. The container is the one `zbsdiff` defines, and `zbsdiff` carries `meta.json` without interpreting it, leaving the schema to whoever writes it. Other projects reuse the same container under their own identifiers - `zync` writes `zsidecar.v1` for the block-oriented sidecars that accompany its transfers - so a Zoi delta is told apart by the `format` field. A descriptor declaring any other `format` is rejected.
 
 - **Bare patch**: a zstd-compressed raw `BSDIFF40` patch with no metadata. Accepted, but carries no hash binding, so the published `hash` checksum is the only integrity check available.
 

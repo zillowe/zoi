@@ -23,13 +23,11 @@ use anyhow::{Result, anyhow};
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use tempfile::Builder;
-use zbsdiff::zdelta::{self as delta, ZDELTA_FORMAT_ID, ZDelta};
+use zbsdiff::zdelta::{self as delta, ZDelta};
+use zoi_core::delta::{ZOIDELTA_FORMAT_ID, ZREPO_DELTA_TYPE};
 use zoi_core::types::ZrepoLink;
 use zoi_core::{pgp, types, utils as core_utils};
 use zoi_install::util as install_util;
-
-/// The `meta.json` discriminator written into registry update patches.
-const ZREPO_DELTA_TYPE: &str = "zrepo";
 
 /// The `registry_meta` key holding the hash of the `.zrepo` snapshot the
 /// local index was last built from.
@@ -314,7 +312,7 @@ pub fn create_zrepo_delta(
         .map_err(|e| anyhow!("Failed to diff the registry snapshots: {e}"))?;
 
     let meta = serde_json::json!({
-        "format": ZDELTA_FORMAT_ID,
+        "format": ZOIDELTA_FORMAT_ID,
         "type": ZREPO_DELTA_TYPE,
         "base_sha256": sha256_bytes(&old_tar),
         "target_sha256": sha256_bytes(&new_tar),
@@ -619,7 +617,7 @@ pub fn apply_delta(
         ZDelta::Single(patch) => (patch, None, None),
         ZDelta::Container(meta, files) => {
             if meta.get("format").and_then(|v| v.as_str())
-                != Some(ZDELTA_FORMAT_ID)
+                != Some(ZOIDELTA_FORMAT_ID)
             {
                 return Err(anyhow!(
                     "Registry update patch has an unsupported format: {}",

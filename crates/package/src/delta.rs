@@ -22,7 +22,8 @@ use anyhow::{Result, anyhow};
 use colored::Colorize;
 use serde_json::json;
 use tar::Archive;
-use zbsdiff::zdelta::{self as delta, ZDELTA_FORMAT_ID, ZDelta};
+use zbsdiff::zdelta::{self as delta, ZDelta};
+use zoi_core::delta::{ZOIDELTA_FORMAT_ID, ZPA_DELTA_TYPE};
 use zoi_core::types::PooledZpaManifest;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
@@ -216,8 +217,8 @@ pub fn create_zpa_delta(
     }
 
     let meta = json!({
-        "format": ZDELTA_FORMAT_ID,
-        "type": "zpa",
+        "format": ZOIDELTA_FORMAT_ID,
+        "type": ZPA_DELTA_TYPE,
         "ops": ops,
         "root_hashes": root_hashes
     });
@@ -286,12 +287,12 @@ pub fn apply_zpa_delta(
         }
     };
 
-    if meta.get("format")
-        != Some(&serde_json::Value::String(ZDELTA_FORMAT_ID.to_string()))
-    {
+    if meta.get("format").and_then(|v| v.as_str()) != Some(ZOIDELTA_FORMAT_ID) {
         return Err(anyhow!(
             "Unsupported delta format: {}",
-            meta.get("format").unwrap_or(&serde_json::Value::Null)
+            meta.get("format")
+                .and_then(|v| v.as_str())
+                .unwrap_or("none")
         ));
     }
 
