@@ -19,7 +19,7 @@ use crate::{cmd, utils};
 /// display only and are mapped in `utils::format_version_summary`.
 ///
 /// Updated by `scripts/bump.sh`, not by hand.
-const BRANCH: &str = "Dev";
+const BRANCH: &str = "Prod";
 
 /// The ZFVM status of the current build (Pre-Alpha, Alpha, Beta, RC, Release).
 ///
