@@ -1600,6 +1600,69 @@ pub fn get_current_shell() -> Option<Shell> {
     }
 }
 
+/// The shell program names Zoi is willing to execute on the user's behalf.
+///
+/// `SHELL` is an environment variable, so it is attacker-influenced whenever
+/// Zoi runs inside an environment it does not control: a CI job with a polluted
+/// environment, a package post-install hook, or a container entrypoint. Passing
+/// that value straight to `Command::new` turns the variable into an arbitrary
+/// program-execution primitive, which is exactly what the command-injection
+/// scanners flag. Restricting the executable to a known set of shells means the
+/// worst an attacker achieves is picking *which* shell runs, not *what* runs.
+const TRUSTED_SHELLS: &[&str] = &[
+    "bash",
+    "sh",
+    "dash",
+    "zsh",
+    "fish",
+    "elvish",
+    "ksh",
+    "mksh",
+    "ash",
+    "pwsh",
+    "powershell",
+    "nu"
+];
+
+/// Resolves the shell binary to launch for interactive sessions.
+///
+/// The value of `SHELL` is used when it names one of [`TRUSTED_SHELLS`],
+/// otherwise the platform default is returned. Only the *file name* is
+/// inspected: an absolute path such as `/bin/zsh` is fine, but
+/// `/tmp/evil/payload` is not a shell and must never be executed.
+///
+/// # Errors
+///
+/// This function currently cannot fail; the `Result` is kept so callers can
+/// treat shell resolution as fallible if the trusted set ever needs to load
+/// from configuration.
+pub fn resolve_shell_binary() -> Result<String> {
+    Ok(trusted_shell_name(std::env::var("SHELL").ok().as_deref()))
+}
+
+/// The pure half of [`resolve_shell_binary`], split out so it can be tested
+/// without mutating the process-wide `SHELL` variable (which would race with
+/// every other test in the binary).
+fn trusted_shell_name(shell_path: Option<&str>) -> String {
+    let default = if cfg!(windows) { "pwsh" } else { "bash" };
+
+    let Some(shell_path) = shell_path else {
+        return default.to_string();
+    };
+
+    // `file_name` rather than the raw value, so `/bin/bash` matches while
+    // `bash; rm -rf /` does not.
+    let file_name = Path::new(shell_path).file_name().and_then(|n| n.to_str());
+
+    match file_name {
+        Some(name) if TRUSTED_SHELLS.contains(&name) => name.to_string(),
+        // `SHELL` is unset, empty, or names something we do not trust. Falling
+        // back to the default is the safe outcome: the user still gets a
+        // shell, just not the one they may have been tricked into asking for.
+        _ => default.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1609,6 +1672,30 @@ mod tests {
         assert!(is_external_license_link("https://example.com/LICENSE"));
         assert!(is_external_license_link("http://example.com/license"));
         assert!(is_external_license_link("  https://example.com/MIT.txt  "));
+    }
+
+    #[test]
+    fn accepts_trusted_shell_paths() {
+        // An absolute path is fine as long as the final component is a shell.
+        assert_eq!(trusted_shell_name(Some("/bin/bash")), "bash");
+        assert_eq!(trusted_shell_name(Some("/usr/bin/zsh")), "zsh");
+        assert_eq!(trusted_shell_name(Some("/usr/local/bin/fish")), "fish");
+        assert_eq!(trusted_shell_name(Some("bash")), "bash");
+    }
+
+    #[test]
+    fn rejects_untrusted_shell_values() {
+        let default = if cfg!(windows) { "pwsh" } else { "bash" };
+
+        // An arbitrary program must never be handed to Command::new.
+        assert_eq!(trusted_shell_name(Some("/tmp/evil/payload")), default);
+        // Shell metacharacters must not survive as a program name.
+        assert_eq!(trusted_shell_name(Some("bash; rm -rf /")), default);
+        assert_eq!(trusted_shell_name(Some("$(id)")), default);
+        assert_eq!(trusted_shell_name(Some("")), default);
+        assert_eq!(trusted_shell_name(Some("/bin/../evil")), default);
+        // Unset falls back to the platform default.
+        assert_eq!(trusted_shell_name(None), default);
     }
 
     #[test]

@@ -688,7 +688,22 @@ fn symlink_to(root: &Path, target: &str, link: &Path) -> Result<()> {
         Err(_) => {}
     }
 
-    std::os::unix::fs::symlink(&effective, link).with_context(|| {
+    // Windows has no `symlink`: `symlink_dir` and `symlink_file` are separate
+    // entry points and Windows rejects the call when the link type disagrees
+    // with the target. Both kinds of link are produced here,
+    // `/etc/alternatives` and the canonical path point at the intermediate
+    // while the group link points at the implementation, so the target
+    // decides which one to use.
+    #[cfg(unix)]
+    let created = std::os::unix::fs::symlink(&effective, link);
+    #[cfg(windows)]
+    let created = if Path::new(&effective).is_dir() {
+        std::os::windows::fs::symlink_dir(&effective, link)
+    } else {
+        std::os::windows::fs::symlink_file(&effective, link)
+    };
+
+    created.with_context(|| {
         format!("Failed to create symlink {} -> {effective}", link.display())
     })?;
 

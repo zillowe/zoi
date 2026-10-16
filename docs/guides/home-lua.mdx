@@ -45,6 +45,10 @@ Manages symbolic links for configuration files. Zoi will automatically create th
 | :--- | :--- |
 | Target Path (rel to `~`) | Source Path (absolute or `~/`) |
 
+The target must resolve to a path inside your home directory. An absolute
+target, or one containing `..`, is rejected so that `home.lua` cannot place a
+symlink outside `$HOME`.
+
 ```lua
 dotfiles({
     [".zshrc"] = "~/code/dotfiles/zshrc",

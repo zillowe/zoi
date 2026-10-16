@@ -330,6 +330,9 @@ pub fn add_advisory(
     let prefix = repo_config
         .advisory_prefix
         .unwrap_or_else(|| "ZSA".to_string());
+    // Validated for the same reason as in `generate_metadata`: this prefix is
+    // interpolated into the advisory file name below.
+    let prefix = validate_advisory_prefix(&prefix)?;
 
     let current_year = chrono::Utc::now().year();
     let adv_file_path =
@@ -390,6 +393,33 @@ references:
     Ok(())
 }
 
+/// Validates the `advisory_prefix` from a registry's `repo.yaml`.
+///
+/// The prefix is interpolated straight into the file name every advisory is
+/// written to (`{prefix}-{year}-{sev}{n}.sec.yaml`). A registry setting a
+/// prefix that contains a separator, a dot segment, or a NUL byte would
+/// therefore make `zoi reg addadvisory` and `zoi reg build` read and write
+/// outside the registry root. An allowlist is used rather than a denylist so
+/// percent-encoding and Unicode look-alikes cannot smuggle a separator past it.
+///
+/// # Errors
+///
+/// Returns an error if the prefix is empty or contains anything outside
+/// ASCII letters, digits, hyphen, or underscore.
+fn validate_advisory_prefix(prefix: &str) -> Result<String> {
+    if prefix.is_empty()
+        || !prefix
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+    {
+        return Err(anyhow!(
+            "advisory_prefix '{prefix}' in repo.yaml must be non-empty and \
+             contain only ASCII letters, digits, '-' or '_'"
+        ));
+    }
+    Ok(prefix.to_string())
+}
+
 /// Scans the entire registry to generate optimized JSON index files.
 ///
 /// This function is the "Build Pipeline" for Zoi registries. It:
@@ -405,6 +435,7 @@ references:
 /// - The path is not a Zoi registry.
 /// - The registry index files cannot be written.
 /// - Any package or advisory definition is malformed.
+/// - `repo.yaml` declares an `advisory_prefix` that is not a plain name.
 pub fn generate_metadata(registry_root: &Path) -> Result<()> {
     if !registry_root.join("repo.yaml").exists() {
         return Err(anyhow!(
@@ -421,6 +452,8 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
         .advisory_prefix
         .clone()
         .unwrap_or_else(|| "ZSA".to_string());
+
+    let advisory_prefix = validate_advisory_prefix(&advisory_prefix)?;
 
     let advisories_json_path = registry_root.join("advisories.json");
     let mut adv_registry: types::AdvisoryRegistry =

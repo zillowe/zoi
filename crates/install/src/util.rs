@@ -77,13 +77,91 @@ pub fn display_updates(pkg: &types::Package, yes: bool) -> Result<bool> {
 }
 
 /// Extracts the filename from a URL.
-pub fn get_filename_from_url(url: &str) -> &str {
-    url.split(['?', '#'])
+///
+/// The last path segment is taken verbatim, which means a URL such as
+/// `https://host/..%2F..%2Fetc%2Fpasswd` yields a "filename" full of separators
+/// and dot segments. Callers use the result to build cache and download paths,
+/// so the value has to be a single inert path component before it is joined
+/// onto a directory.
+///
+/// This uses an **allowlist** of characters rather than a denylist. A denylist
+/// of separators and `.`/`..` is not enough: `%2F` is not a literal separator,
+/// but it is one the HTTP layer will decode, and other transports may normalise
+/// `\` or Unicode look-alikes into a separator. Only characters that have no
+/// such ambiguity are accepted.
+///
+/// Returning `None` for anything else lets callers decide the fallback (the
+/// download path substitutes a default; the progress-bar label uses the host).
+pub fn get_filename_from_url(url: &str) -> Option<&str> {
+    let name = url
+        .split(['?', '#'])
         .next()
         .unwrap_or_default()
         .rsplit('/')
         .next()
+        .unwrap_or_default();
+
+    // Letters, digits, dot, dash and underscore cover every archive name Zoi
+    // actually deals in (`zoi-1.0.0.zpa`, `node_20.11.1_linux-x64.tar.gz`).
+    // Everything else is refused.
+    let is_allowlisted = !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'));
+
+    // A whole `.` or `..` is a directory reference, not a file name. With the
+    // allowlist in place `..` is otherwise spellable, so it needs its own
+    // check.
+    let is_dot_segment = name == "." || name == "..";
+
+    // Windows refuses these device names regardless of extension, and the
+    // cache root is shared across platforms in some setups.
+    let stem = name
+        .split('.')
+        .next()
         .unwrap_or_default()
+        .to_ascii_uppercase();
+    let is_reserved_device = matches!(
+        stem.as_str(),
+        "CON"
+            | "PRN"
+            | "AUX"
+            | "NUL"
+            | "COM1"
+            | "COM2"
+            | "COM3"
+            | "COM4"
+            | "COM5"
+            | "COM6"
+            | "COM7"
+            | "COM8"
+            | "COM9"
+            | "LPT1"
+            | "LPT2"
+            | "LPT3"
+            | "LPT4"
+            | "LPT5"
+            | "LPT6"
+            | "LPT7"
+            | "LPT8"
+            | "LPT9"
+    );
+
+    (is_allowlisted && !is_dot_segment && !is_reserved_device).then_some(name)
+}
+
+/// A human-readable name for a download URL, for progress output only.
+///
+/// Unlike the path-building callers this never fails: a URL whose last segment
+/// is not a usable file name falls back to the host, so the progress bar still
+/// says something useful.
+fn download_label(url: &str) -> &str {
+    get_filename_from_url(url).unwrap_or_else(|| {
+        url.split("//")
+            .nth(1)
+            .and_then(|rest| rest.split('/').next())
+            .unwrap_or(url)
+    })
 }
 
 /// Fetches the text content from a list of candidate URLs.
@@ -147,12 +225,12 @@ pub fn download_file_with_progress(
     let pb = if let Some(p) = pb_override {
         p.set_style(pb_style.clone());
         p.set_length(expected_size.unwrap_or(0));
-        p.set_message(format!("Downloading {}", get_filename_from_url(url)));
+        p.set_message(format!("Downloading {}", download_label(url)));
         p
     } else {
         let p = ProgressBar::new(expected_size.unwrap_or(0));
         p.set_style(pb_style);
-        p.set_message(format!("Downloading {}", get_filename_from_url(url)));
+        p.set_message(format!("Downloading {}", download_label(url)));
         internal_pb = Some(p);
         internal_pb.as_ref().ok_or_else(|| {
             anyhow!("internal_pb should be set if not using pb_override")
@@ -218,7 +296,7 @@ pub fn download_file_with_progress(
 
     pb.set_length(total_size);
     pb.set_position(partial_size);
-    pb.set_message(format!("Downloading {}", get_filename_from_url(url)));
+    pb.set_message(format!("Downloading {}", download_label(url)));
 
     let mut dest_file = if is_resumed {
         std::fs::OpenOptions::new().append(true).open(dest_path)?
@@ -243,7 +321,7 @@ pub fn download_file_with_progress(
 
     if let Some(p) = internal_pb {
         p.finish_and_clear();
-        println!("Downloaded {}", get_filename_from_url(url));
+        println!("Downloaded {}", download_label(url));
     }
     Ok(())
 }

@@ -835,7 +835,12 @@ fn finalize_installation(
                 let app_name = app_path.file_name().ok_or_else(|| {
                     anyhow!("App path has no filename: {:?}", app_path)
                 })?;
-                let symlink_path = applications_dir.join(app_name);
+                // `file_name` already yields a single component, but the bundle
+                // name comes from inside the package archive, so pin the link
+                // to the applications directory explicitly rather than relying
+                // on that invariant holding upstream.
+                let symlink_path =
+                    zoi_core::utils::safe_join(&applications_dir, app_name)?;
 
                 if symlink_path.exists() {
                     let _ = fs::remove_file(&symlink_path);

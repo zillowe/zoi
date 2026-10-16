@@ -323,3 +323,52 @@ fn test_registry_zrepo_requires_a_registry_directory() -> Result<()> {
     );
     Ok(())
 }
+
+/// A hostile `advisory_prefix` in `repo.yaml` must not be able to redirect
+/// `zoi reg build` writes outside the registry root.
+///
+/// The prefix is interpolated into the advisory file name
+/// (`{prefix}-{year}-{sev}{n}.sec.yaml`), so a prefix carrying a path
+/// separator or `..` would otherwise let a crafted registry write files to
+/// arbitrary locations relative to the registry directory.
+#[test]
+fn test_registry_build_rejects_traversal_advisory_prefix() -> Result<()> {
+    for hostile_prefix in ["../escape", "sub/dir", "..", "", "ZSA/../../x"] {
+        let temp_dir = TempDir::new()?;
+        let path = temp_dir.path().join("my-reg");
+        registry::init(&path)?;
+
+        // Rewrite repo.yaml with a prefix that tries to break out.
+        let repo_yaml = fs::read_to_string(path.join("repo.yaml"))?;
+        let repo_yaml = repo_yaml.replace(
+            "advisory_prefix: \"RSA\"",
+            &format!("advisory_prefix: \"{hostile_prefix}\"")
+        );
+        fs::write(path.join("repo.yaml"), repo_yaml)?;
+
+        let err = registry::generate_metadata(&path).expect_err(
+            "a traversal advisory_prefix must be rejected before any write"
+        );
+
+        assert!(
+            err.to_string().contains("advisory_prefix"),
+            "prefix '{hostile_prefix}' produced an unexpected error: {err}"
+        );
+    }
+
+    Ok(())
+}
+
+/// The benign default prefix must keep working, so the hardening above does
+/// not regress normal advisory generation.
+#[test]
+fn test_registry_build_accepts_default_advisory_prefix() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let path = temp_dir.path().join("my-reg");
+    registry::init(&path)?;
+
+    registry::generate_metadata(&path)?;
+
+    assert!(path.join("advisories.json").exists());
+    Ok(())
+}

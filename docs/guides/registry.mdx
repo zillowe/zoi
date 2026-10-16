@@ -198,7 +198,7 @@ git push
 
 This file defines how Zoi treats the registry. You can configure:
 
-- **`advisory_prefix`**: The prefix for your vulnerability IDs (e.g. `MYCORP-SEC`).
+- **`advisory_prefix`**: The prefix for your vulnerability IDs (e.g. `MYCORP-SEC`). It must be non-empty and contain only ASCII letters, digits, `-` or `_`, since it becomes part of the advisory file names written into the registry.
 - **`pkg` mirrors**: Locations for pre-built `.zpa` archives.
 - **`authorities`**: PGP fingerprints that must sign commits for the registry to be trusted.
 

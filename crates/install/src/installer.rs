@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Result, anyhow};
 use colored::Colorize;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use zoi_core::{cache, config, pgp, pkgdir, recorder, types};
+use zoi_core::{cache, config, pgp, pkgdir, recorder, types, utils};
 use zoi_db as db;
 use zoi_hooks as hooks;
 use zoi_resolver::local;
@@ -49,15 +49,20 @@ pub fn download_and_cache_archive(
     let archive_cache_root = cache::get_archive_cache_root()?;
     fs::create_dir_all(&archive_cache_root)?;
 
-    let archive_filename = util::get_filename_from_url(&details.info.final_url);
-    let archive_filename = if archive_filename.is_empty() {
-        "archive.zpa"
-    } else {
-        archive_filename
-    };
-    let cached_archive_path = archive_cache_root.join(archive_filename);
+    // `final_url` comes from registry metadata, so it is untrusted input. The
+    // helper only returns a value that is a single inert path component;
+    // anything else (empty, or carrying separators/dot segments) falls back to
+    // a fixed name rather than being joined onto the cache root.
+    let archive_filename = util::get_filename_from_url(&details.info.final_url)
+        .unwrap_or("archive.zpa");
+
+    // Defence in depth: assert the invariant the helper promises, so a future
+    // change to that helper cannot silently reintroduce a writable path.
+    let cached_archive_path =
+        utils::safe_join(&archive_cache_root, Path::new(archive_filename))?;
     let sig_filename = format!("{archive_filename}.sig");
-    let cached_sig_path = archive_cache_root.join(&sig_filename);
+    let cached_sig_path =
+        utils::safe_join(&archive_cache_root, Path::new(&sig_filename))?;
 
     let authorities = config
         .default_registry

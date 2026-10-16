@@ -177,7 +177,19 @@ pub fn apply_home_config(config: &HomeConfig) -> Result<()> {
         .ok_or_else(|| anyhow!("Could not find home directory"))?;
 
     for (target, source) in &config.dotfiles {
-        let target_path = home_dir.join(target);
+        // A dotfile target is documented as a path *inside* `$HOME` (for
+        // example `.zshrc` or `.config/nvim`). `join` alone would also accept
+        // an absolute path or `../` segments, letting a `home.lua` symlink
+        // land anywhere on the filesystem. `safe_join` pins it to `$HOME`.
+        let target_path =
+            zoi_core::utils::safe_join(&home_dir, Path::new(target)).map_err(
+                |e| {
+                    anyhow!(
+                        "Dotfile target '{target}' must stay inside the home \
+                         directory: {e}"
+                    )
+                }
+            )?;
 
         // Decrypt source path if it's a secret
         let decrypted_source = crate::secret::decrypt_secret(source)?;

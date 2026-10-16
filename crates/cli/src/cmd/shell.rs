@@ -554,13 +554,9 @@ pub fn enter_ephemeral_shell(
 
     let package_list = package_sources.join(",");
 
-    let shell_bin = std::env::var("SHELL").unwrap_or_else(|_| {
-        if cfg!(windows) {
-            "pwsh".to_string()
-        } else {
-            "bash".to_string()
-        }
-    });
+    // `SHELL` is environment-controlled, so it goes through the validated
+    // resolver instead of being executed directly.
+    let shell_bin = zoi_core::utils::resolve_shell_binary()?;
 
     let mut envs = HashMap::new();
     envs.insert("PATH".to_string(), new_path);

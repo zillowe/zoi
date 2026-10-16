@@ -319,13 +319,9 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
             std::process::exit(status.code().unwrap_or(1));
         }
     } else {
-        let shell_bin = std::env::var("SHELL").unwrap_or_else(|_| {
-            if cfg!(windows) {
-                "pwsh".to_string()
-            } else {
-                "bash".to_string()
-            }
-        });
+        // `SHELL` is environment-controlled, so it goes through the validated
+        // resolver instead of being executed directly.
+        let shell_bin = zoi_core::utils::resolve_shell_binary()?;
 
         println!(
             "{} Entering dev shell (type 'exit' to leave)...",

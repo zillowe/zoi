@@ -21,7 +21,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use anyhow::{Context, Result, anyhow, bail};
 use zoi_core::sysroot;
@@ -862,6 +862,19 @@ fn create_home(
              path"
         );
     }
+    // `trim_start_matches('/')` alone is not enough: a home of
+    // `/home/alice/../../../etc` would resolve back out of the sysroot and let
+    // `system.lua` create directories on the build host. Reject parent
+    // components outright instead of trying to normalise them.
+    if Path::new(home)
+        .components()
+        .any(|c| matches!(c, Component::ParentDir))
+    {
+        bail!(
+            "Home directory '{home}' for user '{name}' must not contain '..' \
+             components"
+        );
+    }
     let home_path = root.join(home.trim_start_matches('/'));
     if home_path.exists() {
         return Ok(());
@@ -1440,6 +1453,28 @@ mod tests {
                 .mode();
             assert_eq!(mode & 0o777, SHADOW_MODE);
         }
+    }
+
+    #[test]
+    fn home_path_cannot_escape_the_sysroot() {
+        let root = temp_root();
+
+        // A `system.lua` that declares `/home/alice/../../../etc` would, with
+        // a plain `trim_start_matches('/')` + `join`, resolve back out of the
+        // sysroot and create directories on the build host.
+        let mut hostile = cfg(None, None, None);
+        hostile.home = Some("/home/alice/../../../etc".to_string());
+
+        let users = HashMap::from([("alice".to_string(), hostile)]);
+        let err =
+            apply_accounts_in(root.path(), &HashMap::new(), &users, false)
+                .expect_err("a home containing '..' must be rejected");
+
+        assert!(err.to_string().contains(".."), "unexpected error: {err}");
+        assert!(
+            !root.path().join("etc/../../../etc").exists(),
+            "nothing may be created outside the sysroot root"
+        );
     }
 
     #[test]

@@ -108,8 +108,61 @@ fn get_filename_from_url_should_exclude_query_and_fragment() {
         zoi::pkg::install::util::get_filename_from_url(
             "https://example.test/releases/zoi-1.0.zpa?token=value#ignored"
         ),
-        "zoi-1.0.zpa"
+        Some("zoi-1.0.zpa")
     );
+}
+
+/// A registry-supplied `final_url` is untrusted input that becomes a cache
+/// path component. Anything that is not a single inert file name must be
+/// rejected so the download cannot be redirected outside the cache root.
+#[test]
+fn get_filename_from_url_rejects_traversal_and_non_components() {
+    for hostile in [
+        // Encoded separators that survive naive `rsplit('/')`.
+        "https://example.test/..%2F..%2Fetc%2Fpasswd",
+        "https://example.test/a%2F..%2F..%2Fevil.zpa",
+        // Dot segments.
+        "https://example.test/..",
+        "https://example.test/.",
+        // Empty and missing names.
+        "https://example.test/",
+        "",
+        // A backslash is a separator on Windows.
+        "https://example.test/..\\..\\evil.zpa",
+        // Windows reserved device names.
+        "https://example.test/CON",
+        "https://example.test/nul.zpa",
+        // A NUL byte truncates the name at the syscall boundary.
+        "https://example.test/evil%00.zpa"
+    ] {
+        assert_eq!(
+            zoi::pkg::install::util::get_filename_from_url(hostile),
+            None,
+            "URL '{hostile}' must not yield a usable path component"
+        );
+    }
+}
+
+/// The accepted cases still work, so hardening did not break normal downloads.
+#[test]
+fn get_filename_from_url_accepts_ordinary_names() {
+    for (url, expected) in [
+        ("https://example.test/releases/zoi-1.0.zpa", "zoi-1.0.zpa"),
+        ("https://example.test/zoi-2.0.zpa?token=x", "zoi-2.0.zpa"),
+        ("https://example.test/zoi-3.0.zpa#frag", "zoi-3.0.zpa"),
+        // Dots inside a name are fine; only a whole `.`/`..` is not.
+        ("https://example.test/zoi..1.0.zpa", "zoi..1.0.zpa"),
+        ("https://example.test/a.b.c", "a.b.c"),
+        // A Windows reserved stem is only rejected as the whole stem.
+        ("https://example.test/CONSOLE.zpa", "CONSOLE.zpa"),
+        ("https://example.test/NULLFILE.zpa", "NULLFILE.zpa")
+    ] {
+        assert_eq!(
+            zoi::pkg::install::util::get_filename_from_url(url),
+            Some(expected),
+            "URL '{url}' should yield '{expected}'"
+        );
+    }
 }
 
 #[test]

@@ -866,7 +866,19 @@ impl PluginManager {
         let import_fn = self
             .lua
             .create_function(move |lua, file_name: String| {
-                let path = plugin_dir.join(&file_name);
+                // `IMPORT` is documented as "load a file that sits next to
+                // the plugin", but a plain `join` also accepts an absolute
+                // path or `../` segments, which would let a plugin read any
+                // file on the host. `safe_join` enforces the boundary.
+                let path = zoi_core::utils::safe_join(
+                    &plugin_dir,
+                    Path::new(&file_name)
+                )
+                .map_err(|e| {
+                    mlua::Error::RuntimeError(format!(
+                        "Invalid import path '{file_name}': {e}"
+                    ))
+                })?;
                 if !path.exists() {
                     return Err(mlua::Error::RuntimeError(format!(
                         "File not found: {}",
