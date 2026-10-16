@@ -100,9 +100,16 @@ pub struct ZrepoStats {
 
 /// Returns true when a path inside a registry tree must not be published.
 ///
-/// Git plumbing, previous snapshots, and half-written downloads are local
-/// artifacts rather than registry content, so publishing them would both bloat
-/// the snapshot and leak local state.
+/// Git plumbing and published artifacts are local state rather than registry
+/// content, so publishing them would both bloat the snapshot and leak it back
+/// out.
+///
+/// Artifacts are matched on the `.zrepo` marker anywhere in the file name
+/// rather than on the extension alone. `zoi registry zrepo` writes into the
+/// tree by default, and the sidecars it leaves behind - `main.zrepo.hash`,
+/// `main.zrepo.size`, `main.zrepo.sig` and `main.zrepo.zsync` - all carry a
+/// different extension, so an extension check would republish the previous
+/// snapshot's sidecars inside the next one.
 fn is_excluded_from_snapshot(relative: &Path) -> bool {
     relative.components().any(|component| {
         matches!(
@@ -111,8 +118,8 @@ fn is_excluded_from_snapshot(relative: &Path) -> bool {
                 if name == ".git"
         )
     }) || relative
-        .extension()
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("zrepo"))
+        .file_name()
+        .is_some_and(|name| name.to_string_lossy().contains(".zrepo"))
 }
 
 /// Collects the files a snapshot includes, sorted by archive path.
@@ -1318,6 +1325,59 @@ mod tests {
             err.to_string().contains("no repo.yaml"),
             "unexpected error: {err}"
         );
+    }
+
+    #[test]
+    fn published_artifacts_are_not_republished_into_the_next_snapshot() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let tree = dir.path().join("registry");
+        make_registry_tree(&tree, "14.1.0");
+
+        // Publish into the tree, which is where the default output path puts
+        // it, so the sidecars land among the registry content.
+        create_zrepo(&tree, &tree.join("testreg.zrepo"), None)
+            .expect("first publish");
+        assert!(
+            tree.join("testreg.zrepo.zsync").exists(),
+            "the control file should have been written beside the snapshot"
+        );
+
+        let second = dir.path().join("second.zrepo");
+        create_zrepo(&tree, &second, None).expect("second publish");
+
+        let bytes = fs::read(&second).expect("read");
+        let tar = delta::zstd_decompress(&bytes).expect("decompress");
+        let mut archive = tar::Archive::new(Cursor::new(tar));
+        let names: Vec<String> = archive
+            .entries()
+            .expect("entries should read")
+            .map(|entry| {
+                entry
+                    .expect("entry")
+                    .path()
+                    .expect("path")
+                    .to_string_lossy()
+                    .to_string()
+            })
+            .collect();
+
+        // The previous snapshot and every sidecar beside it are local state.
+        // Republishing them makes each snapshot larger than the last and
+        // feeds a client's seed its own output.
+        for leaked in [
+            "testreg.zrepo",
+            "testreg.zrepo.hash",
+            "testreg.zrepo.size",
+            "testreg.zrepo.zsync"
+        ] {
+            assert!(
+                !names.iter().any(|name| name == leaked),
+                "'{leaked}' leaked into the next snapshot: {names:?}"
+            );
+        }
+
+        // The registry content itself must still be there.
+        assert!(names.contains(&"repo.yaml".to_string()), "{names:?}");
     }
 
     #[test]

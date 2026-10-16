@@ -247,16 +247,16 @@ Here are the fields available in `repo.yaml`:
 | `git`             | `list` of `GitLink`   | A list of git repository URLs. The `type` can be `main` for the primary repository or `mirror` for fallbacks.                                                                                                                                  |
 | `pkg`             | `list` of `PkgLink`   | (Optional) A list of URLs for pre-built package registries. Zoi will try to download pre-built packages from here before building from source.                                                                                                 |
 | `delta`           | `list` of `DeltaLink` | (Optional) A list of URLs for delta patch registries. Zoi will use these for bandwidth-efficient upgrades when a previous version is cached.                                                                                                   |
-| `zrepo`           | `list` of `ZrepoLink` | (Optional) A list of zstd-compressed registry snapshots (`.zrepo`). When present, Zoi syncs the registry from a snapshot instead of cloning the `git` repository. The `type` can be `main` for the primary snapshot or `mirror` for fallbacks. |
+| `zrepo`           | `list` of `ZrepoLink` | (Optional) A list of registry snapshots (`.zrepo`) and their zsync control files. When present, Zoi syncs the registry from a snapshot instead of cloning the `git` repository. The `type` can be `main` for the primary snapshot or `mirror` for fallbacks. |
 | `db`              | `string`              | (Optional) URL for registry database metadata.                                                                                                                                                                                                 |
 | `pgp`             | `list` of `PgpKey`    | (Optional) A list of PGP keys to import for package signature verification. The `key` can be a URL to the key file or a PGP fingerprint.                                                                                                       |
 | `repos`           | `list` of `Repo`      | A list of the sub-repositories (or tiers) contained within the registry. `type` can be `official`, `community`, etc. `active` determines if it's enabled by default.                                                                           |
 
 ## Snapshot Registries (`.zrepo`)
 
-Instead of cloning a Git repository, a registry can publish a single zstd-compressed snapshot of its entire contents. This is often much cheaper than a Git negotiation: a client downloads one immutable file and skips the clone, the packfile negotiation, and the object database entirely.
+Instead of cloning a Git repository, a registry can publish a single compressed snapshot of its entire contents. This is often much cheaper than a Git negotiation: a client downloads one immutable file and skips the clone, the packfile negotiation, and the object database entirely.
 
-A `.zrepo` file is a zstd-compressed tar of the whole registry tree - `repo.yaml`, `packages.json`, and every `.pkg.lua` and `.sec.yaml`. Because the tree is the same one a Git clone would produce, everything downstream (the metadata index, `zoi search`, `zoi info`, PURL resolution) works exactly as it does for a Git registry.
+A `.zrepo` file holds the whole registry tree - `repo.yaml`, `packages.json`, and every `.pkg.lua` and `.sec.yaml` - as a sequence of independently compressed zstd frames, one per file, which decompress into an ordinary tar. The per-file framing is what lets a client transfer only the parts that changed; see [Incremental updates](/docs/zds/zoi/repositories#incremental-updates). Because the tree is the same one a Git clone would produce, everything downstream (the metadata index, `zoi search`, `zoi info`, PURL resolution) works exactly as it does for a Git registry.
 
 ### Declaring a snapshot registry
 
