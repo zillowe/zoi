@@ -16,7 +16,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 """
 body = """
 {% if version %}\
-    ## [{{ version | replace_regex(from="^([A-Za-z]+)-", to="${1}. ") | replace_regex(from="-([0-9.]+)$", to=" ${1}") | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+    ## [{{ version | replace_regex(from="^([A-Za-z]+)-", to="${1}. ") | replace_regex(from="-([0-9.]+)$", to=" ${1}") | trim_start_matches(pat="v") }}](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/tags/{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
 {% else %}\
     ## [unreleased]
 {% endif %}\
@@ -99,7 +99,7 @@ footer = """
 - Moved the commands to a `commands` folder.
 - Better code structure and better code overall.
 
-## [Dev. Pre-Alpha 2.4.0]
+## [Dev. Pre-Alpha 2.4.0](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Dev-Pre-Alpha-2.4.0) - 2025-04-27
 
 ### 🛠️ Build
 
@@ -163,6 +163,14 @@ render_always = true
 postprocessors = [
     # Replace the placeholder <REPO> with a URL.
     #{ pattern = '<REPO>', replace = "https://github.com/orhun/git-cliff" },
+    # A git tag and a GitLab release are not the same thing: only some tags
+    # carry a release page. The body template links every version heading at
+    # its tag, which always exists, and this postprocessor upgrades the
+    # headings of the tags that do have a release to the release page.
+    # git-cliff runs the command once per rendered release and replaces that
+    # release with its stdout. The pattern is only a gate: when it does not
+    # appear in the rendered text, the command is skipped.
+    { pattern = '## \[[^]]+\]', replace_command = './scripts/changelog-release-links.sh' },
 ]
 output = "CHANGELOG.md"
 
