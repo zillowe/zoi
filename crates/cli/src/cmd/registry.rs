@@ -48,7 +48,7 @@ pub enum RegistryCommands {
         #[arg(long, short)]
         repo: Option<String>
     },
-    /// Build a zstd-compressed .zrepo snapshot of this registry
+    /// Build a .zrepo snapshot of this registry, plus its zsync control file
     #[command(alias = "snapshot")]
     Zrepo {
         /// Registry directory to snapshot. Defaults to the current directory
@@ -58,21 +58,6 @@ pub enum RegistryCommands {
         #[arg(long, short = 'o')]
         output: Option<std::path::PathBuf>,
         /// Sign the snapshot with a PGP key from the Zoi keyring
-        #[arg(long)]
-        sign: Option<String>
-    },
-    /// Build a .zdelta update patch from an older .zrepo to this registry
-    #[command(alias = "snapshot-delta")]
-    Zdelta {
-        /// The older .zrepo snapshot this patch updates from
-        old: std::path::PathBuf,
-        /// Registry directory to publish as the patch's target
-        #[arg(default_value = ".")]
-        path: std::path::PathBuf,
-        /// Where to write the .zdelta. Defaults to <old>.zdelta
-        #[arg(long, short = 'o')]
-        output: Option<std::path::PathBuf>,
-        /// Sign the patch with a PGP key from the Zoi keyring
         #[arg(long)]
         sign: Option<String>
     }
@@ -110,12 +95,6 @@ pub fn run(args: RegistryCommand) -> Result<()> {
         RegistryCommands::Zrepo { path, output, sign } => {
             build_zrepo(&path, output.as_deref(), sign.as_deref())
         }
-        RegistryCommands::Zdelta {
-            old,
-            path,
-            output,
-            sign
-        } => build_zdelta(&old, &path, output.as_deref(), sign.as_deref())
     }
 }
 
@@ -154,71 +133,12 @@ fn build_zrepo(
         if sign.is_some() { ", .sig" } else { "" }
     );
     println!(
-        "{} Publish it at the 'url' in the registry's 'zrepo' section, and \
-         point 'hash' at the .hash sidecar.",
+        "{} Publish the snapshot and its .zsync control file together at the \
+         'url' in the registry's 'zrepo' section, and point 'hash' at the \
+         .hash sidecar. Clients use the control file to transfer only the \
+         frames that changed.",
         "::".bold().blue()
     );
-    Ok(())
-}
-
-/// Builds a `.zdelta` update patch from an older snapshot to a registry
-/// directory.
-///
-/// # Errors
-///
-/// Returns an error if the base snapshot is missing, the directory is not a
-/// registry, or the patch cannot be written.
-fn build_zdelta(
-    old: &std::path::Path,
-    path: &std::path::Path,
-    output: Option<&std::path::Path>,
-    sign: Option<&str>
-) -> Result<()> {
-    let output = if let Some(explicit) = output {
-        explicit.to_path_buf()
-    } else {
-        let stem = old.file_name().map_or_else(
-            || "registry.zrepo".to_string(),
-            |f| f.to_string_lossy().to_string()
-        );
-        old.with_file_name(format!("{stem}.zdelta"))
-    };
-
-    let stats =
-        crate::pkg::sync::zrepo::create_zrepo_delta(old, path, &output, sign)?;
-
-    println!(
-        "{} Created update patch: {}",
-        "::".bold().green(),
-        output.display()
-    );
-    println!(
-        "  Patch size:  {}",
-        zoi_core::utils::format_bytes(stats.patch_size)
-    );
-    println!(
-        "  Full size:   {}",
-        zoi_core::utils::format_bytes(stats.full_download_size)
-    );
-    println!(
-        "  Saved:       {}",
-        zoi_core::utils::format_bytes(stats.saved_bytes)
-    );
-
-    if stats.patch_size >= stats.full_download_size {
-        println!(
-            "{} The patch is not smaller than a full download. Publishing it \
-             would make clients slower; consider publishing the snapshot \
-             alone.",
-            "Warning:".yellow()
-        );
-    } else {
-        println!(
-            "{} Publish it at the 'delta' URL in the registry's 'zrepo' \
-             section, or at <zrepo url>.zdelta if no 'delta' is declared.",
-            "::".bold().blue()
-        );
-    }
     Ok(())
 }
 

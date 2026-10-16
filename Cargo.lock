@@ -2563,6 +2563,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "md4"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd76fb0fd6b2e4be62a73f8e0858ca97f81babcb1af322dcaca196f735f17f80"
+dependencies = [
+ "digest 0.11.3",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3769,7 +3778,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
 dependencies = [
  "aws-lc-rs",
+ "log",
  "once_cell",
+ "ring",
  "rustls-pki-types",
  "rustls-webpki",
  "subtle",
@@ -4860,13 +4871,16 @@ checksum = "9a7ac20be9b7726e0bbdbf974c059676d9acb1cd414961f570a4e8231cacd7fc"
 dependencies = [
  "base64 0.23.1",
  "der",
+ "flate2",
  "log",
  "native-tls",
  "percent-encoding",
+ "rustls",
  "rustls-pki-types",
  "ureq-proto",
  "utf8-zero",
  "webpki-root-certs",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -5063,6 +5077,15 @@ name = "webpki-root-certs"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b96554aa2acc8ccdb7e1c9a58a7a68dd5d13bccc69cd124cb09406db612a1c9b"
+dependencies = [
+ "rustls-pki-types",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "1.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7dcd9d09a39985f5344844e66b0c530a33843579125f23e21e9f0f220850f22a"
 dependencies = [
  "rustls-pki-types",
 ]
@@ -5903,6 +5926,7 @@ dependencies = [
  "git2",
  "indicatif",
  "rayon",
+ "reqwest",
  "serde_json",
  "tar",
  "tempfile",
@@ -5914,6 +5938,7 @@ dependencies = [
  "zoi-install",
  "zoi-lua",
  "zoi-project",
+ "zync-rs",
 ]
 
 [[package]]
@@ -6005,6 +6030,7 @@ dependencies = [
  "zoi-transaction",
  "zoi-uninstall",
  "zstd",
+ "zync-rs",
 ]
 
 [[package]]
@@ -6122,4 +6148,18 @@ dependencies = [
  "serde",
  "syn 3.0.9",
  "winnow",
+]
+
+[[package]]
+name = "zync-rs"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e9c83a746a65bbb249e61f263ea5f00d5483178d195893895de4e0b71ffb7e4"
+dependencies = [
+ "md4",
+ "serde_json",
+ "sha1",
+ "thiserror",
+ "ureq",
+ "zbsdiff",
 ]

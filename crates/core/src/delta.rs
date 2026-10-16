@@ -13,6 +13,9 @@
 //! the container id would then accept a descriptor whose shape it cannot
 //! interpret.
 //!
+//! Registry snapshots are not described here. They carry no `.zdelta` at all:
+//! they are transferred with `zync`, against a `.zsync` control file.
+//!
 //! [`zbsdiff`]: https://crates.io/crates/zbsdiff
 
 /// The format identifier stored in a `.zdelta` container's `meta.json`.
@@ -23,9 +26,3 @@ pub const ZOIDELTA_FORMAT_ID: &str = "zoidelta.v1";
 /// A package delta carries an `ops` array describing pool objects to patch or
 /// ship whole.
 pub const ZPA_DELTA_TYPE: &str = "zpa";
-
-/// The `type` discriminator of a `.zrepo` registry snapshot delta.
-///
-/// A registry delta carries a single `patch` entry bound to its base and
-/// target by SHA-256.
-pub const ZREPO_DELTA_TYPE: &str = "zrepo";

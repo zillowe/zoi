@@ -15,7 +15,7 @@ This page explains Zoi's official repositories and mirrors, and how package repo
 
 The package database is the core git repository that Zoi clones to its user data directory under `zoi/pkgs/db`. This repository contains all the package definitions organized into tiers. While you can manage which repositories inside the database are active using `zoi repo`, you can also change which package database registry Zoi uses via `zoi sync`.
 
-A registry can publish its content either as a Git repository or as a single zstd-compressed snapshot called a `.zrepo` file, with optional `.zdelta` updates between snapshots. See [Snapshot Registries](/docs/zds/zoi/repositories#snapshot-registries-zrepo).
+A registry can publish its content either as a Git repository or as a single compressed snapshot called a `.zrepo` file, transferred incrementally through a zsync control file. See [Snapshot Registries](/docs/zds/zoi/repositories#snapshot-registries-zrepo).
 
 Official and supported registries are shipped as built-in definitions embedded in the Zoi binary (see [Specifications](/docs/zds/zoi/specs#1-built-in-registry-definition)). You can reference them by their handle instead of a full URL, and Zoi derives the git URL and metadata automatically.
 
@@ -273,7 +273,7 @@ git:
 zrepo:
   - type: main
     url: https://packages.example.com/zoidberg/main.zrepo
-    delta: https://packages.example.com/zoidberg/main.zrepo.zdelta
+    control: https://packages.example.com/zoidberg/main.zrepo.zsync
     pgp: https://packages.example.com/zoidberg/main.zrepo.sig
     hash: https://packages.example.com/zoidberg/main.zrepo.sha256
   - type: mirror
@@ -286,50 +286,34 @@ Each `ZrepoLink` supports these fields:
 | ------- | -------- | --------------------------------------------------------------------------- |
 | `type`  | `string` | `main` for the primary snapshot, `mirror` for a fallback.                   |
 | `url`   | `string` | The URL of the `.zrepo` file.                                               |
-| `delta` | `string` | (Optional) URL of the incremental update patch. Defaults to `<url>.zdelta`. |
+| `control` | `string` | (Optional) URL of the zsync control file. Defaults to `<url>.zsync`. |
 | `pgp`   | `string` | (Optional) URL of the detached PGP signature of the snapshot.               |
 | `hash`  | `string` | (Optional) URL of the snapshot's checksum.                                  |
 | `size`  | `string` | (Optional) URL of the snapshot's size information.                          |
 
-If `delta` is omitted, Zoi looks for the update patch at `<url>.zdelta`.
+If `control` is omitted, Zoi looks for the control file at `<url>.zsync`.
 
 A `zrepo` registry needs no `git` section at all - the whole point of the snapshot is to replace the clone - so `git` and `repos` are both optional in a `repo.yaml`. A manifest declaring only `name`, `description`, and `zrepo` is valid.
 
 ### Incremental updates
 
-Snapshots are immutable, so a sync that finds an unchanged registry has nothing to do. When a new snapshot is published, the registry also publishes a `.zdelta` patch alongside it, and Zoi applies that instead of downloading the whole file again.
+Snapshots are immutable, so a sync that finds an unchanged registry has nothing to do. When a new snapshot is published, the registry publishes a `.zsync` control file beside it, and Zoi transfers only the parts of the new snapshot it does not already hold.
 
-The patch is a bsdiff diff computed over the _uncompressed tar_ of the previous snapshot. Unchanged tar entries are byte-identical, so they diff to almost nothing, whereas diffing the compressed bytes would not compress well. The rebuilt tar is byte-for-byte the tar the registry author published, so a patched registry is indistinguishable from a freshly downloaded one.
+The snapshot is stored as a sequence of independently compressed zstd frames, one per registry file. That framing is what makes this work: an entry that has not changed compresses to exactly the same bytes it did last time, so Zoi recognises it in its cached copy and skips it. A single compressed stream would resynchronise after the first edit and force a re-download of most of the file - measured at 53% of a snapshot for a three-line change, against 1.3% with per-entry framing.
 
-A patch is published in either of two shapes:
+The control file carries the snapshot's length, its SHA-1, and a table of per-block checksums, and is written by [`zync`](https://crates.io/crates/zync-rs). The `URL` Zoi writes is a bare file name rather than an absolute address, because the publisher does not know where the snapshot will be hosted. Clients resolve it against the URL they fetched the control file from, so one control file serves a primary and every mirror unchanged, and Zoi further expands it with any mirrors you have configured locally.
 
-- A **container**, which is a zstd-compressed tar holding a `meta.json` descriptor and a single patch entry. This is the recommended shape, because `meta.json` can bind the patch to its base and target:
+Incremental transfers are strictly an optimization. The `control` field is entirely optional, and Zoi handles its absence in the way that suits the registry:
 
-  ```json
-  {
-    "format": "zoidelta.v1",
-    "type": "zrepo",
-    "base_sha256": "<sha256 of the previous snapshot's tar>",
-    "target_sha256": "<sha256 of the new snapshot's tar>",
-    "patch": "data.bsdiff"
-  }
-  ```
+- **`control` not declared:** Zoi makes a single best-effort request for the conventional `<url>.zsync` and quietly downloads the full snapshot if there is nothing there. This is the normal state of affairs for a registry that has not adopted zsync, so it is not reported as a problem. If a publisher starts shipping control files later, they are picked up automatically.
+- **`control` declared but not served:** the registry promised a control file and did not deliver, so Zoi warns and falls back to a full download.
+- **Control file present but unusable:** a stale snapshot, a truncated download, a hash mismatch, or a server that cannot answer a range request. Zoi warns and falls back to a full download rather than installing anything it cannot fully verify.
 
-  Zoi verifies `base_sha256` against the cached snapshot and `target_sha256` against the rebuilt one, so a patch built against a different base, or a corrupted download, is rejected instead of being installed.
+In every case the snapshot is obtained in full, so a registry that never ships a control file syncs exactly as well as one that does - just without the bandwidth saving. A registry that stops publishing them is never left unsyncable, and no path through a failed update can leave a partially-applied registry behind.
 
-  The `format` field names Zoi's descriptor schema rather than the container holding it. The container is the one `zbsdiff` defines, and `zbsdiff` carries `meta.json` without interpreting it, so the schema is left to whoever writes it - `zync`, for instance, writes `zsidecar.v1` descriptors into the same container for its transfer sidecars. Zoi rejects a descriptor declaring any other `format`.
+The control file only decides how the bytes arrive. A completed transfer is verified against the published `hash` and `pgp` exactly as a full download is, so a registry's trust model does not change when it starts publishing one.
 
-- A **bare bsdiff patch**, which is just a zstd-compressed raw `BSDIFF40` patch with no metadata. This works, but carries no hash binding, so the published `hash` checksum is the only integrity check available.
-
-Updates are strictly an optimization. The `delta` field is entirely optional, and Zoi handles its absence in the way that suits the registry:
-
-- **`delta` not declared:** Zoi makes a single best-effort request for the conventional `<url>.zdelta` and quietly downloads the full snapshot if there is nothing there. This is the normal state of affairs for a registry that does not publish patches, so it is not reported as a problem. If a publisher starts shipping patches later, they are picked up automatically.
-- **`delta` declared but not served:** the registry promised a patch and did not deliver, so Zoi warns and falls back to a full download.
-- **Patch present but does not fit:** the client and the publisher disagree about registry state - a stale base, a truncated download, or a hash mismatch. Zoi warns and falls back to a full download, and the patch is discarded rather than installed.
-
-In every case the snapshot is obtained by a full download, so a registry that never ships a single `.zdelta` syncs exactly as well as one that does - just without the bandwidth saving. A registry that stops publishing patches is never left unsyncable, and no path through a failed update can leave a partially-applied registry behind.
-
-Zoi keeps the last snapshot it downloaded next to the registry index (as `<handle>.zrepo`) purely as the base for the next update, and reuses it across syncs.
+Zoi keeps the last snapshot it downloaded next to the registry index (as `<handle>.zrepo`) purely as the seed for the next transfer, and reuses it across syncs.
 
 ### Adding a registry by URL
 
@@ -341,7 +325,7 @@ zoi sync add https://packages.example.com/zoidberg/repo.yaml
 
 Zoi fetches the `repo.yaml`, resolves the registry's real handle, name, description and advisory prefix, and records them. Only the content is deferred: the snapshot itself is downloaded on the next `zoi sync`. If the URL is not reachable, or turns out to be a plain Git URL, the registry is still recorded and the handle is resolved during the next sync.
 
-A registry may also declare a `git` section alongside its `zrepo` section. When both are present, Zoi prefers the snapshot, because it is the cheaper transport. The Git repository remains a working fallback for clients that cannot fetch snapshots, and the `zdelta` chain covers the common case of a client that missed a release.
+A registry may also declare a `git` section alongside its `zrepo` section. When both are present, Zoi prefers the snapshot, because it is the cheaper transport. The Git repository remains a working fallback for clients that cannot fetch snapshots, and the control file covers the common case of a client that missed a release.
 
 ### Verification
 
@@ -354,35 +338,32 @@ A snapshot that fails verification is discarded, and a Git registry additionally
 Use `zoi registry zrepo` to build the snapshot from a registry checkout:
 
 ```sh
-# Build main.zrepo from the registry in the current directory
+# Build main.zrepo, plus main.zrepo.zsync, from the registry in the current directory
 zoi registry zrepo . -o main.zrepo
 
 # Sign it with a key from your keyring, producing main.zrepo.sig
 zoi registry zrepo . -o main.zrepo --sign your-key-id
 ```
 
-The snapshot is **reproducible**: entries are sorted by name, timestamps are fixed to the epoch, and ownership is zeroed. This is not cosmetic - it is what allows a patch to be published against a specific base and still land on exactly the published bytes. Git plumbing and previous snapshots are excluded automatically.
+The snapshot is **reproducible**: entries are sorted by name, timestamps are fixed to the epoch, and ownership is zeroed. Git plumbing and previous snapshots are excluded automatically. Reproducibility is load-bearing rather than cosmetic - because every unchanged file keeps a byte-identical compressed frame across publishes, that is precisely what lets a client skip fetching it.
 
-Alongside the `.zrepo`, the command writes a `.hash` and a `.size` sidecar (and a `.sig` when signing), matching the convention already used for `.zpa` and `.zdelta` artifacts, so a registry can serve the same trio for its snapshot that it serves for packages.
+The command writes three files: `main.zrepo`, the `main.zrepo.zsync` control file, and a `.hash`/`.size` sidecar pair (plus `.sig` when signing), matching the convention already used for `.zpa` artifacts.
 
 ### Publishing an update
 
-When the registry changes, publish a new snapshot and the patch that reaches it from the previous one:
+When the registry changes, publish a new snapshot. The control file is regenerated with it, so there is no separate patch to build:
 
 ```sh
 # After updating packages and re-running 'zoi registry generate-metadata'
 zoi registry zrepo . -o main.zrepo
-zoi registry zdelta ../previous/main.zrepo . -o main.zrepo.zdelta
 ```
-
-`zdelta` takes the older snapshot as its base and diffs it against the current tree, writing the `base_sha256` and `target_sha256` that let a client prove the patch applies to exactly the snapshot it holds. It reports the patch size, the full download size, and the difference, and warns if the patch would not be smaller than a full download.
 
 The workflow a publisher follows is therefore:
 
 - Publish `main.zrepo` at the `url` in the `zrepo` section.
-- Publish `main.zrepo.zdelta` (the output of `zdelta`) at the `delta` URL, or at `<url>.zdelta` if no `delta` is declared.
+- Publish `main.zrepo.zsync` (written by the same command) at the `control` URL, or at `<url>.zsync` if no `control` is declared.
 - Serve `main.zrepo.hash` at the `hash` URL, if declared.
-- Repeat both steps on every release. A client that missed a release falls back to a full download, so a forgotten patch costs bandwidth but never correctness.
+- Repeat on every release. A client that missed a release, or that holds no snapshot at all, falls back to a full download, so an unadopted control file costs bandwidth but never correctness.
 
 ## Registry Verification
 

@@ -81,6 +81,7 @@ walkdir.workspace = true
 zip.workspace = true
 zbsdiff.workspace = true
 zstd.workspace = true
+zync-rs.workspace = true
 rusqlite.workspace = true
 rustc-hash.workspace = true
 

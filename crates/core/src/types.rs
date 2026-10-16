@@ -1818,10 +1818,16 @@ pub struct ZrepoLink {
     pub link_type: String,
     /// The URL of the `.zrepo` archive.
     pub url: String,
-    /// Optional URL template for the incremental update patch. When omitted,
-    /// the delta is assumed to live at `<url>.zdelta`.
+    /// Optional URL of the zsync control file describing the snapshot. When
+    /// omitted, the control file is assumed to live at `<url>.zsync`.
+    ///
+    /// A snapshot is transferred as a sequence of independently compressed
+    /// frames, one per registry file, so that a client holding an older
+    /// snapshot can recover the entries it already has and fetch only the
+    /// rest. A registry that publishes no control file is still usable; the
+    /// snapshot is simply downloaded whole.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub delta: Option<String>,
+    pub control: Option<String>,
     /// Optional URL for PGP signature.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pgp: Option<String>,

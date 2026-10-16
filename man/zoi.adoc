@@ -294,9 +294,9 @@ details. *files* _ID_:: List files modified by a transaction. *undo*,
 
 *sync*, *sy* [_SUBCOMMAND_] [_OPTIONS_]::
   Download or update the package database from the remote repository.
-Registry content is fetched from a zstd-compressed `.zrepo` snapshot when the
-registry publishes one in its `repo.yaml`, updating it with a `.zdelta` patch
-when available, and from a Git clone otherwise.
+Registry content is fetched from a `.zrepo` snapshot when the registry publishes
+one in its `repo.yaml`, transferred incrementally through its `.zsync` control
+file when available, and from a Git clone otherwise.
 +
 *-v*, *--verbose*:: Show underlying git output. *--fallback*:: Use
 fallback behavior. *--no-pm*:: Skip the native package-manager check.
@@ -466,15 +466,12 @@ instead of writing.
   Add a security advisory for a package.
 
 *zrepo*, *snapshot* [_PATH_] [*-o*, *--output*=_FILE_] [*--sign*=_KEY_]::
-  Build a zstd-compressed `.zrepo` snapshot of the registry (default path:
-  current directory). Writes `.hash` and `.size` sidecars alongside it, and
-  `.sig` when *--sign* is given. The output is reproducible, so an unchanged
-  registry always yields identical bytes.
-
-*zdelta*, *snapshot-delta* _OLD_ [_PATH_] [*-o*, *--output*=_FILE_] [*--sign*=_KEY_]::
-  Build a `.zdelta` update patch taking clients from the `.zrepo` snapshot
-  _OLD_ to the current state of the registry. Publish it at the `delta` URL in
-  the `zrepo` section, or at `<zrepo url>.zdelta` if none is declared.
+  Build a `.zrepo` snapshot of the registry (default path: current directory).
+  Writes a `.zsync` control file plus `.hash` and `.size` sidecars alongside it,
+  and `.sig` when *--sign* is given. The output is reproducible, so an
+  unchanged registry always yields identical bytes. Publish the snapshot and
+  its control file together at the `url` in the `zrepo` section, and the
+  control file at the `control` URL, or at `<url>.zsync` if none is declared.
 
 == Environments and projects
 

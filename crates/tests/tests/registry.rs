@@ -217,14 +217,12 @@ fn test_registry_zrepo_builds_a_publishable_snapshot() -> Result<()> {
 }
 
 #[test]
-fn test_registry_zdelta_updates_a_previous_snapshot() -> Result<()> {
+fn test_registry_zrepo_publishes_a_zsync_control_file() -> Result<()> {
     let temp_dir = TempDir::new()?;
     let tree = temp_dir.path().join("registry");
     make_registry_tree(&tree, "14.1.0")?;
 
-    // Bulk packages, of which only ripgrep changes. The patch is only worth
-    // publishing when the registry is substantially larger than the update, so
-    // the fixture has to be big enough for that to be a real claim.
+    // Bulk packages so the snapshot has more than one frame to recover.
     for index in 0..200 {
         let dir = tree.join(format!("main/tool-{index}"));
         fs::create_dir_all(&dir)?;
@@ -237,41 +235,26 @@ fn test_registry_zdelta_updates_a_previous_snapshot() -> Result<()> {
         )?;
     }
 
-    let base = temp_dir.path().join("v1.zrepo");
-    zoi_sync::zrepo::create_zrepo(&tree, &base, None)?;
-
-    // Publish a new revision, then the patch that reaches it.
-    make_registry_tree(&tree, "14.1.1")?;
-    let published = temp_dir.path().join("v2.zrepo");
+    let published = temp_dir.path().join("main.zrepo");
     zoi_sync::zrepo::create_zrepo(&tree, &published, None)?;
 
-    let patch = temp_dir.path().join("v1.zrepo.zdelta");
-    let stats =
-        zoi_sync::zrepo::create_zrepo_delta(&base, &tree, &patch, None)?;
-
-    assert!(patch.exists(), "the .zdelta should be written");
+    let control_path = temp_dir.path().join("main.zrepo.zsync");
     assert!(
-        stats.patch_size < stats.full_download_size,
-        "a patch that is not smaller than a full download should not be worth \
-         publishing ({} vs {})",
-        stats.patch_size,
-        stats.full_download_size
-    );
-    assert!(
-        temp_dir.path().join("v1.zrepo.zdelta.hash").exists(),
-        "the patch should get a checksum sidecar too"
+        control_path.exists(),
+        "a snapshot must be published with the control file that makes it \
+         transferable"
     );
 
-    // The whole point: a client holding only v1 lands on exactly the v2 that
-    // was published, byte for byte.
-    let rebuilt = temp_dir.path().join("rebuilt.zrepo");
-    zoi_sync::zrepo::apply_delta(&base, &patch, &rebuilt)?;
-
+    let control = zync::ControlFile::parse(fs::File::open(&control_path)?)?;
     assert_eq!(
-        fs::read(&rebuilt)?,
-        fs::read(&published)?,
-        "applying the published patch must reproduce the published snapshot"
+        control.length,
+        fs::metadata(&published)?.len(),
+        "the control file must describe the snapshot beside it"
     );
+
+    // The URL is relative, so one control file serves a primary and every
+    // mirror without the publisher knowing where it will be hosted.
+    assert_eq!(control.urls, vec!["main.zrepo".to_string()]);
 
     Ok(())
 }

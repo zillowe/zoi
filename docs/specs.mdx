@@ -65,7 +65,7 @@ git:
 zrepo:
   - type: "main"
     url: "https://packages.zillowe.qzz.io/zoidberg/main.zrepo"
-    delta: "https://packages.zillowe.qzz.io/zoidberg/main.zrepo.zdelta"
+    control: "https://packages.zillowe.qzz.io/zoidberg/main.zrepo.zsync"
     pgp: "https://packages.zillowe.qzz.io/zoidberg/main.zrepo.sig"
     hash: "https://packages.zillowe.qzz.io/zoidberg/main.zrepo.sha256"
   - type: "mirror"
@@ -97,7 +97,7 @@ repos:
 - **`handle`** (String): Short identifier used as the registry handle. This is what users see in `@handle/repo/package` install syntax.
 - **`advisory_prefix`** (String, Optional): Prefix used for security advisories (e.g. `ZSA`).
 - **`git`** (List of Objects, Optional): Git mirrors for the repository content. May be omitted entirely when the registry is published as a `zrepo` snapshot.
-- **`zrepo`** (List of Objects, Optional): zstd-compressed registry snapshots (`.zrepo`) and their incremental update patches. Takes precedence over `git` when present, so a client downloads one immutable file instead of cloning.
+- **`zrepo`** (List of Objects, Optional): Registry snapshots (`.zrepo`) and the zsync control files that make them transferable incrementally. Takes precedence over `git` when present, so a client downloads one immutable file instead of cloning.
 - **`pkg`** (List of Objects): Package download mirrors. Supports placeholders like `{repo}`, `{os}`, `{arch}`, `{version}`, `{id}`.
 - **`delta`** (List of Objects): Delta patch mirrors for bandwidth-efficient upgrades. Supports placeholders like `{repo}`, `{os}`, `{arch}`, `{version}`, `{id}`.
 - **`pgp`** (List of Objects): Trusted PGP keys for signature verification.
@@ -141,44 +141,31 @@ When the cached version is more than one release behind the target, Zoi applies 
 
 A registry may publish its entire content as a single `.zrepo` file instead of relying on a Git clone.
 
-**Format:** zstd frame wrapping a POSIX tar
+**Format:** a concatenation of independently compressed zstd frames, one per registry file, whose decompressed contents form a POSIX tar
 
 The tar holds the same tree a Git clone would produce: `repo.yaml`, `packages.json`, and every `.pkg.lua` and `.sec.yaml`. A snapshot missing `repo.yaml` is rejected, since it cannot be used to build a registry.
+
+The per-file framing is what makes incremental transfer possible. An entry that has not changed compresses to exactly the same bytes it did last time, so a client recognises it and skips it. A single zstd frame wrapping the whole tar would resynchronise after the first edit and leave clients re-downloading most of the file - measured at 53% of a snapshot for a three-line change, against 1.3% with per-entry framing. Entries are sorted by archive path and every header field is normalised, so the same tree always produces byte-identical frames.
+
+Each entry is encoded as a bare header, its data, and padding, with no end-of-archive marker: the marker would otherwise be repeated once per file, and a tar reader stops at the first one, leaving every file after it unrecovered.
 
 Snapshots are configured in the `zrepo` section of `repo.yaml`, using the same `main`/`mirror` mirror types as `git`. When `zrepo` is present it takes precedence over `git`: the snapshot is the cheaper transport, and the Git repository remains available as a fallback.
 
 - `url`: The `.zrepo` snapshot URL.
-- `delta`: (Optional) URL of the incremental update patch. Defaults to `<url>.zdelta`.
+- `control`: (Optional) URL of the zsync control file. Defaults to `<url>.zsync`.
 - `pgp`: (Optional) URL of the snapshot's detached PGP signature.
 - `hash`: (Optional) URL of the snapshot's SHA-256 checksum.
 - `size`: (Optional) URL of the snapshot's size information.
 
-**Update patches:** a registry `.zdelta` is a bsdiff diff computed over the _uncompressed tar_ of the previous snapshot. Tar stores each file in a contiguous, byte-stable block, so unchanged entries diff to almost nothing; diffing the compressed bytes would not compress well.
+**Control files:** a registry publishes a `.zsync` control file beside the snapshot, written by [`zync`](https://crates.io/crates/zync-rs). It carries the snapshot's length, its SHA-1, and a table of per-block checksums, plus a `URL` naming where the snapshot itself can be fetched.
 
-A patch is published in one of two shapes:
-
-- **Container** (recommended): a zstd-compressed tar holding a `meta.json` descriptor and a single patch entry. The descriptor binds the patch to its base and target:
-
-  ```json
-  {
-    "format": "zoidelta.v1",
-    "type": "zrepo",
-    "base_sha256": "<sha256 of the previous snapshot's tar>",
-    "target_sha256": "<sha256 of the new snapshot's tar>",
-    "patch": "data.bsdiff"
-  }
-  ```
-
-  Zoi verifies `base_sha256` against the cached snapshot and `target_sha256` against the rebuilt one, so a patch built against a different base or a corrupted download is rejected rather than installed.
-
-  `zoidelta.v1` identifies Zoi's descriptor schema, not the container. The container is the one `zbsdiff` defines, and `zbsdiff` carries `meta.json` without interpreting it, leaving the schema to whoever writes it. Other projects reuse the same container under their own identifiers - `zync` writes `zsidecar.v1` for the block-oriented sidecars that accompany its transfers - so a Zoi delta is told apart by the `format` field. A descriptor declaring any other `format` is rejected.
-
-- **Bare patch**: a zstd-compressed raw `BSDIFF40` patch with no metadata. Accepted, but carries no hash binding, so the published `hash` checksum is the only integrity check available.
+The `URL` Zoi writes is the bare file name rather than an absolute address, because the publisher does not know where the snapshot will be served from. Clients resolve it against the URL they fetched the control file from, so one control file serves a primary and every mirror unchanged. Zoi additionally expands the resolved URL with any mirrors configured locally.
 
 **Behaviour:**
 
-- The client keeps the last downloaded snapshot alongside the registry index as the base for the next update, and reuses it across syncs.
-- A patch is optional. A registry that declares no `delta` is probed once at `<url>.zdelta`; finding nothing there is the normal case and is not reported, because a full download is the correct response to a registry that does not publish patches. A `delta` that is declared but unserved, or a patch that does not fit the snapshot held, is reported as a warning. In all three cases Zoi falls back to a full download, so no failed update can leave a registry unsyncable or half-applied.
+- The client keeps the last downloaded snapshot alongside the registry index and submits it as a zsync seed, recovering every block it already holds and range-requesting only the ones that moved.
+- A control file is optional. A registry that publishes none is downloaded whole, which is the correct response and is not reported as a problem. A control file that is declared but unserved, or a server that cannot answer a range request, is reported as a warning. In every case Zoi falls back to a full download, so no failed update can leave a registry unsyncable or half-applied.
+- The control file only decides how the bytes arrive. A completed transfer is verified against the published `hash` and `pgp` exactly as a full download is, so a registry's trust model does not change when it starts publishing one.
 - Entry paths inside the snapshot are validated on extraction. Absolute paths and `..` components are rejected, so a crafted archive cannot write outside the registry directory.
 - A new tree is staged and swapped into place, and the previous tree is only removed once the new one is installed. An interrupted sync leaves the previous registry intact.
 - When `authorities` are configured and the snapshot publishes a `pgp` signature, the signature is verified before the snapshot is installed. The registry's PGP keys are imported from `repo.yaml` first so they are available in the keyring.

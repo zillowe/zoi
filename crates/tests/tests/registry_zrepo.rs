@@ -1,338 +1,306 @@
-//! Integration tests for the zstd-compressed registry database (`.zrepo`)
-//! transport and its incremental `.zdelta` updates.
+//! Integration tests for the registry snapshot (`.zrepo`) transport and its
+//! incremental zsync transfers.
 
 use std::fs;
-use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use anyhow::Result;
-use serde_json::json;
 use tempfile::tempdir;
-use zbsdiff::zdelta;
-use zoi_core::delta::{ZOIDELTA_FORMAT_ID, ZREPO_DELTA_TYPE};
 use zoi_core::types::RepoConfig;
 use zoi_sync::zrepo;
 
 mod common;
 
-/// Builds the uncompressed tar of a registry snapshot.
-///
-/// The tree always carries a `repo.yaml` and a `packages.json` so it mirrors
-/// what a real published registry looks like, plus one package definition whose
-/// body the tests vary between revisions. `filler` adds that many unchanged
-/// package definitions, standing in for the bulk of a real registry.
-fn build_registry_tar_with_filler(
+/// Fills `root` with a registry tree holding `filler` package definitions and
+/// one `ripgrep` definition whose body the tests vary between revisions.
+fn make_registry_tree(
+    root: &Path,
     pkg_lua_body: &str,
     filler: usize
-) -> Vec<u8> {
-    let mut builder = tar::Builder::new(Vec::new());
-
-    let append =
-        |builder: &mut tar::Builder<Vec<u8>>, name: &str, body: &str| {
-            let mut header = tar::Header::new_gnu();
-            header.set_size(body.len() as u64);
-            header.set_mode(0o644);
-            header.set_cksum();
-            builder
-                .append_data(&mut header, name, Cursor::new(body.as_bytes()))
-                .expect("tar append should succeed");
-        };
-
-    append(
-        &mut builder,
-        "repo.yaml",
-        "version: \"2\"\n\
-         name: testreg\n\
-         description: A test registry\n\
-         git: []\n\
-         repos: []\n\
-         zrepo:\n\
-         \x20 - type: main\n\
-         \x20   url: https://example.com/testreg.zrepo\n",
-    );
-    append(
-        &mut builder,
-        "packages.json",
-        r#"{"version":"2","packages":{}}"#
-    );
+) -> Result<()> {
+    fs::create_dir_all(root.join("main/ripgrep"))?;
+    fs::write(
+        root.join("repo.yaml"),
+        "version: \"2\"\nname: testreg\ndescription: A test registry\ngit: \
+         []\nrepos: []\nzrepo:\n  - type: main\n    url: \
+         http://placeholder/testreg.zrepo\n"
+    )?;
+    fs::write(
+        root.join("packages.json"),
+        "{\"version\":\"2\",\"packages\":{}}"
+    )?;
+    fs::write(root.join("main/ripgrep/ripgrep.pkg.lua"), pkg_lua_body)?;
 
     for index in 0..filler {
-        let name = format!("main/tool-{index:04}/tool-{index:04}.pkg.lua");
-        let body = format!(
-            "metadata({{name=\"tool-{index:04}\",version=\"1.{index}.0\",\
-             description=\"Filler package {index} with a body long enough to \
-             compress and diff like a real package definition would.\"}})\n"
-        );
-        append(&mut builder, &name, &body);
+        let dir = root.join(format!("main/tool-{index}"));
+        fs::create_dir_all(&dir)?;
+        fs::write(
+            dir.join(format!("tool-{index}.pkg.lua")),
+            format!(
+                "metadata({{name=\"tool-{index}\",repo=\"main\",version=\"1.0.\
+                 {index}\"}})\n"
+            )
+        )?;
     }
-
-    append(&mut builder, "main/ripgrep/ripgrep.pkg.lua", pkg_lua_body);
-
-    builder.into_inner().expect("tar build should succeed")
+    Ok(())
 }
 
-/// Builds a minimal registry snapshot.
-fn build_registry_tar(pkg_lua_body: &str) -> Vec<u8> {
-    build_registry_tar_with_filler(pkg_lua_body, 0)
-}
+/// Serves `root` over HTTP on a background thread, counting the body bytes it
+/// hands out so a test can tell an incremental transfer from a full one.
+///
+/// Supports `Range`, which is the request the snapshot transfer is built on.
+fn serve(root: PathBuf) -> (String, Arc<AtomicU64>) {
+    let served = Arc::new(AtomicU64::new(0));
+    let counter = Arc::clone(&served);
 
-/// Writes `tar_bytes` as a zstd-compressed `.zrepo` file.
-fn write_zrepo(path: &Path, tar_bytes: &[u8]) {
-    let compressed = zdelta::zstd_compress(tar_bytes)
-        .expect("zstd compression should succeed");
-    fs::write(path, compressed).expect("zrepo write should succeed");
-}
+    let listener = std::net::TcpListener::bind("127.0.0.1:0")
+        .expect("bind an ephemeral port");
+    let address = listener.local_addr().expect("read the bound address");
 
-/// Writes a `.zdelta` container carrying a bsdiff patch from `old_tar` to
-/// `new_tar`, with the given `meta` overrides merged over the required fields.
-fn write_zrepo_delta(
-    path: &Path,
-    old_tar: &[u8],
-    new_tar: &[u8],
-    meta_overrides: &serde_json::Value
-) {
-    let diff =
-        zdelta::diff_bytes(old_tar, new_tar).expect("diff should succeed");
-
-    let mut meta = json!({
-        "format": ZOIDELTA_FORMAT_ID,
-        "type": ZREPO_DELTA_TYPE,
-        "base_sha256": sha256_hex(old_tar),
-        "target_sha256": sha256_hex(new_tar),
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { continue };
+            handle_request(&mut stream, &root, &counter);
+        }
     });
-    // Let a test override any field, e.g. to forge a hash.
-    if let (Some(base), Some(overrides)) =
-        (meta.as_object_mut(), meta_overrides.as_object())
-    {
-        for (key, value) in overrides {
-            base.insert(key.clone(), value.clone());
+
+    (format!("http://{address}"), served)
+}
+
+/// Answers one HTTP request, honouring `Range` when one is asked for.
+fn handle_request(
+    stream: &mut std::net::TcpStream,
+    root: &Path,
+    counter: &AtomicU64
+) {
+    use std::io::{BufRead, BufReader, Write};
+
+    let mut reader = BufReader::new(stream.try_clone().expect("clone stream"));
+    let mut request_line = String::new();
+    if reader.read_line(&mut request_line).is_err() {
+        return;
+    }
+
+    let mut range: Option<(usize, usize)> = None;
+    loop {
+        let mut header = String::new();
+        if reader.read_line(&mut header).is_err() || header.trim().is_empty() {
+            break;
+        }
+        let lower = header.to_lowercase();
+        if let Some(at) = lower.find("range: bytes=") {
+            let spec = header[at + 13..]
+                .split_whitespace()
+                .next()
+                .unwrap_or("0-")
+                .to_string();
+            let mut parts = spec.split('-');
+            let start = parts
+                .next()
+                .and_then(|n| n.trim().parse::<usize>().ok())
+                .unwrap_or(0);
+            let end = parts
+                .next()
+                .and_then(|n| n.trim().parse::<usize>().ok())
+                .unwrap_or(usize::MAX);
+            range = Some((start, end));
         }
     }
 
-    zdelta::write_container(&meta, &[("data.bsdiff".to_string(), diff)], path)
-        .expect("zdelta write should succeed");
-}
+    let name = request_line
+        .split_whitespace()
+        .nth(1)
+        .unwrap_or("/")
+        .trim_start_matches('/')
+        .to_string();
+    let path = root.join(&name);
 
-/// SHA-256 hex digest of `data`.
-fn sha256_hex(data: &[u8]) -> String {
-    zoi_core::hash::calculate_reader_hash(
-        &mut Cursor::new(data),
-        zoi_core::hash::HashAlgorithm::Sha256
-    )
-    .expect("hashing should succeed")
-    .1
-}
+    let Ok(body) = fs::read(&path) else {
+        let _ = stream
+            .write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
+        return;
+    };
 
-/// Decompresses a `.zrepo` file back to its tar bytes.
-fn read_zrepo(path: &Path) -> Vec<u8> {
-    let bytes = fs::read(path).expect("zrepo read should succeed");
-    zdelta::zstd_decompress(&bytes).expect("zstd decompression should succeed")
-}
+    let empty: &[u8] = &[];
+    let (status, slice) = match range {
+        // A range that runs past the end answers empty rather than panicking,
+        // which is what a real server does and what the client has to survive.
+        Some((start, end)) => {
+            let end = end.min(body.len().saturating_sub(1));
+            let slice = body.get(start..=end).unwrap_or(empty);
+            ("206 Partial Content", slice)
+        }
+        None => ("200 OK", body.as_slice())
+    };
 
-/// Reads a single file out of a tar archive's bytes.
-fn read_tar_entry(tar_bytes: &[u8], wanted: &str) -> String {
-    let mut archive = tar::Archive::new(Cursor::new(tar_bytes));
-    for entry in archive.entries().expect("tar entries") {
-        let mut entry = entry.expect("tar entry");
-        let name = entry
-            .path()
-            .expect("entry path")
-            .to_string_lossy()
-            .to_string();
-        if name == wanted {
-            let mut body = String::new();
-            std::io::Read::read_to_string(&mut entry, &mut body)
-                .expect("read entry");
-            return body;
+    counter.fetch_add(slice.len() as u64, Ordering::Relaxed);
+    let head = format!(
+        "HTTP/1.1 {status}\r\nContent-Length: {}\r\nAccept-Ranges: \
+         bytes\r\n\r\n",
+        slice.len()
+    );
+    if stream.write_all(head.as_bytes()).is_ok() {
+        let mut remaining = slice;
+        // Streamed so a large snapshot does not need a second copy.
+        while !remaining.is_empty() {
+            let chunk = remaining.len().min(64 * 1024);
+            let Some(head) = remaining.get(..chunk) else {
+                return;
+            };
+            if stream.write_all(head).is_err() {
+                return;
+            }
+            remaining = remaining.get(chunk..).unwrap_or_default();
         }
     }
-    panic!("'{wanted}' not found in archive");
+    let _ = stream.flush();
 }
 
-const REVISION_ONE: &str = "metadata({name=\"ripgrep\",version=\"14.1.0\"})";
-const REVISION_TWO: &str = "metadata({name=\"ripgrep\",version=\"14.1.1\"})";
-
-#[test]
-fn zrepo_delta_roundtrip_rebuilds_the_new_snapshot() {
-    let tmp = tempdir().expect("tempdir");
-    let old_tar = build_registry_tar(REVISION_ONE);
-    let new_tar = build_registry_tar(REVISION_TWO);
-
-    let base = tmp.path().join("testreg.zrepo");
-    let patch = tmp.path().join("testreg.zrepo.zdelta");
-    let out = tmp.path().join("rebuilt.zrepo");
-
-    write_zrepo(&base, &old_tar);
-    write_zrepo_delta(&patch, &old_tar, &new_tar, &json!({}));
-
-    zrepo::apply_delta(&base, &patch, &out).expect("delta should apply");
-
-    // The rebuilt snapshot must be byte-identical to a full download, so the
-    // incremental path is invisible to every consumer of the registry.
-    let rebuilt = read_zrepo(&out);
-    assert_eq!(rebuilt, new_tar, "rebuilt tar must equal the published tar");
-    assert_eq!(
-        read_tar_entry(&rebuilt, "main/ripgrep/ripgrep.pkg.lua"),
-        REVISION_TWO
-    );
+/// A `.zrepo` link pointing at a snapshot served by `base`.
+fn served_link(base: &str) -> zoi_core::types::ZrepoLink {
+    zoi_core::types::ZrepoLink {
+        link_type: "main".to_string(),
+        url: format!("{base}/testreg.zrepo"),
+        control: None,
+        pgp: None,
+        hash: None,
+        size: None
+    }
 }
 
 #[test]
-fn zrepo_delta_is_smaller_than_a_full_download() {
+fn zrepo_sync_reuses_an_older_snapshot_and_transfers_only_what_changed() {
     let tmp = tempdir().expect("tempdir");
-    // A realistic registry: many packages, of which one changed. This is the
-    // case the incremental update exists for, and the reason the patch is
-    // computed over the uncompressed tar rather than the compressed snapshot -
-    // unchanged tar blocks are byte-identical and diff to almost nothing.
-    let old_tar = build_registry_tar_with_filler(REVISION_ONE, 400);
-    let new_tar = build_registry_tar_with_filler(REVISION_TWO, 400);
+    let serve_root = tmp.path().join("serve");
+    let tree = tmp.path().join("registry");
+    fs::create_dir_all(&serve_root).expect("serve dir");
 
-    let base = tmp.path().join("testreg.zrepo");
-    let patch = tmp.path().join("testreg.zrepo.zdelta");
-    let out = tmp.path().join("rebuilt.zrepo");
-
-    write_zrepo(&base, &old_tar);
-    write_zrepo_delta(&patch, &old_tar, &new_tar, &json!({}));
-
-    zrepo::apply_delta(&base, &patch, &out).expect("delta should apply");
-
-    let patch_size = fs::metadata(&patch).expect("patch size").len();
-    let full_size = fs::metadata(&base).expect("base size").len();
-    assert!(
-        patch_size * 10 < full_size,
-        "an incremental update ({patch_size} bytes) must be far smaller than \
-         a full download ({full_size} bytes)"
-    );
-}
-
-#[test]
-fn zrepo_delta_rejects_a_base_the_patch_was_not_built_against() {
-    let tmp = tempdir().expect("tempdir");
-    let old_tar = build_registry_tar(REVISION_ONE);
-    let new_tar = build_registry_tar(REVISION_TWO);
-    // A different base than the one the patch targets, as happens when a
-    // client missed a sync.
-    let other_tar =
-        build_registry_tar("metadata({name=\"ripgrep\",version=\"14.0.9\"})");
-
-    let base = tmp.path().join("testreg.zrepo");
-    let patch = tmp.path().join("testreg.zrepo.zdelta");
-    let out = tmp.path().join("rebuilt.zrepo");
-
-    write_zrepo(&base, &other_tar);
-    write_zrepo_delta(&patch, &old_tar, &new_tar, &json!({}));
-
-    let err = zrepo::apply_delta(&base, &patch, &out)
-        .expect_err("a mismatched base must be rejected");
-    let message = err.to_string();
-    assert!(
-        message.contains("does not match the base"),
-        "unexpected error: {message}"
-    );
-    assert!(
-        !out.exists(),
-        "a rejected delta must not leave a snapshot behind"
-    );
-}
-
-#[test]
-fn zrepo_delta_rejects_a_rebuilt_snapshot_with_the_wrong_hash() {
-    let tmp = tempdir().expect("tempdir");
-    let old_tar = build_registry_tar(REVISION_ONE);
-    let new_tar = build_registry_tar(REVISION_TWO);
-
-    let base = tmp.path().join("testreg.zrepo");
-    let patch = tmp.path().join("testreg.zrepo.zdelta");
-    let out = tmp.path().join("rebuilt.zrepo");
-
-    write_zrepo(&base, &old_tar);
-    // Forge the target hash so the rebuilt snapshot cannot be trusted.
-    write_zrepo_delta(
-        &patch,
-        &old_tar,
-        &new_tar,
-        &json!({ "target_sha256": sha256_hex(b"something else entirely") })
-    );
-
-    let err = zrepo::apply_delta(&base, &patch, &out)
-        .expect_err("a hash mismatch must be rejected");
-    assert!(
-        err.to_string().contains("does not match the expected hash"),
-        "unexpected error: {err}"
-    );
-}
-
-#[test]
-fn zrepo_delta_rejects_a_patch_meant_for_another_target() {
-    let tmp = tempdir().expect("tempdir");
-    let old_tar = build_registry_tar(REVISION_ONE);
-    let new_tar = build_registry_tar(REVISION_TWO);
-
-    let base = tmp.path().join("testreg.zrepo");
-    let patch = tmp.path().join("testreg.zrepo.zdelta");
-    let out = tmp.path().join("rebuilt.zrepo");
-
-    write_zrepo(&base, &old_tar);
-    // A `.zpa` update patch aimed at a different artifact type must not be
-    // applied to a registry snapshot.
-    write_zrepo_delta(&patch, &old_tar, &new_tar, &json!({ "type": "zpa" }));
-
-    let err = zrepo::apply_delta(&base, &patch, &out)
-        .expect_err("a foreign patch type must be rejected");
-    assert!(
-        err.to_string().contains("expected 'zrepo'"),
-        "unexpected error: {err}"
-    );
-}
-
-#[test]
-fn zrepo_delta_accepts_a_bare_bsdiff_patch() {
-    let tmp = tempdir().expect("tempdir");
-    let old_tar = build_registry_tar(REVISION_ONE);
-    let new_tar = build_registry_tar(REVISION_TWO);
-
-    let base = tmp.path().join("testreg.zrepo");
-    let out = tmp.path().join("rebuilt.zrepo");
-
-    write_zrepo(&base, &old_tar);
-
-    // The single-target shape: just a zstd-compressed raw bsdiff patch, with
-    // no container metadata at all.
-    let patch_bytes =
-        zdelta::diff_bytes(&old_tar, &new_tar).expect("diff should succeed");
-    let patch = tmp.path().join("bare.zdelta");
-    fs::write(
-        &patch,
-        zdelta::zstd_compress(&patch_bytes).expect("compress patch")
+    // A registry with real bulk, so an incremental transfer has something to
+    // save rather than trivially matching everything.
+    make_registry_tree(
+        &tree,
+        "metadata({name=\"ripgrep\",version=\"14.1.0\"})",
+        300
     )
-    .expect("write patch");
+    .expect("first tree");
+    zrepo::create_zrepo(&tree, &serve_root.join("testreg.zrepo"), None)
+        .expect("first snapshot");
 
-    zrepo::apply_delta(&base, &patch, &out).expect("bare patch should apply");
-    assert_eq!(read_zrepo(&out), new_tar);
+    let (base, served) = serve(serve_root.clone());
+    let link = served_link(&base);
+
+    let db_root = tmp.path().join("db");
+    let installed = tmp.path().join("registry-live");
+
+    let hash = zrepo::sync_zrepo(
+        &[&link],
+        &db_root,
+        "testreg",
+        &installed,
+        &[],
+        None,
+        false
+    )
+    .expect("first sync");
+    assert!(!hash.is_empty(), "a snapshot hash should be recorded");
+    assert!(
+        installed.join("repo.yaml").exists(),
+        "the registry tree should have been installed"
+    );
+    assert!(
+        zrepo::base_artifact_path(&db_root, "testreg").exists(),
+        "the snapshot should be cached as a seed for the next sync"
+    );
+
+    // Publish a new revision that changes exactly one package definition.
+    make_registry_tree(
+        &tree,
+        "metadata({name=\"ripgrep\",version=\"14.1.1\"})",
+        300
+    )
+    .expect("second tree");
+    zrepo::create_zrepo(&tree, &serve_root.join("testreg.zrepo"), None)
+        .expect("second snapshot");
+
+    let snapshot_size = fs::metadata(serve_root.join("testreg.zrepo"))
+        .expect("stat")
+        .len();
+
+    served.store(0, Ordering::Relaxed);
+    zrepo::sync_zrepo(
+        &[&link],
+        &db_root,
+        "testreg",
+        &installed,
+        &[],
+        None,
+        false
+    )
+    .expect("second sync");
+
+    let definition =
+        fs::read_to_string(installed.join("main/ripgrep/ripgrep.pkg.lua"))
+            .expect("the new definition should be installed");
+    assert!(
+        definition.contains("14.1.1"),
+        "the new revision should be installed, got {definition}"
+    );
+
+    // The point of the exercise: the second sync must not have re-downloaded
+    // the registry. Serving less than a tenth of the snapshot is a wide margin
+    // for a one-file change out of hundreds.
+    let transferred = served.load(Ordering::Relaxed);
+    assert!(
+        transferred < snapshot_size / 10,
+        "expected an incremental transfer, but {transferred} of \
+         {snapshot_size} bytes were served"
+    );
 }
 
 #[test]
-fn zrepo_delta_rejects_garbage() {
+fn zrepo_sync_falls_back_to_a_full_download_without_a_control_file() {
     let tmp = tempdir().expect("tempdir");
-    let old_tar = build_registry_tar(REVISION_ONE);
+    let serve_root = tmp.path().join("serve");
+    let tree = tmp.path().join("registry");
+    fs::create_dir_all(&serve_root).expect("serve dir");
 
-    let base = tmp.path().join("testreg.zrepo");
-    let patch = tmp.path().join("garbage.zdelta");
-    let out = tmp.path().join("rebuilt.zrepo");
-
-    write_zrepo(&base, &old_tar);
-    fs::write(
-        &patch,
-        zdelta::zstd_compress(b"neither a container nor a bsdiff patch")
-            .expect("compress")
+    make_registry_tree(
+        &tree,
+        "metadata({name=\"ripgrep\",version=\"14.1.0\"})",
+        20
     )
-    .expect("write patch");
+    .expect("tree");
+    zrepo::create_zrepo(&tree, &serve_root.join("testreg.zrepo"), None)
+        .expect("snapshot");
+    // Remove the control file: a registry that has not adopted zsync yet.
+    fs::remove_file(serve_root.join("testreg.zrepo.zsync"))
+        .expect("remove control file");
 
-    zrepo::apply_delta(&base, &patch, &out)
-        .expect_err("garbage must be rejected");
+    let (base, _served) = serve(serve_root);
+    let link = served_link(&base);
+    let installed = tmp.path().join("registry-live");
+
+    // Must succeed anyway: the control file is an optimisation, not a
+    // requirement.
+    zrepo::sync_zrepo(
+        &[&link],
+        &tmp.path().join("db"),
+        "testreg",
+        &installed,
+        &[],
+        None,
+        false
+    )
+    .expect("sync should fall back to a full download");
+
+    assert!(
+        installed.join("repo.yaml").exists(),
+        "the registry tree should still have been installed"
+    );
 }
 
-/// Parses a `repo.yaml` declaring `zrepo` entries in the given order.
 fn repo_config_with_zrepo_links(yaml: &str) -> RepoConfig {
     serde_yaml::from_str(yaml).expect("repo.yaml should parse")
 }
@@ -405,7 +373,7 @@ zrepo:
 }
 
 #[test]
-fn zrepo_delta_url_defaults_to_the_conventional_suffix() {
+fn zrepo_control_url_defaults_to_the_conventional_suffix() {
     let repo_config = repo_config_with_zrepo_links(
         r#"
 version: "2"
@@ -418,7 +386,7 @@ zrepo:
     url: https://example.com/testreg.zrepo
   - type: mirror
     url: https://mirror.example.com/testreg.zrepo
-    delta: https://patch.example.com/testreg.delta
+    control: https://index.example.com/testreg.zsync
 "#
     );
 
@@ -427,14 +395,14 @@ zrepo:
     let mirror = candidates.get(1).expect("mirror link should be present");
 
     assert_eq!(
-        zrepo::delta_url(main),
-        "https://example.com/testreg.zrepo.zdelta",
-        "an entry without an explicit delta resolves to <url>.zdelta"
+        zrepo::control_url(main),
+        "https://example.com/testreg.zrepo.zsync",
+        "an entry without an explicit control resolves to <url>.zsync"
     );
     assert_eq!(
-        zrepo::delta_url(mirror),
-        "https://patch.example.com/testreg.delta",
-        "an explicit delta URL must win"
+        zrepo::control_url(mirror),
+        "https://index.example.com/testreg.zsync",
+        "an explicit control URL must win"
     );
 }
 
