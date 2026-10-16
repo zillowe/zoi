@@ -839,8 +839,10 @@ fn finalize_installation(
                 // name comes from inside the package archive, so pin the link
                 // to the applications directory explicitly rather than relying
                 // on that invariant holding upstream.
-                let symlink_path =
-                    zoi_core::utils::safe_join(&applications_dir, app_name)?;
+                let symlink_path = zoi_core::utils::safe_join(
+                    &applications_dir,
+                    Path::new(app_name)
+                )?;
 
                 if symlink_path.exists() {
                     let _ = fs::remove_file(&symlink_path);

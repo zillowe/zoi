@@ -176,10 +176,13 @@ fn build_registry_tar(registry_root: &Path) -> Result<(Vec<u8>, usize)> {
 ///
 /// Returns an error if the file's permissions cannot be read.
 fn is_executable(path: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-
+    // The `PermissionsExt` import has to live inside the `cfg(unix)` block:
+    // `std::os::unix` does not exist on Windows, so an ungated import fails
+    // to compile there even though the code below it is gated.
     #[cfg(unix)]
     {
+        use std::os::unix::fs::PermissionsExt;
+
         fs::metadata(path).is_ok_and(|m| m.permissions().mode() & 0o111 != 0)
     }
     #[cfg(not(unix))]
