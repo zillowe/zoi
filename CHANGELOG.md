@@ -4,7 +4,18 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](./INSTALL.md).
 
-## [Prod. Release 1.29.0](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.0) - 2026-10-16
+## [Prod. Release 1.29.2](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/tags/Prod-Release-1.29.2) - 2026-10-17
+
+### ♻️ Refactor
+
+- [`da8f22af`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/da8f22af58cba03c8679381886236a039ddcc005) *(registry)* Replace .zdelta snapshots with zsync incremental transfers
+- [`c45cde81`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/c45cde8159b86aa469ae3290098e682095215a6f) *(core)* Introduce dedicated zoidelta format and type constants
+
+### 🩹 Bug Fixes
+
+- [`4fc30cb3`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/4fc30cb361749a8dae0e3bc9e8e5d4a84e7762c3) *(sync)* Exclude .zrepo sidecars from snapshots
+
+## [Prod. Release 1.29.0](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/tags/Prod-Release-1.29.0) - 2026-10-16
 
 ### ♻️ Refactor
 
