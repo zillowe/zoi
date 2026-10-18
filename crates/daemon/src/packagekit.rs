@@ -34,6 +34,11 @@
 //! deadlock. Keeping emission strictly on threads this module spawns removes
 //! that hazard entirely.
 //!
+//! zbus 6 has no blocking connection, so every await point here is driven by
+//! `async_io::block_on` on one of those worker threads. The connection itself
+//! lives on a dedicated host thread that parks inside an executor for the life
+//! of the process - see [`start_packagekit`].
+//!
 //! ## Package identifiers
 //!
 //! `PackageKit`'s identifier format is `name;version;arch;origin;data`, e.g.
@@ -74,9 +79,8 @@ use std::time::Instant;
 
 use anyhow::{Context, Result, bail};
 use colored::Colorize;
-use zbus::blocking::{Connection, connection};
 use zbus::object_server::SignalEmitter;
-use zbus::zvariant::{ObjectPath, OwnedObjectPath, OwnedValue};
+use zbus::{Connection, ObjectPath, OwnedObjectPath, OwnedVariant};
 
 // ---------------------------------------------------------------------------
 // Enumerations, transcribed from PackageKit's pk-enum.h
@@ -551,7 +555,7 @@ impl Reporter {
         B: serde::ser::Serialize + zbus::zvariant::DynamicType
     {
         let conn = dbus_connection()?;
-        let emitter = SignalEmitter::new(conn.inner(), self.path.as_ref())
+        let emitter = SignalEmitter::new(&conn, self.path.as_ref())
             .with_context(|| {
                 format!("Failed to build a signal emitter for {}", self.path)
             })?;
@@ -713,13 +717,13 @@ fn transaction_interface() -> zbus::names::InterfaceName<'static> {
         .expect("the transaction interface name is a valid D-Bus name")
 }
 
-/// Converts a string into an `OwnedValue` for a `a{sv}` dictionary.
+/// Converts a string into an `OwnedVariant` for a `a{sv}` dictionary.
 ///
 /// `zvariant` only implements `From<&str>` for the borrowed `Value`, so the
 /// conversion goes through `Str`. Wrapped in a helper because every `Details`
 /// key needs it and getting it wrong is a type error at each site.
-fn owned_str(value: &str) -> OwnedValue {
-    OwnedValue::from(zbus::zvariant::Str::from(value))
+fn owned_str(value: &str) -> OwnedVariant {
+    OwnedVariant::from(zbus::Str::from(value))
 }
 
 /// One record of the `UpdateDetails` signal.
@@ -1427,18 +1431,18 @@ fn do_get_details(package_ids: &[String], reporter: &Reporter) -> Result<()> {
         let name = package_name_from_id(raw);
         let id = raw.trim().to_string();
 
-        let mut details: HashMap<String, OwnedValue> = HashMap::new();
-        let mut put = |k: &str, v: OwnedValue| {
+        let mut details: HashMap<String, OwnedVariant> = HashMap::new();
+        let mut put = |k: &str, v: OwnedVariant| {
             details.insert(k.to_string(), v);
         };
 
         // Defaults, so the map is always complete.
         put("package_id", owned_str(&id));
         put("license", owned_str(""));
-        put("group", OwnedValue::from(info::UNKNOWN));
+        put("group", OwnedVariant::from(info::UNKNOWN));
         put("detail", owned_str(""));
         put("url", owned_str(""));
-        put("size", OwnedValue::from(0u64));
+        put("size", OwnedVariant::from(0u64));
         put("summary", owned_str(""));
 
         // The registry metadata is consulted for every package, installed or
@@ -1465,7 +1469,7 @@ fn do_get_details(package_ids: &[String], reporter: &Reporter) -> Result<()> {
             put("detail", owned_str(&manifest.description));
             put(
                 "size",
-                OwnedValue::from(manifest.installed_size.unwrap_or(0))
+                OwnedVariant::from(manifest.installed_size.unwrap_or(0))
             );
         } else if let Some(pkg) = registry_entry
             && let Some(version) = package_version(&pkg)
@@ -1590,7 +1594,7 @@ fn refreshed() {
     let Ok(conn) = dbus_connection() else {
         return;
     };
-    let Ok(emitter) = SignalEmitter::new(conn.inner(), ROOT_PATH) else {
+    let Ok(emitter) = SignalEmitter::new(&conn, ROOT_PATH) else {
         return;
     };
     let _ = async_io::block_on(emitter.emit::<_, _, _>(
@@ -1645,32 +1649,43 @@ impl PackageKitRoot {
 
         let state = Arc::new(Mutex::new(TransactionState::new(role::UNKNOWN)));
 
+        // Collected outside the lock, because dropping an exported interface is
+        // async in zbus 6 and blocking on it while holding the table would put
+        // a lock across an await point, where the object server may want the
+        // same lock to answer the call that got us here.
+        let mut expired = Vec::new();
         if let Ok(mut table) = self.transactions.lock() {
             // Reclaim anything idle for too long. Unbounded growth would
             // otherwise leak one object path per transaction forever.
-            let expired: Vec<String> = table
-                .iter()
-                .filter(|(_, tx)| {
-                    tx.lock().is_ok_and(|s| {
-                        s.started.elapsed().as_secs()
-                            > TRANSACTION_IDLE_TIMEOUT_SECS
+            expired.extend(
+                table
+                    .iter()
+                    .filter(|(_, tx)| {
+                        tx.lock().is_ok_and(|s| {
+                            s.started.elapsed().as_secs()
+                                > TRANSACTION_IDLE_TIMEOUT_SECS
+                        })
                     })
-                })
-                .map(|(path, _)| path.clone())
-                .collect();
-            for path in expired {
-                table.remove(&path);
-                // Drop the exported interface so the object path stops
-                // resolving, otherwise a reused path would answer with a stale
-                // transaction.
-                if let Ok(conn) = dbus_connection() {
-                    let _ = conn
-                        .object_server()
-                        .remove::<PackageKitTransaction, _>(path.as_str());
-                }
+                    .map(|(path, _)| path.clone())
+            );
+            for path in &expired {
+                table.remove(path);
             }
 
             table.insert(path.clone(), state.clone());
+        }
+
+        // Drop the exported interfaces so the object paths stop resolving,
+        // otherwise a reused path would answer with a stale transaction.
+        if !expired.is_empty()
+            && let Ok(conn) = dbus_connection()
+        {
+            for path in expired {
+                let _ = async_io::block_on(
+                    conn.object_server()
+                        .remove::<PackageKitTransaction, _>(path.as_str())
+                );
+            }
         }
 
         Ok((path, state))
@@ -1695,7 +1710,7 @@ impl PackageKitRoot {
         let Ok(conn) = dbus_connection() else {
             return;
         };
-        let Ok(emitter) = SignalEmitter::new(conn.inner(), ROOT_PATH) else {
+        let Ok(emitter) = SignalEmitter::new(&conn, ROOT_PATH) else {
             return;
         };
 
@@ -1849,15 +1864,22 @@ impl PackageKitRoot {
             uid: 0
         };
 
-        dbus_connection()
-            .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?
-            .object_server()
-            .at(object_path.clone(), interface)
-            // `at` reports whether the interface was newly added. A `false`
-            // would mean the path was taken, which the monotonic counter above
-            // already rules out, so the flag is not interesting here.
-            .map(|_| ())
-            .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?;
+        // `at` is async in zbus 6, and this runs on a D-Bus dispatcher thread,
+        // so it is driven to completion here rather than left as a
+        // future nobody polls.
+        async_io::block_on(
+            dbus_connection()
+                .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?
+                .object_server()
+                .at(object_path.clone(), interface)
+        )
+        // `at` reports whether the interface was newly added. A `false`
+        // would mean the path was taken, which the monotonic counter above
+        // already rules out, so the flag is not interesting here.
+        .map(|_| ())
+        .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?;
+
+        let () = ();
 
         Ok(OwnedObjectPath::from(object_path))
     }
@@ -1916,7 +1938,7 @@ impl PackageKitRoot {
         &self,
         _names: Vec<String>,
         _count: u32
-    ) -> HashMap<String, Vec<HashMap<String, OwnedValue>>> {
+    ) -> HashMap<String, Vec<HashMap<String, OwnedVariant>>> {
         HashMap::new()
     }
 
@@ -2520,7 +2542,7 @@ impl PackageKitTransaction {
     async fn details(
         &self,
         _emitter: &zbus::object_server::SignalEmitter<'_>,
-        data: HashMap<String, OwnedValue>
+        data: HashMap<String, OwnedVariant>
     ) -> zbus::Result<()>;
 
     /// Emits the file list for one package.
@@ -2652,25 +2674,60 @@ pub(crate) fn dbus_connection() -> Result<Connection> {
 
 /// Starts the `PackageKit` service on the system bus.
 ///
-/// Blocks for the lifetime of the process: the blocking connection drives its
-/// own executor thread, and dropping it would take the bus name with it.
+/// zbus 6 has no blocking connection, so the connection is built on a dedicated
+/// thread that then parks inside the executor for the rest of the process.
+///
+/// Parking is the important part. The connection's own runtime drives its
+/// D-Bus I/O, but the executor that established that runtime has to stay alive
+/// for as long as the connection does: letting the thread fall out of
+/// `block_on` tears the runtime down, and dropping the connection takes the
+/// `PackageKit` bus name with it. `main` spends its life blocked on the Unix
+/// socket accept loop, so it cannot be the thread that hosts this.
+///
+/// # Errors
+///
+/// Returns an error if the hosting thread cannot be spawned. A failure to reach
+/// the bus is reported on that thread rather than here, because by the time it
+/// could be returned the caller has already moved on to its accept loop.
 pub(crate) fn start_packagekit() -> Result<()> {
-    let conn = connection::Builder::system()
-        .context("Failed to connect to the system D-Bus. Is D-Bus running?")?
-        .name(BUS_NAME)
-        .context("Failed to request the PackageKit bus name")?
-        .serve_at(ROOT_PATH, PackageKitRoot::new())
-        .context("Failed to export the PackageKit root interface")?
-        .build()
-        .context("Failed to build the D-Bus connection")?;
+    std::thread::Builder::new()
+        .name("zoi-dbus".to_string())
+        .spawn(|| {
+            let result = async_io::block_on(async {
+                let conn = zbus::connection::Builder::system()
+                    .name(BUS_NAME)
+                    .serve_at(ROOT_PATH, PackageKitRoot::new())
+                    .build()
+                    .await
+                    .context(
+                        "Failed to connect to the system D-Bus, request the \
+                         PackageKit bus name, or export the root interface"
+                    )?;
 
-    // Stored before use so worker threads can reach it.
-    CONNECTION.set(conn).ok();
+                // Stored before use so worker threads can reach it.
+                CONNECTION.set(conn).ok();
 
-    println!(
-        "{} PackageKit service ready on {BUS_NAME} ({ROOT_PATH})",
-        "::".bold().blue()
-    );
+                println!(
+                    "{} PackageKit service ready on {BUS_NAME} ({ROOT_PATH})",
+                    "::".bold().blue()
+                );
+
+                // Never resolves. The connection must outlive this future, and
+                // dropping it would release the bus name.
+                std::future::pending::<()>().await;
+                #[allow(unreachable_code)]
+                Ok::<(), anyhow::Error>(())
+            });
+
+            if let Err(e) = result {
+                eprintln!(
+                    "Warning: failed to start the PackageKit interface: {e}. \
+                     Desktop package tools will not work; the zoi CLI is \
+                     unaffected."
+                );
+            }
+        })
+        .context("Failed to spawn the D-Bus thread")?;
 
     Ok(())
 }
