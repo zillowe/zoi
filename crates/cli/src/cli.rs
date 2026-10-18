@@ -29,7 +29,7 @@ const STATUS: &str = "Release";
 /// The core version of the current build, as `X.Y.Z`.
 ///
 /// Updated by `scripts/bump.sh`, not by hand.
-const NUMBER: &str = "1.29.2";
+const NUMBER: &str = "1.29.3";
 /// Help text for package source identifiers.
 const PKG_SOURCE_HELP: &str =
     "Package identifier (e.g. @repo/name, #git@repo/name, path, or URL)";
