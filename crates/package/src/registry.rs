@@ -17,6 +17,55 @@ use zoi_lua;
 
 use crate::{doctor as pkg_doctor, init_lsp};
 
+/// Reports `repo.yaml` keys that Zoi no longer reads.
+///
+/// The `zrepo` section used to take a `delta` key naming a bsdiff patch. That
+/// is gone: snapshots transfer through a zsync control file instead, named by
+/// `control`. The old key is dropped silently when the manifest is parsed, so
+/// a registry still carrying one looks configured while its clients quietly
+/// download whole snapshots. This is the only place that says so.
+///
+/// A manifest that cannot be read or parsed yields no findings, rather than
+/// an error: a broken manifest is reported by the checks that actually parse
+/// it, and this one stays quiet rather than raising a second, less useful
+/// complaint.
+fn check_obsolete_manifest_keys(registry_root: &Path) -> Vec<String> {
+    let path = registry_root.join("repo.yaml");
+    let Ok(text) = fs::read_to_string(&path) else {
+        return Vec::new();
+    };
+    let Ok(document) = serde_yaml::from_str::<serde_yaml::Value>(&text) else {
+        return Vec::new();
+    };
+
+    let Some(links) = document.get("zrepo").and_then(|v| v.as_sequence())
+    else {
+        return Vec::new();
+    };
+
+    let mut obsolete = Vec::new();
+    for link in links {
+        let Some(link) = link.as_mapping() else {
+            continue;
+        };
+        if !link.contains_key(serde_yaml::Value::String("delta".into())) {
+            continue;
+        }
+        let url = link
+            .get(serde_yaml::Value::String("url".into()))
+            .and_then(|v| v.as_str())
+            .unwrap_or("<no url>");
+        obsolete.push(format!(
+            "The 'zrepo' entry for '{url}' still declares a 'delta' key. That \
+             key is no longer read: snapshots transfer through a zsync \
+             control file, named by 'control' (which defaults to \
+             '<url>.zsync'). Until it is replaced, clients download the whole \
+             snapshot."
+        ));
+    }
+    obsolete
+}
+
 /// Initializes a new Zoi registry at the given path.
 ///
 /// This creates the necessary directory structure, `repo.yaml`,
@@ -813,6 +862,11 @@ pub fn check(registry_root: &Path) -> Result<()> {
         }
     }
 
+    for message in check_obsolete_manifest_keys(registry_root) {
+        println!("    {} {message}", "Warning:".yellow().bold());
+        warnings += 1;
+    }
+
     if errors > 0 {
         return Err(anyhow!(
             "Registry check failed with {errors} error(s) and {warnings} \
@@ -826,4 +880,83 @@ pub fn check(registry_root: &Path) -> Result<()> {
         warnings
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Writes a `repo.yaml` with the given `zrepo` section body.
+    fn write_manifest(root: &Path, zrepo: &str) {
+        fs::create_dir_all(root).expect("create root");
+        fs::write(
+            root.join("repo.yaml"),
+            format!(
+                "version: \"2\"\nname: testreg\ndescription: test\ngit: \
+                 []\nrepos: []\nzrepo:\n{zrepo}"
+            )
+        )
+        .expect("write repo.yaml");
+    }
+
+    #[test]
+    fn an_obsolete_delta_key_is_reported() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        write_manifest(
+            dir.path(),
+            "  - type: main\n    url: https://example.com/reg/main.zrepo\n    \
+             delta: https://example.com/reg/main.zrepo.zdelta\n",
+        );
+
+        let found = check_obsolete_manifest_keys(dir.path());
+        assert_eq!(found.len(), 1, "expected one warning, got {found:?}");
+        assert!(
+            found.first().is_some_and(|m| m.contains("main.zrepo")),
+            "the warning should name the entry: {found:?}"
+        );
+    }
+
+    #[test]
+    fn a_control_key_is_not_reported() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        write_manifest(
+            dir.path(),
+            "  - type: main\n    url: https://example.com/reg/main.zrepo\n    \
+             control: https://example.com/reg/main.zrepo.zsync\n",
+        );
+
+        let found = check_obsolete_manifest_keys(dir.path());
+        assert!(found.is_empty(), "unexpected warning: {found:?}");
+    }
+
+    #[test]
+    fn a_manifest_without_a_zrepo_section_is_not_reported() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        write_manifest(dir.path(), "");
+        // Rewrite without the empty `zrepo` key, which is not valid YAML for
+        // the shape the manifest expects.
+        fs::write(
+            dir.path().join("repo.yaml"),
+            "version: \"2\"\nname: testreg\ndescription: test\ngit: \
+             []\nrepos: []\n"
+        )
+        .expect("write repo.yaml");
+
+        let found = check_obsolete_manifest_keys(dir.path());
+        assert!(found.is_empty(), "unexpected warning: {found:?}");
+    }
+
+    #[test]
+    fn a_malformed_manifest_is_left_to_the_other_checks() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        fs::create_dir_all(dir.path()).expect("create root");
+        fs::write(dir.path().join("repo.yaml"), "zrepo: [oh no")
+            .expect("write repo.yaml");
+
+        // Not an error here: a broken manifest is reported by the checks that
+        // actually parse it, and this one stays quiet rather than adding a
+        // second, less useful complaint.
+        let found = check_obsolete_manifest_keys(dir.path());
+        assert!(found.is_empty(), "unexpected warning: {found:?}");
+    }
 }

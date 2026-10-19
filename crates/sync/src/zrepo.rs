@@ -832,13 +832,13 @@ fn zync_transfer(
     }
 
     let blocksize = control.blocksize;
+    let control_length = control.length;
     let progress_bar = pb.cloned();
     let output = work_dir.join("assembled.zrepo");
 
     let transport = ZoiTransport {
         client: core_utils::get_http_client().map_err(unusable)?
     };
-    let _ = &transport;
     let mut assembly = AssemblyBuilder::new(control, &output)
         .transport(Arc::new(transport))
         .build()
@@ -867,7 +867,7 @@ fn zync_transfer(
         );
     }
 
-    assembly
+    let stats = assembly
         .fetch()
         .map_err(|e| unusable(anyhow!("Snapshot transfer failed: {e}")))?;
     assembly
@@ -899,7 +899,27 @@ fn zync_transfer(
     .map_err(unusable)?;
 
     if verbose {
-        println!("{}", "Registry snapshot updated incrementally.".green());
+        // What the transfer actually cost, so the saving is visible rather
+        // than merely implied. A registry author who cannot see the number
+        // has no reason to publish a control file in the first place.
+        let total = control_length;
+        let reused = total.saturating_sub(stats.downloaded);
+        let percent =
+            reused.saturating_mul(100).checked_div(total).unwrap_or(0);
+        println!(
+            "{}",
+            format!(
+                "Registry snapshot updated incrementally: {reused_pct} of \
+                 {total_bytes} reused ({percent}%), {downloaded} fetched in \
+                 {requests} request{s}.",
+                reused_pct = core_utils::format_bytes(reused),
+                total_bytes = core_utils::format_bytes(total),
+                downloaded = core_utils::format_bytes(stats.downloaded),
+                requests = stats.requests,
+                s = if stats.requests == 1 { "" } else { "s" }
+            )
+            .green()
+        );
     }
     Ok(hash)
 }
