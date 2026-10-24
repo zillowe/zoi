@@ -1,0 +1,45 @@
+#!/usr/bin/make -f
+export DH_VERBOSE = 1
+ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+PROJ_NAME := debian/zoi
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	@# Pre-compiled binaries are used; no build step required
+
+override_dh_auto_install:
+	mkdir -p $(PROJ_NAME)/usr/bin
+	mkdir -p $(PROJ_NAME)/usr/share/man/man1
+	mkdir -p $(PROJ_NAME)/usr/share/man/man3
+	mkdir -p $(PROJ_NAME)/usr/share/man/man5
+	mkdir -p $(PROJ_NAME)/usr/share/bash-completion/completions
+	mkdir -p $(PROJ_NAME)/usr/share/zsh/site-functions
+	mkdir -p $(PROJ_NAME)/usr/share/fish/vendor_completions.d
+	mkdir -p $(PROJ_NAME)/usr/share/doc/zoi
+
+	if [ "$(ARCH)" = "amd64" ]; then \
+		install -m 755 zoi-linux-amd64 $(PROJ_NAME)/usr/bin/zoi; \
+	elif [ "$(ARCH)" = "arm64" ]; then \
+		install -m 755 zoi-linux-arm64 $(PROJ_NAME)/usr/bin/zoi; \
+	else \
+		echo "Unsupported architecture: $(ARCH)" && exit 1; \
+	fi
+
+	$(PROJ_NAME)/usr/bin/zoi generate-completions bash > $(PROJ_NAME)/usr/share/bash-completion/completions/zoi || true
+	$(PROJ_NAME)/usr/bin/zoi generate-completions zsh > $(PROJ_NAME)/usr/share/zsh/site-functions/_zoi || true
+	$(PROJ_NAME)/usr/bin/zoi generate-completions fish > $(PROJ_NAME)/usr/share/fish/vendor_completions.d/zoi.fish || true
+
+	[ -f zoi.1 ] && install -m 644 zoi.1 $(PROJ_NAME)/usr/share/man/man1/zoi.1 || true
+	[ -f zoi-rs.3 ] && install -m 644 zoi-rs.3 $(PROJ_NAME)/usr/share/man/man3/zoi-rs.3 || true
+	[ -f zoi-lua.5 ] && install -m 644 zoi-lua.5 $(PROJ_NAME)/usr/share/man/man5/zoi-lua.5 || true
+
+	[ -f README.md ] && install -m 644 README.md $(PROJ_NAME)/usr/share/doc/zoi/README.md || true
+	[ -f LICENSE ] && install -m 644 LICENSE $(PROJ_NAME)/usr/share/doc/zoi/copyright || true
+
+override_dh_strip:
+	dh_strip --no-automatic-dbgsym || true
+
+override_dh_dwz:
+	@# Skip dwz on pre-compiled Rust binaries

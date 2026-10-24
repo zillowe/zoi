@@ -1,0 +1,17 @@
+Source: zoi
+Section: utils
+Priority: optional
+Maintainer: Zillowe Foundation <contact@zillowe.qzz.io>
+Rules-Requires-Root: no
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://gitlab.com/zillowe/zillwen/zusty/zoi
+
+Package: zoi
+Architecture: amd64 arm64
+Depends: ${shlibs:Depends}, ${misc:Depends}, git, gnupg
+Recommends: bubblewrap
+Description: Advanced Package Manager & Environment Orchestrator
+ Zoi is an advanced package manager and environment orchestrator,
+ designed to simplify package management and environment configuration
+ across multiple operating systems.

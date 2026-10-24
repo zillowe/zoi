@@ -290,6 +290,10 @@ directory. These can be used as a reference.
 
 - [`zoi.spec`](./packages/rpm/zoi.spec): RPM spec file for RHEL distros.
 
+### Debian / Ubuntu (OpenSUSE Build Service)
+
+- [`packages/obs/`](./packages/obs/): Debian source package files (`control`, `rules`, `changelog`, `zoi.dsc`) used to publish native APT repositories on the OpenSUSE Build Service (OBS) for Debian (Unstable, Testing, 13) and Ubuntu on `x86_64` and `aarch64`.
+
 ## Packaging Status
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/zoi.svg)](https://repology.org/project/zoi/versions)

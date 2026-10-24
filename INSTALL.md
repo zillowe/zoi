@@ -62,6 +62,57 @@ sudo apt install ./zoi-*.deb
 sudo dpkg -i zoi-*.deb
 ```
 
+Or you can add our official repository on the [OpenSUSE Build Service (OBS)](https://build.opensuse.org/package/show/home:zillowez/zoi)
+(Supports Debian Unstable, Debian Testing, Debian 13, and Ubuntu on `x86_64` and `aarch64`):
+
+**Debian Unstable (Sid):**
+
+```sh
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://download.opensuse.org/repositories/home:/zillowez/Debian_Unstable/Release.key | gpg --dearmor | sudo tee /etc/apt/keyrings/home_zillowez.gpg > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/home_zillowez.gpg] https://download.opensuse.org/repositories/home:/zillowez/Debian_Unstable/ ./" | sudo tee /etc/apt/sources.list.d/home_zillowez.list
+sudo apt update
+sudo apt install zoi
+```
+
+**Debian Testing:**
+
+```sh
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://download.opensuse.org/repositories/home:/zillowez/Debian_Testing/Release.key | gpg --dearmor | sudo tee /etc/apt/keyrings/home_zillowez.gpg > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/home_zillowez.gpg] https://download.opensuse.org/repositories/home:/zillowez/Debian_Testing/ ./" | sudo tee /etc/apt/sources.list.d/home_zillowez.list
+sudo apt update
+sudo apt install zoi
+```
+
+**Debian 13 (Trixie):**
+
+```sh
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://download.opensuse.org/repositories/home:/zillowez/Debian_13/Release.key | gpg --dearmor | sudo tee /etc/apt/keyrings/home_zillowez.gpg > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/home_zillowez.gpg] https://download.opensuse.org/repositories/home:/zillowez/Debian_13/ ./" | sudo tee /etc/apt/sources.list.d/home_zillowez.list
+sudo apt update
+sudo apt install zoi
+```
+
+**Ubuntu (26.04 LTS & 26.10):**
+
+```sh
+# For Ubuntu 26.04:
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://download.opensuse.org/repositories/home:/zillowez/xUbuntu_26.04/Release.key | gpg --dearmor | sudo tee /etc/apt/keyrings/home_zillowez.gpg > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/home_zillowez.gpg] https://download.opensuse.org/repositories/home:/zillowez/xUbuntu_26.04/ ./" | sudo tee /etc/apt/sources.list.d/home_zillowez.list
+sudo apt update
+sudo apt install zoi
+
+# For Ubuntu 26.10:
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://download.opensuse.org/repositories/home:/zillowez/xUbuntu_26.10/Release.key | gpg --dearmor | sudo tee /etc/apt/keyrings/home_zillowez.gpg > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/home_zillowez.gpg] https://download.opensuse.org/repositories/home:/zillowez/xUbuntu_26.10/ ./" | sudo tee /etc/apt/sources.list.d/home_zillowez.list
+sudo apt update
+sudo apt install zoi
+```
+
 #### Fedora / RHEL (.rpm)
 
 Download the `.rpm` package for your architecture from the

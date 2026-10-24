@@ -180,3 +180,71 @@ if [[ -n $(git status --porcelain) ]]; then
   git push "https://oauth2:${GITLAB_TOKEN_COPR}@gitlab.com/zillowe/packaging/copr.git" HEAD:main
 fi
 cd ..
+
+echo "--- OpenSUSE Build Service (OBS) ---"
+if [ -n "${OBS_USER:-}" ] && [ -n "${OBS_PASSWORD:-}" ]; then
+  OBS_PROJECT="${OBS_PROJECT:-home:zillowez}"
+  OBS_PACKAGE="${OBS_PACKAGE:-zoi}"
+  OBS_WORK_DIR=$(mktemp -d)
+
+  mkdir -p ~/.config/osc
+  cat <<EOF >~/.config/osc/oscrc
+[general]
+apiurl = https://api.opensuse.org
+
+[https://api.opensuse.org]
+user = ${OBS_USER}
+pass = ${OBS_PASSWORD}
+EOF
+
+  TAR_TMP=$(mktemp -d)
+  tar -xf "${ARCHIVE_DIR}/zoi-linux-amd64.tar.zst" -C "$TAR_TMP"
+  mv "$TAR_TMP/zoi" "$TAR_TMP/zoi-linux-amd64"
+  tar -xf "${ARCHIVE_DIR}/zoi-linux-arm64.tar.zst" -C "$TAR_TMP"
+  mv "$TAR_TMP/zoi" "$TAR_TMP/zoi-linux-arm64"
+  cp "${ARCHIVE_DIR}/zoi.1" "${ARCHIVE_DIR}/zoi-rs.3" "${ARCHIVE_DIR}/zoi-lua.5" "$TAR_TMP/" 2>/dev/null || true
+  cp ./README.md "$TAR_TMP/" 2>/dev/null || true
+  cp ./LICENSE "$TAR_TMP/" 2>/dev/null || true
+
+  ORIG_TAR="${OBS_WORK_DIR}/zoi_${VERSION}.orig.tar.xz"
+  DEB_TAR="${OBS_WORK_DIR}/zoi_${VERSION}-1.debian.tar.xz"
+  DSC_FILE="${OBS_WORK_DIR}/zoi_${VERSION}-1.dsc"
+
+  tar -cJf "$ORIG_TAR" -C "$TAR_TMP" .
+  tar -cJf "$DEB_TAR" -C "$TMP_PACKAGES/obs" debian
+
+  SHA1_ORIG=$(sha1sum "$ORIG_TAR" | awk '{print $1}')
+  SHA256_ORIG=$(sha256sum "$ORIG_TAR" | awk '{print $1}')
+  MD5_ORIG=$(md5sum "$ORIG_TAR" | awk '{print $1}')
+  SIZE_ORIG=$(stat -c%s "$ORIG_TAR")
+
+  SHA1_DEB=$(sha1sum "$DEB_TAR" | awk '{print $1}')
+  SHA256_DEB=$(sha256sum "$DEB_TAR" | awk '{print $1}')
+  MD5_DEB=$(md5sum "$DEB_TAR" | awk '{print $1}')
+  SIZE_DEB=$(stat -c%s "$DEB_TAR")
+
+  sed \
+    -e "s/__SHA1_ORIG__/${SHA1_ORIG}/g" \
+    -e "s/__SHA256_ORIG__/${SHA256_ORIG}/g" \
+    -e "s/__MD5_ORIG__/${MD5_ORIG}/g" \
+    -e "s/__SIZE_ORIG__/${SIZE_ORIG}/g" \
+    -e "s/__SHA1_DEB__/${SHA1_DEB}/g" \
+    -e "s/__SHA256_DEB__/${SHA256_DEB}/g" \
+    -e "s/__MD5_DEB__/${MD5_DEB}/g" \
+    -e "s/__SIZE_DEB__/${SIZE_DEB}/g" \
+    "$TMP_PACKAGES/obs/zoi.dsc" >"$DSC_FILE"
+
+  (
+    cd "$OBS_WORK_DIR"
+    osc checkout "${OBS_PROJECT}" "${OBS_PACKAGE}"
+    cd "${OBS_PROJECT}/${OBS_PACKAGE}"
+    rm -f zoi_*.orig.tar.* zoi_*.debian.tar.* zoi_*.dsc
+    cp "$ORIG_TAR" "$DEB_TAR" "$DSC_FILE" ./
+    osc addremove
+    if [[ -n $(osc status) ]]; then
+      osc commit -m "Release: ${VERSION}"
+    fi
+  )
+else
+  echo "OBS_USER and OBS_PASSWORD not set; skipping OBS publication."
+fi

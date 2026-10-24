@@ -417,7 +417,8 @@ release:packages:
   stage: release-package
   image: archlinux:latest
   before_script:
-    - pacman -Sy --needed --noconfirm base-devel sed git openssh sudo
+    - pacman -Sy --needed --noconfirm base-devel sed git openssh sudo python python-pip zstd
+    - pip install --break-system-packages osc
   script:
     - chmod +x ./scripts/packages.sh
     - ./scripts/packages.sh

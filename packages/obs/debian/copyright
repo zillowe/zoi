@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: zoi
+Upstream-Contact: Zillowe Foundation <contact@zillowe.qzz.io>
+Source: https://gitlab.com/zillowe/zillwen/zusty/zoi
+
+Files: *
+Copyright: 2026 Zillowe Foundation
+License: Apache-2.0
