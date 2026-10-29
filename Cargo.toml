@@ -140,7 +140,7 @@ reqwest = { version = "0.13.5", default-features = false, features = [
     "json",
     "rustls",
 ] }
-self-replace = "1.5.0"
+self-replace = "1.5.1"
 semver = "1.0.28"
 sequoia-openpgp = { version = "2.4.2", default-features = false, features = [
     "crypto-openssl",
@@ -150,7 +150,7 @@ serde_json = "1.0.154"
 serde_yaml = { package = "yaml_serde", version = "0.10.7" }
 sha2 = "0.11.1"
 zbsdiff = { version = "1.6.6", features = ["zdelta"] }
-zbus = { version = "6.1.0", default-features = false, features = [
+zbus = { version = "6.2.0", default-features = false, features = [
     "default-rt",
     "service",
 ] }
@@ -168,32 +168,32 @@ winapi = { version = "0.3.9", default-features = false, features = [
     "winnt",
 ] }
 xz2 = "0.1.7"
-zip = { version = "9.1.0", default-features = false, features = ["deflate"] }
+zip = { version = "9.1.3", default-features = false, features = ["deflate"] }
 zstd = "0.14.3"
 zync-rs = "0.1.2"
 ar = "0.9.0"
 sevenz-rust2 = "0.24.1"
 phf = "0.14.0"
-rusqlite = { version = "0.41.0", default-features = false, features = [
+rusqlite = { version = "0.41.1", default-features = false, features = [
     "bundled",
 ] }
 glob = "0.3.4"
 pubgrub = "0.4.0"
 thiserror = "2.0.21"
 rustc-hash = "2.1.3"
-json5 = "1.3.4"
+json5 = "1.3.6"
 purl = "0.1.6"
 dotenvy = "0.15.7"
 phf_codegen = "0.14.0"
 diffy = "0.5.2"
-ignore = "0.4.33"
+ignore = "0.4.34"
 aes-gcm = "0.11.1"
 rand = { version = "0.10.3", features = ["std", "thread_rng", "sys_rng"] }
 getrandom = "0.4.3"
 argon2 = "0.6.0"
 base64 = "0.23.1"
-posthog-rs = { version = "0.27.1", default-features = false }
-sentry = { version = "0.49.3", default-features = false, features = [
+posthog-rs = { version = "0.30.0", default-features = false }
+sentry = { version = "0.49.5", default-features = false, features = [
     "backtrace",
     "contexts",
     "panic",
