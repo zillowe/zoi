@@ -294,6 +294,10 @@ directory. These can be used as a reference.
 
 - [`packages/obs/`](./packages/obs/): Debian source package files (`control`, `rules`, `changelog`, `zoi.dsc`) used to publish native APT repositories on the OpenSUSE Build Service (OBS) for Debian (Unstable, Testing, 13) and Ubuntu on `x86_64` and `aarch64`.
 
+### Nix / NixOS
+
+- [`flake.nix`](./flake.nix): Flake providing `packages.default` (`zoi`), `devShells.default`, and `overlays.default`.
+
 ## Packaging Status
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/zoi.svg)](https://repology.org/project/zoi/versions)

@@ -30,6 +30,53 @@ powershell -c "irm zillowe.pages.dev/scripts/zoi/install.ps1|iex"
 
 Install Zoi on Linux distros.
 
+#### Nix / NixOS
+
+Install or run Zoi directly with Nix flakes, or include it in your NixOS configuration:
+
+**Run directly:**
+
+```sh
+nix run gitlab:zillowe/zillwen/zusty/zoi -- --version
+```
+
+**Install to user profile:**
+
+```sh
+nix profile install gitlab:zillowe/zillwen/zusty/zoi
+```
+
+**In your NixOS `flake.nix`:**
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    zoi.url = "gitlab:zillowe/zillwen/zusty/zoi";
+  };
+
+  outputs = { self, nixpkgs, zoi, ... }: {
+    nixosConfigurations.myhostname = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ({ pkgs, ... }: {
+          environment.systemPackages = [
+            zoi.packages.''${pkgs.system}.default
+          ];
+        })
+      ];
+    };
+  };
+}
+```
+
+Or via overlay:
+
+```nix
+nixpkgs.overlays = [ zoi.overlays.default ];
+environment.systemPackages = [ pkgs.zoi ];
+```
+
 #### Arch Linux (AUR)
 
 Install [`zoi-bin`](https://aur.archlinux.org/packages/zoi-bin)

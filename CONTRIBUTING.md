@@ -12,7 +12,8 @@ making our project better. Every contribution, no matter how small, is valuable 
   - [Contributing Code](#contributing-code)
 - [Development](#development)
   - [Prerequisites](#prerequisites)
-  - [First-Time Setup](#first-time-setup)
+  - [Installation locally](#installation-locally)
+  - [Development with Nix](#development-with-nix)
   - [Development with Docker](#development-with-docker)
   - [Development Commands](#development-commands)
 - [Crash Reports](#crash-reports)
@@ -71,11 +72,10 @@ You can find instructions at [rust-lang.org](https://www.rust-lang.org/tools/ins
 
 See [`PACKAGING.md`](./PACKAGING.md) for more information.
 
-### First-Time Setup
+### Installation locally
 
-Because Zoi is used to manage its own development, you must first build and
-install it manually using `just` (Or you can install
-[pre-compiled binaries](./INSTALL.md) instead):
+To test Zoi locally you must first build and install it manually using
+`just` (Or you can install [pre-compiled binaries](./INSTALL.md) instead):
 
 1. **Configure the build:**
 
@@ -92,7 +92,31 @@ install it manually using `just` (Or you can install
    sudo just install
    ```
 
-Once you have a working `zoi` command, you can use it for all other development tasks.
+### Development with Nix
+
+If you use [Nix](https://nixos.org) with flakes enabled, a fully configured development shell is provided with all required compilers, tools, and libraries (pinned Rust toolchain, nightly rustfmt, LLVM/Clang, `libclang`, `pkg-config`, `just`, OpenSSL, and runtime dependencies).
+
+#### Using `direnv` (Recommended)
+
+If you have [`direnv`](https://direnv.net) and [`nix-direnv`](https://github.com/nix-community/nix-direnv) installed, entering the repository directory will automatically load the environment via `.envrc`:
+
+```sh
+direnv allow
+```
+
+#### Using `nix develop`
+
+You can also manually spawn the development shell at any time:
+
+```sh
+nix develop
+```
+
+Or run any development command directly inside the shell without entering an interactive prompt:
+
+```sh
+nix develop --command just build
+```
 
 ### Development with Docker
 
