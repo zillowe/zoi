@@ -1,11 +1,12 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended",
-    ":gitSignOff"
-  ],
-  "enabledManagers": [
-    "cargo"
-  ],
-  "rangeStrategy": "bump"
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"extends": ["config:recommended", ":gitSignOff"],
+	"enabledManagers": ["cargo", "nix"],
+	"rangeStrategy": "bump",
+	"packageRules": [
+		{
+			"matchManagers": ["nix"],
+			"groupName": "nix flake inputs"
+		}
+	]
 }

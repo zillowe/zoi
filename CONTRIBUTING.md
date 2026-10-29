@@ -104,9 +104,17 @@ If you have [`direnv`](https://direnv.net) and [`nix-direnv`](https://github.com
 direnv allow
 ```
 
-#### Using `nix develop`
+#### Using `nix develop` or `just nix`
 
-You can also manually spawn the development shell at any time:
+You can enter the development shell using the convenient `just nix` recipe or `nix develop -c $SHELL` to preserve your current interactive shell (e.g. `zsh`, `fish`) and your personal prompt/configs:
+
+```sh
+just nix
+# or:
+nix develop -c $SHELL
+```
+
+Or run standard isolated Bash:
 
 ```sh
 nix develop
@@ -115,6 +123,8 @@ nix develop
 Or run any development command directly inside the shell without entering an interactive prompt:
 
 ```sh
+just nix cargo check
+# or:
 nix develop --command just build
 ```
 

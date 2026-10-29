@@ -212,6 +212,14 @@ lint-fix:
 test:
     @cargo test --workspace --all-targets --all-features
 
+# Enter the Nix development shell with the current shell (or run a command)
+nix *args:
+    @if [ -z "{{ args }}" ]; then \
+        nix develop -c "$SHELL"; \
+    else \
+        nix develop --command {{ args }}; \
+    fi
+
 # Bump Zoi version
 bump *args:
     @./scripts/bump.sh {{ args }}
