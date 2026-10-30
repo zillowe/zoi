@@ -210,8 +210,33 @@ pub fn install_dependency<S: std::hash::BuildHasher>(
         }
         res
     } else if dep.manager == "native" {
+        let is_available = utils::command_exists(dep.package)
+            || match dep.package {
+                "bubblewrap" => utils::command_exists("bwrap"),
+                _ => false
+            };
+
+        if is_available {
+            if let Some(p) = pb {
+                p.set_message(format!("{} (already available)", dep.package));
+                p.finish();
+            } else {
+                println!(
+                    "-> '{}' is already available in PATH. Skipping.",
+                    dep.package.cyan()
+                );
+            }
+            return Ok(());
+        }
+
         let pm = utils::get_native_package_manager().ok_or_else(|| {
-            anyhow!("Native package manager not found for this OS")
+            anyhow!(
+                "Native dependency '{}' is not available in PATH and no \
+                 supported native package manager was detected for this OS. \
+                 Please install '{}' using your system's package manager.",
+                dep.package,
+                dep.package
+            )
         })?;
         if pb.is_none() {
             println!("-> Using native package manager: {}", pm.cyan());

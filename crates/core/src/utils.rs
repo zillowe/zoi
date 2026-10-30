@@ -597,6 +597,7 @@ pub fn get_linux_distro_family() -> Option<String> {
                 "void" => Some("void".to_string()),
                 "solus" => Some("solus".to_string()),
                 "guix" => Some("guix".to_string()),
+                "nixos" => Some("nixos".to_string()),
                 _ => None
             };
         }
@@ -876,6 +877,7 @@ pub fn get_native_package_manager() -> Option<String> {
                     "solus" => "eopkg",
                     "guix" => "guix",
                     "zoios" => "zoi",
+                    "nixos" => "nix",
                     _ => "unknown"
                 }
                 .to_string()

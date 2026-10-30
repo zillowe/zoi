@@ -82,3 +82,33 @@ fn test_skip_missing_package_manager() {
         );
     }
 }
+
+#[test]
+fn test_native_dependency_available_in_path() {
+    if zoi::utils::command_exists("git") {
+        let dep = parse_dependency_string("native:git")
+            .expect("Failed to parse native dependency string");
+
+        assert_eq!(dep.manager, "native");
+        assert_eq!(dep.package, "git");
+
+        let processed = Mutex::new(HashSet::new());
+        let mut installed = Vec::new();
+
+        let result = install_dependency(
+            &dep,
+            "test-parent",
+            Scope::User,
+            true,
+            true,
+            &processed,
+            &mut installed,
+            None
+        );
+
+        assert!(
+            result.is_ok(),
+            "Should succeed when native binary is already available in PATH"
+        );
+    }
+}
