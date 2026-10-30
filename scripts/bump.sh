@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 set -e
 
 # Usage: ./scripts/bump.sh [Branch]-[Status]-[Number]

@@ -19,7 +19,7 @@ use crate::{cmd, utils};
 /// display only and are mapped in `utils::format_version_summary`.
 ///
 /// Updated by `scripts/bump.sh`, not by hand.
-const BRANCH: &str = "Prod";
+const BRANCH: &str = "Dev";
 
 /// The ZFVM status of the current build (Pre-Alpha, Alpha, Beta, RC, Release).
 ///
@@ -29,7 +29,7 @@ const STATUS: &str = "Release";
 /// The core version of the current build, as `X.Y.Z`.
 ///
 /// Updated by `scripts/bump.sh`, not by hand.
-const NUMBER: &str = "1.29.3";
+const NUMBER: &str = "1.30.0";
 /// Help text for package source identifiers.
 const PKG_SOURCE_HELP: &str =
     "Package identifier (e.g. @repo/name, #git@repo/name, path, or URL)";
