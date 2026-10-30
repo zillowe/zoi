@@ -25,7 +25,7 @@
           overlays = [ (import rust-overlay) ];
         };
 
-        rustToolchain = pkgs.rust-bin.stable.latest.default.override {
+        rustToolchain = pkgs.rust-bin.stable.latest.minimal.override {
           extensions = [
             "rust-src"
             "clippy"
@@ -109,8 +109,8 @@
             name = "zoi-dev";
 
             nativeBuildInputs = with pkgs; [
-              rustToolchain
               nightlyRustfmt
+              rustToolchain
 
               just
               pkg-config

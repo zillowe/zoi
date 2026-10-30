@@ -190,11 +190,25 @@ deps:
 
 # Format Rust code
 fmt:
-    @cargo +nightly fmt --all
+    @if rustfmt --version 2>/dev/null | grep -q 'nightly'; then \
+        cargo fmt --all; \
+    elif cargo +nightly --version >/dev/null 2>&1; then \
+        cargo +nightly fmt --all; \
+    else \
+        echo "Error: Nightly rustfmt is required. Please enter the Nix dev shell or install nightly via rustup."; \
+        exit 1; \
+    fi
 
 # Check for formating issues in Rust code
 fmt-check:
-    @cargo +nightly fmt --all --check
+    @if rustfmt --version 2>/dev/null | grep -q 'nightly'; then \
+        cargo fmt --all --check; \
+    elif cargo +nightly --version >/dev/null 2>&1; then \
+        cargo +nightly fmt --all --check; \
+    else \
+        echo "Error: Nightly rustfmt is required. Please enter the Nix dev shell or install nightly via rustup."; \
+        exit 1; \
+    fi
 
 # Check Rust code for error
 check:
