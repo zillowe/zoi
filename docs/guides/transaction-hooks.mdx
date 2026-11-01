@@ -19,6 +19,7 @@ In a standard package manager, if you install 50 packages that all contain fonts
 
 Hooks are defined using simple YAML files. They can be placed in:
 
+- **Packages (Bundled):** Installed directly inside the package store via `${pkgstore}/hooks/` in `.pkg.lua`. These hooks are versioned with the package, automatically discovered by Zoi across scopes, and cleanly garbage-collected when the package version is removed or pruned.
 - **System:** `/etc/zoi/hooks/`
 - **User:** the user data directory under `zoi/hooks/`
 - **Extensions:** Distributed via Zoi [Extensions](/docs/zds/zoi/extensions).
