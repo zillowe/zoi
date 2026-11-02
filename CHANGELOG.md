@@ -4,7 +4,40 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](./INSTALL.md).
 
-## [Prod. Release 1.29.2](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/tags/Prod-Release-1.29.2) - 2026-10-17
+## [Prod. Release 1.29.4](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.4) - 2026-10-18
+
+### ✨ Features
+
+- [`af144973`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/af144973bace8eff546412353da93c93aa61c9ff) *(install)* Add availability check for native dependencies and support NixOS
+- [`0ad2799b`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/0ad2799b686fb9a6bf446d076bec37bb6b0ecf88) *(packaging)* Add support for OpenSUSE Build Service (OBS)
+- [`ad91791a`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/ad91791a9c228efae6a157f12af091b4564c705e) *(package)* Warn on obsolete delta keys in registry manifests and improve transfer stats
+
+### 🛠️ Build
+
+- [`7a39d59a`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/7a39d59a707a6546898244dd88da43d9d1103137) Update justfile for nix
+- [`8297ac97`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/8297ac97e394a1addabf25587d59ef92658a14c8) Add Nix flake
+
+### 🛡️ Dependencies
+
+- [`6e2b0b5b`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/6e2b0b5b9cb3385d0837f0c82a03e8bf195e86f3) Update nix flake
+- [`49cfecb2`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/49cfecb2f3a3b36194ee2281bf4d78ee103dd4f2) Update
+
+### 🩹 Bug Fixes
+
+- [`29aba251`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/29aba25127933bafaeb508ee8fc1f81e7fd8ab49) *(lua)* Include captured stderr in unexpected shell session termination error
+- [`86eac95f`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/86eac95f058b70b9a53fcfc14bea4f49ef83bfbe) *(deps)* Downgrade luau0-src to 0.22.0+luau740
+
+## [Prod. Release 1.29.3](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.3) - 2026-10-18
+
+### ♻️ Refactor
+
+- [`9b1b87b8`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/9b1b87b8d5352f030e50f4fe63fea36db9d795f7) *(daemon)* Upgrade to zbus 6 and update connection handling
+
+### 🛡️ Dependencies
+
+- [`c65421a0`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/c65421a04dff9de68f8db96ae92d2d00727453ff) Update
+
+## [Prod. Release 1.29.2](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.2) - 2026-10-17
 
 ### ♻️ Refactor
 
@@ -15,7 +48,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 - [`4fc30cb3`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/4fc30cb361749a8dae0e3bc9e8e5d4a84e7762c3) *(sync)* Exclude .zrepo sidecars from snapshots
 
-## [Prod. Release 1.29.0](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/tags/Prod-Release-1.29.0) - 2026-10-16
+## [Prod. Release 1.29.0](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.0) - 2026-10-16
 
 ### ♻️ Refactor
 
