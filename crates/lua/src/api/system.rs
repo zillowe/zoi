@@ -220,8 +220,7 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                     })?;
                 } else {
                     let cmd_text = format!(
-                        "{{ {command} ; }} ; printf \"\\n%s %d\\n\" \
-                         {sentinel:?} $?\n"
+                        "{{\n{command}\n}}\nprintf \"\\n%s %d\\n\" {sentinel:?} $?\n"
                     );
                     inner.stdin.write_all(cmd_text.as_bytes()).map_err(
                         |e| mlua::Error::RuntimeError(e.to_string())
@@ -265,9 +264,16 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                     continue;
                 }
                 if session_died {
-                    return Err(mlua::Error::RuntimeError(
+                    let stderr = inner
+                        .stderr_buffer
+                        .lock()
+                        .map(|b| b.clone())
+                        .unwrap_or_default();
+                    return Err(mlua::Error::RuntimeError(if stderr.is_empty() {
                         "Shell session ended unexpectedly".to_string()
-                    ));
+                    } else {
+                        format!("Shell session ended unexpectedly:\n{stderr}")
+                    }));
                 }
 
                 // Retrieve captured stderr
