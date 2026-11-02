@@ -10,7 +10,8 @@ fi
 VERSION="${CI_COMMIT_TAG#Prod-Release-}"
 echo "Publishing version: $VERSION"
 
-ARCHIVE_DIR="./scripts/archived"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ARCHIVE_DIR="${REPO_ROOT}/scripts/archived"
 CHECKSUM_FILE="${ARCHIVE_DIR}/checksums.txt"
 CHECKSUM_SHA256_FILE="${ARCHIVE_DIR}/checksums-256.txt"
 
@@ -86,7 +87,7 @@ SHA256_MAN_ZOI_LUA=$(get_sha256 "zoi-lua.5")
 
 TMP_PACKAGES=$(mktemp -d)
 chmod 755 "$TMP_PACKAGES"
-cp -r packages/* "$TMP_PACKAGES/"
+cp -r "${REPO_ROOT}/packages/"* "$TMP_PACKAGES/"
 
 find "$TMP_PACKAGES" -type f -exec sed -i \
   -e "s/__VERSION__/${VERSION}/g" \
@@ -109,11 +110,14 @@ find "$TMP_PACKAGES" -type f -exec sed -i \
 
 echo "Generating .SRCINFO for AUR packages..."
 chown -R nobody "$TMP_PACKAGES/aur"
-cd "$TMP_PACKAGES/aur/zoi"
-sudo -u nobody makepkg --printsrcinfo >.SRCINFO
-cd ../zoi-bin
-sudo -u nobody makepkg --printsrcinfo >.SRCINFO
-cd ../../../
+(
+  cd "$TMP_PACKAGES/aur/zoi"
+  sudo -u nobody makepkg --printsrcinfo >.SRCINFO
+)
+(
+  cd "$TMP_PACKAGES/aur/zoi-bin"
+  sudo -u nobody makepkg --printsrcinfo >.SRCINFO
+)
 
 echo "--- Updating package manager files ---"
 mkdir -p ~/.ssh
@@ -203,8 +207,8 @@ EOF
   tar -xf "${ARCHIVE_DIR}/zoi-linux-arm64.tar.zst" -C "$TAR_TMP"
   mv "$TAR_TMP/zoi" "$TAR_TMP/zoi-linux-arm64"
   cp "${ARCHIVE_DIR}/zoi.1" "${ARCHIVE_DIR}/zoi-rs.3" "${ARCHIVE_DIR}/zoi-lua.5" "$TAR_TMP/" 2>/dev/null || true
-  cp ./README.md "$TAR_TMP/" 2>/dev/null || true
-  cp ./LICENSE "$TAR_TMP/" 2>/dev/null || true
+  cp "${REPO_ROOT}/README.md" "$TAR_TMP/" 2>/dev/null || true
+  cp "${REPO_ROOT}/LICENSE" "$TAR_TMP/" 2>/dev/null || true
 
   ORIG_TAR="${OBS_WORK_DIR}/zoi_${VERSION}.orig.tar.xz"
   DEB_TAR="${OBS_WORK_DIR}/zoi_${VERSION}-1.debian.tar.xz"
