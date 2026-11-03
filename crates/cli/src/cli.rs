@@ -34,6 +34,106 @@ const NUMBER: &str = "1.29.5";
 const PKG_SOURCE_HELP: &str =
     "Package identifier (e.g. @repo/name, #git@repo/name, path, or URL)";
 
+/// Custom help template for the main CLI showing categorized subcommands with
+/// consistent styling.
+const MAIN_HELP_TEMPLATE: &str = "\
+{before-help}{about-with-newline}
+{usage-heading} {usage}
+
+\x1b[1;33mPackage Management:\x1b[0m
+  \x1b[32minstall, i, add\x1b[0m     Installs one or more packages from a \
+                                  name, local file, URL, or git repo
+  \x1b[32muninstall, un, rm\x1b[0m   Uninstalls one or more packages \
+                                  previously installed by Zoi
+  \x1b[32mupdate, up\x1b[0m          Updates one or more packages to their \
+                                  latest versions
+  \x1b[32mdowngrade, dg\x1b[0m       Downgrade a package to a specific version \
+                                  from local cache or store
+  \x1b[32mrollback\x1b[0m            Rollback a package to the previously \
+                                  installed version
+  \x1b[32mautoremove\x1b[0m          Removes packages installed as \
+                                  dependencies that are no longer needed
+  \x1b[32mmark, m\x1b[0m             Modify the installation reason of a \
+                                  package
+  \x1b[32mpin\x1b[0m                 Pin a package to a specific version
+  \x1b[32munpin\x1b[0m               Unpin a package, allowing it to be updated
+
+\x1b[1;33mQuery & Inspection:\x1b[0m
+  \x1b[32msearch, s\x1b[0m           Searches for packages by name, \
+                                  description, files, or tags
+  \x1b[32mshow\x1b[0m                Shows detailed information about a package
+  \x1b[32mlist, ls\x1b[0m            Lists installed or all available packages
+  \x1b[32mfiles\x1b[0m               List all files owned by a package
+  \x1b[32mowner, owns\x1b[0m         Find which package owns a file
+  \x1b[32mprovides\x1b[0m            Find which package provides a specific \
+                                  command or file
+  \x1b[32mtree\x1b[0m                Visualize the dependency tree of a package
+  \x1b[32mwhy\x1b[0m                 Explains why a package is installed
+  \x1b[32mman\x1b[0m                 Shows a package's manual page
+  \x1b[32mhistory\x1b[0m             Shows the history of package operations
+  \x1b[32maudit\x1b[0m               Audit installed or all packages for \
+                                  security vulnerabilities
+
+\x1b[1;33mDevelopment & Execution:\x1b[0m
+  \x1b[32mexec, x\x1b[0m             Execute a package binary directly with \
+                                  its dependencies resolved
+  \x1b[32mshell\x1b[0m               Enter an ephemeral environment or manage \
+                                  shell completions
+  \x1b[32mdev, develop\x1b[0m        Enter a development shell for the current \
+                                  project
+  \x1b[32mrun\x1b[0m                 Execute a command defined in a local \
+                                  zoi.lua file
+  \x1b[32menv\x1b[0m                 Manage and set up project environments \
+                                  from a local zoi.lua file
+  \x1b[32minit\x1b[0m                Create a zoi.lua project file in the \
+                                  current directory
+  \x1b[32mcreate\x1b[0m              Create an application using a package \
+                                  template
+  \x1b[32malt\x1b[0m                 Inspect and choose alternative \
+                                  implementations
+  \x1b[32mservice, svc\x1b[0m        Manage background services for installed \
+                                  packages
+
+\x1b[1;33mPackaging & Registries:\x1b[0m
+  \x1b[32mpackage, pkg\x1b[0m        Build, bundle, test, verify, and migrate \
+                                  Zoi packages
+  \x1b[32mregistry, reg\x1b[0m       Manage and author Zoi registries
+  \x1b[32mrepo\x1b[0m                Manage package repositories
+  \x1b[32msync, sy\x1b[0m            Downloads or updates package databases \
+                                  from remote repositories
+  \x1b[32mclone\x1b[0m               Clones the git repository of a package
+  \x1b[32mdownload, dl\x1b[0m        Downloads a package archive or source \
+                                  bundle
+  \x1b[32mpgp\x1b[0m                 Manage PGP keys for package signature \
+                                  verification
+
+\x1b[1;33mSystem & Storage:\x1b[0m
+  \x1b[32mdoctor\x1b[0m              Checks for common issues and provides \
+                                  actionable suggestions
+  \x1b[32mupgrade, ug\x1b[0m         Upgrades the Zoi binary to the latest \
+                                  version
+  \x1b[32mcache\x1b[0m               Manage Zoi's local cache and download \
+                                  mirrors
+  \x1b[32mtransaction, tx\x1b[0m     Inspect recorded transactions and undo \
+                                  operations
+  \x1b[32mextension, ext\x1b[0m      Manage Zoi extensions
+  \x1b[32mtelemetry\x1b[0m           Manage telemetry settings (opt-in \
+                                  analytics)
+  \x1b[32msystem\x1b[0m              Manage the underlying ZoiOS system (ZoiOS \
+                                  only)
+  \x1b[32mhome\x1b[0m                Manage declarative user environments \
+                                  (ZoiOS only)
+
+\x1b[1;33mGeneral:\x1b[0m
+  \x1b[32minfo\x1b[0m                Displays detected operating system and \
+                                  architecture information
+  \x1b[32mversion, v\x1b[0m          Prints concise version and build \
+                                  information
+  \x1b[32mabout\x1b[0m               Shows detailed application information \
+                                  and credits
+
+{options}{after-help}";
+
 /// Zoi - The Advanced Package Manager & Environment Orchestrator.
 ///
 /// Part of the Zillowe Development Suite (ZDS), Zoi is designed to streamline
@@ -43,6 +143,7 @@ const PKG_SOURCE_HELP: &str =
     trailing_var_arg = true,
     color = ColorChoice::Auto,
     arg_required_else_help = true,
+    help_template = MAIN_HELP_TEMPLATE
 )]
 pub struct Cli {
     /// The subcommand to execute.
@@ -266,9 +367,6 @@ enum Commands {
         #[arg(long, value_enum, conflicts_with = "local")]
         scope: Option<SetupScope>
     },
-
-    /// Migration helpers for converting external manifests to Zoi package files
-    Migrate(cmd::migrate::MigrateCommand),
 
     /// Lists installed or all available packages
     #[command(alias = "ls")]
@@ -940,7 +1038,6 @@ fn command_name(command: &Commands) -> &'static str {
         Commands::Info => "info",
         Commands::Download { .. } => "download",
         Commands::Sync { .. } => "sync",
-        Commands::Migrate(_) => "migrate",
         Commands::List { .. } => "list",
         Commands::Show { .. } => "show",
         Commands::Pin { .. } => "pin",
@@ -1161,7 +1258,6 @@ pub fn run() -> anyhow::Result<()> {
                     res
                 }
             }
-            Commands::Migrate(args) => cmd::migrate::run(args),
             Commands::List {
                 all,
                 outdated,

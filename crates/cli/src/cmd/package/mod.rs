@@ -53,7 +53,9 @@ enum Commands {
     /// Initialize LSP support for .pkg.lua files
     InitLsp(init_lsp::InitLspCommand),
     /// Inspect a package definition and output metadata
-    Inspect(inspect::InspectCommand)
+    Inspect(inspect::InspectCommand),
+    /// Migrate external manifests into Zoi package definitions
+    Migrate(crate::cmd::migrate::MigrateCommand)
 }
 
 /// Runs the package command.
@@ -71,6 +73,7 @@ pub fn run(args: PackageCommand) -> Result<()> {
         Commands::Verify(cmd) => verify::run(&cmd),
         Commands::Doctor(cmd) => doctor::run(&cmd),
         Commands::InitLsp(cmd) => init_lsp::run(&cmd),
-        Commands::Inspect(cmd) => inspect::run(cmd)
+        Commands::Inspect(cmd) => inspect::run(cmd),
+        Commands::Migrate(cmd) => crate::cmd::migrate::run(cmd)
     }
 }
