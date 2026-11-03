@@ -120,7 +120,9 @@ declare *project*, *packages*, *registries*, *tasks*, *environments*,
   *author*, *platforms* (such as `"linux-amd64"`), *scope* or *scopes*,
   *sub_packages* and *main_subs*, *type* (`package`, `app`,
   `collection`, or `extension`), *conflicts*, *replaces*, *provides*,
-  *tags*, *bins*, *versions* (channel map), *rollback*, and *zoios*.
+  *tags*, *bins*, *versions* (channel map), *rollback*, *zoios*, and *zsa*
+  (boolean; set to `false` or set `no_zsa = true` to disable `.zsa` source
+  bundling for large repositories).
 
 *dependencies*(_table_)::
   Define build-time and runtime requirements with the keys *runtime*,

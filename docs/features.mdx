@@ -514,26 +514,6 @@ Modify the installation reason of one or more packages.
 
 ---
 
-### `zoi migrate scoop <input>`
-
-Convert a Scoop package manifest (`.json`/JSON5) into a Zoi `.pkg.lua` package file with broad field coverage.
-
-**Arguments:**
-
-- `<input>`: Path to the Scoop manifest file.
-
-**Options:**
-
-- `-o`, `--output <PATH>`: Output path for generated `.pkg.lua`.
-- `--repo <REPO>`: Value for `metadata.repo` in generated package.
-- `--name <NAME>`: Override output package name.
-- `--version <VERSION>`: Override package version.
-- `--maintainer-name <NAME>`: Maintainer name to set in metadata.
-- `--maintainer-email <EMAIL>`: Maintainer email to set in metadata.
-- `--dry-run`: Print generated `.pkg.lua` instead of writing a file.
-
----
-
 ### `zoi owner <path>`
 
 (alias: `owns`)
@@ -594,6 +574,14 @@ Build, create, and manage Zoi packages.
 - `delta <old_archive> <new_archive>`: Generate a `.zdelta` patch between an older and a newer `.zpa` archive. The delta contains only the changed content as bsdiff patches, transferred through a zstd-compressed tar container. Also generates `.zdelta.hash`, `.zdelta.size`, and optionally `.zdelta.sig` sidecar files.
   - `-o, --output <PATH>`: Output path for the `.zdelta` file (defaults to `<new_archive>.zdelta`).
   - `--sign <KEY>`: Sign the delta patch with a PGP key from your Zoi keyring. Generates a `.zdelta.sig` file.
+- `migrate scoop <input>`: Convert an external package manifest (such as Scoop `.json`/JSON5) into a Zoi `.pkg.lua` package file with broad field coverage.
+  - `-o`, `--output <PATH>`: Output path for generated `.pkg.lua`.
+  - `--repo <REPO>`: Value for `metadata.repo` in generated package.
+  - `--name <NAME>`: Override output package name.
+  - `--version <VERSION>`: Override package version.
+  - `--maintainer-name <NAME>`: Maintainer name to set in metadata.
+  - `--maintainer-email <EMAIL>`: Maintainer email to set in metadata.
+  - `--dry-run`: Print generated `.pkg.lua` instead of writing a file.
 
 ---
 

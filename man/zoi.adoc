@@ -432,8 +432,9 @@ _PACKAGES_... (default: all), *--scope*=_user|system_, *--json*. For
 *--json*:: Machine-readable output. *--platform*=_P_.
 *--version-override*=_V_.
 
-*migrate scoop* _INPUT_ [_OPTIONS_]::
-  Convert a Scoop manifest into a `.pkg.lua` definition.
+*migrate* _TOOL_ _INPUT_ [_OPTIONS_]::
+  Convert an external package manifest into a `.pkg.lua` definition.
+  _TOOL_ is currently `scoop` (for Windows Scoop manifests).
 +
 *-o*, *--output*=_FILE_ (default: _<name>_.pkg.lua).
 *--repo*=_TIER_ (default community). *--name*=_NAME_,
