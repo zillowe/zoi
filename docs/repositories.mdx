@@ -238,19 +238,19 @@ A Zoi package registry is defined by a `repo.yaml` file at its root. This file c
 
 Here are the fields available in `repo.yaml`:
 
-| Field             | Type                  | Description                                                                                                                                                                                                                                    |
-| ----------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`            | `string`              | The display name of the repository.                                                                                                                                                                                                            |
-| `handle`          | `string`              | Short identifier used as the registry handle (e.g. `zoidberg`). This is what users see in `@handle/repo/package` install syntax.                                                                                                               |
-| `description`     | `string`              | A short description of the repository.                                                                                                                                                                                                         |
-| `advisory_prefix` | `string`              | (Optional) Prefix used for advisory identifiers imported from this registry.                                                                                                                                                                   |
-| `git`             | `list` of `GitLink`   | A list of git repository URLs. The `type` can be `main` for the primary repository or `mirror` for fallbacks.                                                                                                                                  |
-| `pkg`             | `list` of `PkgLink`   | (Optional) A list of URLs for pre-built package registries. Zoi will try to download pre-built packages from here before building from source.                                                                                                 |
-| `delta`           | `list` of `DeltaLink` | (Optional) A list of URLs for delta patch registries. Zoi will use these for bandwidth-efficient upgrades when a previous version is cached.                                                                                                   |
+| Field             | Type                  | Description                                                                                                                                                                                                                                                  |
+| ----------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`            | `string`              | The display name of the repository.                                                                                                                                                                                                                          |
+| `handle`          | `string`              | Short identifier used as the registry handle (e.g. `zoidberg`). This is what users see in `@handle/repo/package` install syntax.                                                                                                                             |
+| `description`     | `string`              | A short description of the repository.                                                                                                                                                                                                                       |
+| `advisory_prefix` | `string`              | (Optional) Prefix used for advisory identifiers imported from this registry.                                                                                                                                                                                 |
+| `git`             | `list` of `GitLink`   | A list of git repository URLs. The `type` can be `main` for the primary repository or `mirror` for fallbacks.                                                                                                                                                |
+| `pkg`             | `list` of `PkgLink`   | (Optional) A list of URLs for pre-built package registries. Zoi will try to download pre-built packages from here before building from source.                                                                                                               |
+| `delta`           | `list` of `DeltaLink` | (Optional) A list of URLs for delta patch registries. Zoi will use these for bandwidth-efficient upgrades when a previous version is cached.                                                                                                                 |
 | `zrepo`           | `list` of `ZrepoLink` | (Optional) A list of registry snapshots (`.zrepo`) and their zsync control files. When present, Zoi syncs the registry from a snapshot instead of cloning the `git` repository. The `type` can be `main` for the primary snapshot or `mirror` for fallbacks. |
-| `db`              | `string`              | (Optional) URL for registry database metadata.                                                                                                                                                                                                 |
-| `pgp`             | `list` of `PgpKey`    | (Optional) A list of PGP keys to import for package signature verification. The `key` can be a URL to the key file or a PGP fingerprint.                                                                                                       |
-| `repos`           | `list` of `Repo`      | A list of the sub-repositories (or tiers) contained within the registry. `type` can be `official`, `community`, etc. `active` determines if it's enabled by default.                                                                           |
+| `db`              | `string`              | (Optional) URL for registry database metadata.                                                                                                                                                                                                               |
+| `pgp`             | `list` of `PgpKey`    | (Optional) A list of PGP keys to import for package signature verification. The `key` can be a URL to the key file or a PGP fingerprint.                                                                                                                     |
+| `repos`           | `list` of `Repo`      | A list of the sub-repositories (or tiers) contained within the registry. `type` can be `official`, `community`, etc. `active` determines if it's enabled by default.                                                                                         |
 
 ## Snapshot Registries (`.zrepo`)
 
@@ -282,14 +282,14 @@ zrepo:
 
 Each `ZrepoLink` supports these fields:
 
-| Field   | Type     | Description                                                                 |
-| ------- | -------- | --------------------------------------------------------------------------- |
-| `type`  | `string` | `main` for the primary snapshot, `mirror` for a fallback.                   |
-| `url`   | `string` | The URL of the `.zrepo` file.                                               |
+| Field     | Type     | Description                                                          |
+| --------- | -------- | -------------------------------------------------------------------- |
+| `type`    | `string` | `main` for the primary snapshot, `mirror` for a fallback.            |
+| `url`     | `string` | The URL of the `.zrepo` file.                                        |
 | `control` | `string` | (Optional) URL of the zsync control file. Defaults to `<url>.zsync`. |
-| `pgp`   | `string` | (Optional) URL of the detached PGP signature of the snapshot.               |
-| `hash`  | `string` | (Optional) URL of the snapshot's checksum.                                  |
-| `size`  | `string` | (Optional) URL of the snapshot's size information.                          |
+| `pgp`     | `string` | (Optional) URL of the detached PGP signature of the snapshot.        |
+| `hash`    | `string` | (Optional) URL of the snapshot's checksum.                           |
+| `size`    | `string` | (Optional) URL of the snapshot's size information.                   |
 
 If `control` is omitted, Zoi looks for the control file at `<url>.zsync`.
 
