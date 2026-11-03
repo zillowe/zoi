@@ -176,7 +176,6 @@ man:
 clean:
     @echo "Cleaning project artifacts..."
     @cargo clean
-    @rm -f config.just
     @rm -rf dist/
     @echo "Cleaned."
 
