@@ -39,10 +39,10 @@ pub fn download_with_progress(
         match client.get(url).send() {
             Ok(resp) => {
                 if !resp.status().is_success() {
-                    return Err(mlua::Error::RuntimeError(format!(
-                        "Failed to download {url}: {}",
-                        resp.status()
-                    )));
+                    let err_msg =
+                        format!("Failed to download {url}: {}", resp.status());
+                    eprintln!("{}: {err_msg}", "Error:".bold().red());
+                    return Err(mlua::Error::RuntimeError(err_msg));
                 }
                 break resp;
             }
@@ -54,7 +54,9 @@ pub fn download_with_progress(
                     zoi_core::utils::retry_backoff_sleep(attempt);
                     continue;
                 }
-                return Err(mlua::Error::RuntimeError(e.to_string()));
+                let err_msg = format!("Failed to download {url}: {e}");
+                eprintln!("{}: {err_msg}", "Error:".bold().red());
+                return Err(mlua::Error::RuntimeError(err_msg));
             }
         }
     };
@@ -164,16 +166,19 @@ pub fn add_download_util(
                 let actual_hash =
                     zoi_core::hash::calculate_file_hash(&dest_path, hash_algo)
                         .map_err(|e| {
-                            mlua::Error::RuntimeError(format!(
-                                "Failed to calculate hash: {e}"
-                            ))
+                            let err_msg =
+                                format!("Failed to calculate hash: {e}");
+                            eprintln!("{}: {err_msg}", "Error:".bold().red());
+                            mlua::Error::RuntimeError(err_msg)
                         })?;
 
                 if !actual_hash.eq_ignore_ascii_case(expected_hash) {
-                    return Err(mlua::Error::RuntimeError(format!(
+                    let err_msg = format!(
                         "Hash mismatch for {filename}. Expected: \
                          {algo}-{expected_hash}, Got: {algo}-{actual_hash}"
-                    )));
+                    );
+                    eprintln!("{}: {err_msg}", "Error:".bold().red());
+                    return Err(mlua::Error::RuntimeError(err_msg));
                 }
             }
 

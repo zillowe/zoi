@@ -126,6 +126,24 @@ pub fn run(
         )
     })?;
 
+    let early_pkg_meta_table: Table = lua
+        .globals()
+        .get("__ZoiPackageMeta")
+        .map_err(|e| anyhow!(e.to_string()))?;
+    let early_pkg_meta: zoi_core::types::Package = lua
+        .from_value(Value::Table(early_pkg_meta_table))
+        .map_err(|e| anyhow!(e.to_string()))?;
+
+    if early_pkg_meta.is_zsa_disabled() {
+        println!(
+            "{} Skipping ZSA bundle for '{}': source bundling disabled in \
+             package metadata (zsa = false).",
+            "::".bold().yellow(),
+            early_pkg_meta.name
+        );
+        return Ok(PathBuf::new());
+    }
+
     let args = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
 
     // Call lifecycle functions to find ${pkgluadir} references

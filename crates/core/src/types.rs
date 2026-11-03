@@ -531,6 +531,14 @@ pub struct Package {
     /// Some(true): `ZoiOS` only.
     /// Some(false): Non-ZoiOS only.
     pub zoios: Option<bool>,
+    /// Whether this package allows bundling a ZSA source archive.
+    /// If false (or if `no_zsa` is true), source archiving (`zoi package
+    /// bundle`) is skipped.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zsa: Option<bool>,
+    /// Explicit flag to disable ZSA source archiving.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub no_zsa: Option<bool>,
 
     /// The estimated size of the package after installation (in bytes).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -544,6 +552,13 @@ pub struct Package {
     /// Shell completion scripts provided by the package.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completions: Option<Vec<ShellCompletion>>
+}
+
+impl Package {
+    /// Returns true if ZSA source archiving is disabled for this package.
+    pub fn is_zsa_disabled(&self) -> bool {
+        self.zsa == Some(false) || self.no_zsa == Some(true)
+    }
 }
 
 /// A list of commands to run, either as a simple list or mapped by platform.

@@ -184,16 +184,19 @@ pub fn run(mut args: BuildCommand) -> Result<()> {
             args.r#type.as_deref()
         )?;
 
-        // Pin the output dir to the original package's directory when unset.
-        // Otherwise the build would default its output to the temp bundle
-        // directory, which gets deleted right after this function returns.
-        if args.output_dir.is_none() {
-            args.output_dir = args.package_file.parent().map(PathBuf::from);
-        }
+        if !zsa_path.as_os_str().is_empty() {
+            // Pin the output dir to the original package's directory when
+            // unset. Otherwise the build would default its output to the temp
+            // bundle directory, which gets deleted right after this function
+            // returns.
+            if args.output_dir.is_none() {
+                args.output_dir = args.package_file.parent().map(PathBuf::from);
+            }
 
-        println!("{} Building from source bundle...", "::".bold().blue());
-        args.package_file = zsa_path;
-        _temp_zsa_bundle = Some(temp);
+            println!("{} Building from source bundle...", "::".bold().blue());
+            args.package_file = zsa_path;
+            _temp_zsa_bundle = Some(temp);
+        }
     }
 
     crate::pkg::package::build::run(
