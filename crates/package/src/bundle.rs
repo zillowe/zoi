@@ -357,15 +357,40 @@ pub fn run(
                         continue;
                     }
 
-                    if entry.file_type().is_file() {
+                    let meta = fs::symlink_metadata(entry.path())?;
+                    if meta.is_symlink() {
+                        let target = fs::read_link(entry.path())?;
+                        let mut header = tar::Header::new_gnu();
+                        header.set_metadata(&meta);
+                        tar_builder.append_link(
+                            &mut header,
+                            entry_rel,
+                            target
+                        )?;
+                        println!("  Included local: {}", entry_rel.display());
+                    } else if meta.is_file() {
                         tar_builder
                             .append_path_with_name(entry.path(), entry_rel)?;
                         println!("  Included local: {}", entry_rel.display());
                     }
                 }
             } else {
-                tar_builder.append_path_with_name(&abs_path, &rel_path_str)?;
-                println!("  Included local: {rel_path_str}");
+                let meta = fs::symlink_metadata(&abs_path)?;
+                if meta.is_symlink() {
+                    let target = fs::read_link(&abs_path)?;
+                    let mut header = tar::Header::new_gnu();
+                    header.set_metadata(&meta);
+                    tar_builder.append_link(
+                        &mut header,
+                        &rel_path_str,
+                        target
+                    )?;
+                    println!("  Included local: {rel_path_str}");
+                } else {
+                    tar_builder
+                        .append_path_with_name(&abs_path, &rel_path_str)?;
+                    println!("  Included local: {rel_path_str}");
+                }
             }
         }
     }
@@ -395,8 +420,18 @@ pub fn run(
             continue;
         }
 
-        if entry.file_type().is_dir() {
+        let meta = fs::symlink_metadata(entry.path())?;
+        if meta.is_dir() {
             // We'll add directories as we encounter their files or empty dirs
+            continue;
+        }
+
+        if meta.is_symlink() {
+            let target = fs::read_link(entry.path())?;
+            let mut header = tar::Header::new_gnu();
+            header.set_metadata(&meta);
+            tar_builder.append_link(&mut header, rel_path, target)?;
+            println!("  Included fetch: {rel_path_str}");
             continue;
         }
 
