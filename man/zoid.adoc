@@ -13,7 +13,7 @@ zoid - the ZoiOS privileged system daemon
 
 *zoid* *stop*
 
-*zoid* --help*
+*zoid* *--help*
 
 == Description
 
