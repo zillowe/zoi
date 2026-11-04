@@ -4,7 +4,29 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](./INSTALL.md).
 
-## [Prod. Release 1.29.4](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.4) - 2026-10-18
+## [Prod. Release 1.29.6](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.6) - 2026-11-05
+
+### ✨ Features
+
+- [`0bdf000c`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/0bdf000ca37f44a32a14b9574bee4d43df400601) *(package)* Support symlinks when bundling package assets
+
+## [Prod. Release 1.29.5](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.5) - 2026-11-03
+
+### ✨ Features
+
+- [`fa0b755f`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/fa0b755f7b5c1df188a0df9be9caa93ffeba566a) *(cli)* Add custom categorized help template and move migrate to package subcommand
+- [`726b02af`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/726b02afa9446e31a910441bb48c8551be65615a) *(package)* Add support for disabling ZSA source archiving
+
+### 🛠️ Build
+
+- [`fa9f55ca`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/fa9f55ca154e2595bba303f46171b60487792bd6) Fix Justfile clean command
+
+### 🛡️ Dependencies
+
+- [`375e0423`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/375e04231f69a8f8377c59d833cf8d51732d48d1) Update cargo
+- [`1cd6bafa`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/1cd6bafa39690fd17736fd76db8835c7c7705b54) Update nix flake
+
+## [Prod. Release 1.29.4](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.4) - 2026-11-02
 
 ### ✨ Features
 
