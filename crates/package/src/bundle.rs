@@ -153,6 +153,19 @@ pub fn run(
 
     let mut files_to_include = HashSet::new();
 
+    // Include all sibling asset files and subdirectories in the package
+    // directory
+    if let Ok(entries) = fs::read_dir(pkg_dir) {
+        for entry in entries.flatten() {
+            let file_name = entry.file_name();
+            let file_name_str = file_name.to_string_lossy();
+            if file_name_str.starts_with('.') {
+                continue;
+            }
+            files_to_include.insert(file_name_str.to_string());
+        }
+    }
+
     // Always include the package file itself
     let pkg_filename = package_file
         .file_name()
