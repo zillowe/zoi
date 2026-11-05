@@ -89,7 +89,8 @@ impl ShellSession {
             ("BUILD_TYPE", "BUILD_TYPE"),
             ("SUBPKG", "SUBPKG"),
             ("BUILD_DIR", "BUILD_DIR"),
-            ("STAGING_DIR", "STAGING_DIR")
+            ("STAGING_DIR", "STAGING_DIR"),
+            ("PKGLUADIR", "PKGLUADIR")
         ];
 
         for (lua_name, env_name) in vars {
@@ -104,6 +105,29 @@ impl ShellSession {
                     let _ = writeln!(env_cmds, "export {env_name}={val:?}");
                 }
             }
+        }
+
+        // Also resolve PKGLUADIR from LOCATION table if not set in globals
+        if let Ok(loc) = globals.get::<Table>("LOCATION")
+            && let Ok(pkg_dir) = loc.get::<String>("PKGLUADIR")
+        {
+            if cfg!(target_os = "windows") {
+                let _ = writeln!(
+                    env_cmds,
+                    "$env:PKGLUADIR = '{}'",
+                    pkg_dir.replace('\'', "''")
+                );
+            } else {
+                let _ = writeln!(env_cmds, "export PKGLUADIR={pkg_dir:?}");
+            }
+        }
+
+        // Allow GNU autotools builds to run as root in containerized CI
+        // environments
+        if cfg!(target_os = "windows") {
+            let _ = writeln!(env_cmds, "$env:FORCE_UNSAFE_CONFIGURE = '1'");
+        } else {
+            let _ = writeln!(env_cmds, "export FORCE_UNSAFE_CONFIGURE='1'");
         }
 
         // Handle SYSTEM and ZOI tables
@@ -272,11 +296,20 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                     .lock()
                     .map(|b| b.clone())
                     .unwrap_or_default();
-                return Err(mlua::Error::RuntimeError(if stderr.is_empty() {
-                    "Shell session ended unexpectedly".to_string()
+                let err_text = if !stderr.trim().is_empty() {
+                    stderr.trim().to_string()
+                } else if !stdout_accum.trim().is_empty() {
+                    stdout_accum.trim().to_string()
                 } else {
-                    format!("Shell session ended unexpectedly:\n{stderr}")
-                }));
+                    String::new()
+                };
+                return Err(mlua::Error::RuntimeError(
+                    if err_text.is_empty() {
+                        "Shell session ended unexpectedly".to_string()
+                    } else {
+                        format!("Shell session ended unexpectedly:\n{err_text}")
+                    }
+                ));
             }
 
             // Retrieve captured stderr

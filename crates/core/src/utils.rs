@@ -490,7 +490,17 @@ pub fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
                 }
             }
         } else {
-            fs::copy(entry.path(), dst.join(entry.file_name()))?;
+            let dest_file = dst.join(entry.file_name());
+            fs::copy(entry.path(), &dest_file)?;
+            if let Ok(meta) = entry.metadata()
+                && let Ok(mtime) = meta.modified()
+            {
+                let times = fs::FileTimes::new().set_modified(mtime);
+                if let Ok(f) = fs::File::options().write(true).open(&dest_file)
+                {
+                    let _ = f.set_times(times);
+                }
+            }
         }
     }
     Ok(())

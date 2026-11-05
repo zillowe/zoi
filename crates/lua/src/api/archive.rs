@@ -58,7 +58,19 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 
                 temp_path
             } else {
-                PathBuf::from(source)
+                let p = Path::new(&source);
+                if p.is_absolute() {
+                    p.to_path_buf()
+                } else {
+                    let in_build = build_dir.join(p);
+                    if in_build.exists() {
+                        in_build
+                    } else if p.exists() {
+                        p.to_path_buf()
+                    } else {
+                        in_build
+                    }
+                }
             };
 
             let out_dir_name =
