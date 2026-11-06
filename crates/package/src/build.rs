@@ -675,7 +675,7 @@ fn build_for_platform(
                 sub_pkg_name,
                 Some(*scope),
                 Some(resolved_build_type.as_str()),
-                true // Always quiet for scope loops
+                quiet
             )
             .map_err(|e| anyhow!(e.to_string()))?;
 
@@ -700,6 +700,9 @@ fn build_for_platform(
             if let Ok(package_fn) =
                 lua.globals().get::<mlua::Function>("package")
             {
+                if !quiet {
+                    println!("Running package()...");
+                }
                 package_fn
                     .call::<()>(args.clone())
                     .map_err(|e| anyhow!(e.to_string()))?;

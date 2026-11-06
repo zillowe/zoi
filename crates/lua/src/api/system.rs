@@ -35,7 +35,11 @@ struct ShellSession {
 
 impl ShellSession {
     /// Creates a new `ShellSession` within the specified build directory.
-    fn new(lua: &Lua, build_dir: &str) -> Result<Self, anyhow::Error> {
+    fn new(
+        lua: &Lua,
+        build_dir: &str,
+        quiet: bool
+    ) -> Result<Self, anyhow::Error> {
         let sentinel =
             format!("---ZOI_CMD_COMPLETE_{}---", uuid::Uuid::new_v4());
 
@@ -74,6 +78,10 @@ impl ShellSession {
             let mut reader = BufReader::new(stderr);
             let mut line = String::new();
             while reader.read_line(&mut line).unwrap_or(0) > 0 {
+                if !quiet {
+                    eprint!("{line}");
+                    let _ = std::io::stderr().flush();
+                }
                 if let Ok(mut buf) = buffer_clone.lock() {
                     buf.push_str(&line);
                 }
@@ -207,7 +215,7 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             };
 
             if retried || session_is_dead {
-                let session = ShellSession::new(lua, &build_dir)
+                let session = ShellSession::new(lua, &build_dir, quiet)
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                 lua.set_app_data(session);
             }
@@ -275,6 +283,10 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 if let Some(idx) = line.find(&sentinel) {
                     let out_part = &line[..idx];
                     stdout_accum.push_str(out_part);
+                    if !quiet && !out_part.is_empty() {
+                        print!("{out_part}");
+                        let _ = std::io::stdout().flush();
+                    }
 
                     let rest = line[idx..]
                         .strip_prefix(&sentinel)
@@ -284,6 +296,10 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                     break;
                 }
                 stdout_accum.push_str(&line);
+                if !quiet {
+                    print!("{line}");
+                    let _ = std::io::stdout().flush();
+                }
             }
 
             if session_died && !retried {
@@ -320,7 +336,7 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 .unwrap_or_default();
 
             if exit_code != 0 && !quiet {
-                eprintln!("[cmd] {stderr}");
+                eprintln!("[cmd] Command failed with exit code: {exit_code}");
             }
 
             break (stdout_accum.trim_end().to_string(), stderr, exit_code);
