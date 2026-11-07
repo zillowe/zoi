@@ -575,11 +575,44 @@ pub fn find_registry_info_for_package(
                 version,
                 &platform
             );
+
+            let sub_opt = if is_source {
+                None
+            } else {
+                pkg.sub_package.as_deref().or_else(|| {
+                    if pkg
+                        .sub_packages
+                        .as_ref()
+                        .is_some_and(|subs| !subs.is_empty())
+                    {
+                        pkg.main_subs
+                            .as_ref()
+                            .and_then(|ms| ms.first().map(String::as_str))
+                            .or(Some("main"))
+                    } else {
+                        None
+                    }
+                })
+            };
+
+            let adjust_sub = |url: String| -> String {
+                if let Some(sub) = sub_opt {
+                    url.replace(".zpa", &format!(".{sub}.zpa"))
+                } else {
+                    url
+                }
+            };
+
             let final_url = if final_url_base.ends_with(extension) {
-                final_url_base
+                adjust_sub(final_url_base)
             } else {
                 let archive_filename = if is_source {
                     format!("{}-{}{}", pkg.name, version, extension)
+                } else if let Some(sub) = sub_opt {
+                    format!(
+                        "{}-{}-{}.{}{}",
+                        pkg.name, version, platform, sub, extension
+                    )
                 } else {
                     format!(
                         "{}-{}-{}{}",
@@ -596,25 +629,25 @@ pub fn find_registry_info_for_package(
             let pgp_url = Some(pkg_link.pgp.as_ref().map_or_else(
                 || format!("{final_url}.sig"),
                 |url| {
-                    resolve_url_placeholders(
+                    adjust_sub(resolve_url_placeholders(
                         url, &pkg.name, &pkg.repo, version, &platform
-                    )
+                    ))
                 }
             ));
             let hash_url = pkg_link.hash.as_ref().map(|url| {
-                resolve_url_placeholders(
+                adjust_sub(resolve_url_placeholders(
                     url, &pkg.name, &pkg.repo, version, &platform
-                )
+                ))
             });
             let size_url = pkg_link.size.as_ref().map(|url| {
-                resolve_url_placeholders(
+                adjust_sub(resolve_url_placeholders(
                     url, &pkg.name, &pkg.repo, version, &platform
-                )
+                ))
             });
             let files_url = pkg_link.files.as_ref().map(|url| {
-                resolve_url_placeholders(
+                adjust_sub(resolve_url_placeholders(
                     url, &pkg.name, &pkg.repo, version, &platform
-                )
+                ))
             });
 
             return Ok(Some(types::PrebuiltInfo {
@@ -698,31 +731,54 @@ pub fn find_delta_info(
             // Delta URLs are expected to contain {name}, {version} placeholders
             // The version in the URL refers to the "to" version (target
             // version)
-            let final_url = resolve_url_placeholders(
+            let sub_opt = pkg.sub_package.as_deref().or_else(|| {
+                if pkg
+                    .sub_packages
+                    .as_ref()
+                    .is_some_and(|subs| !subs.is_empty())
+                {
+                    pkg.main_subs
+                        .as_ref()
+                        .and_then(|ms| ms.first().map(String::as_str))
+                        .or(Some("main"))
+                } else {
+                    None
+                }
+            });
+
+            let adjust_sub = |url: String| -> String {
+                if let Some(sub) = sub_opt {
+                    url.replace(".zdelta", &format!(".{sub}.zdelta"))
+                } else {
+                    url
+                }
+            };
+
+            let final_url = adjust_sub(resolve_url_placeholders(
                 &delta_link.url,
                 &pkg.name,
                 &pkg.repo,
                 to_version,
                 &platform
-            );
+            ));
 
             let pgp_url = Some(delta_link.pgp.as_ref().map_or_else(
                 || format!("{final_url}.sig"),
                 |url| {
-                    resolve_url_placeholders(
+                    adjust_sub(resolve_url_placeholders(
                         url, &pkg.name, &pkg.repo, to_version, &platform
-                    )
+                    ))
                 }
             ));
             let hash_url = delta_link.hash.as_ref().map(|url| {
-                resolve_url_placeholders(
+                adjust_sub(resolve_url_placeholders(
                     url, &pkg.name, &pkg.repo, to_version, &platform
-                )
+                ))
             });
             let size_url = delta_link.size.as_ref().map(|url| {
-                resolve_url_placeholders(
+                adjust_sub(resolve_url_placeholders(
                     url, &pkg.name, &pkg.repo, to_version, &platform
-                )
+                ))
             });
 
             return Ok(Some(types::DeltaInfo {
@@ -746,12 +802,11 @@ pub fn find_delta_info_for_node(
     node: &InstallNode,
     base_version: &str
 ) -> Result<Option<types::DeltaInfo>> {
-    find_delta_info(
-        &node.pkg,
-        &node.registry_handle,
-        base_version,
-        &node.version
-    )
+    let mut pkg = node.pkg.clone();
+    if pkg.sub_package.is_none() && node.sub_package.is_some() {
+        pkg.sub_package.clone_from(&node.sub_package);
+    }
+    find_delta_info(&pkg, &node.registry_handle, base_version, &node.version)
 }
 
 /// Finds prebuilt info for an install node.
@@ -762,11 +817,11 @@ pub fn find_delta_info_for_node(
 pub fn find_prebuilt_info(
     node: &InstallNode
 ) -> Result<Option<types::PrebuiltInfo>> {
-    find_prebuilt_info_for_package(
-        &node.pkg,
-        &node.registry_handle,
-        &node.version
-    )
+    let mut pkg = node.pkg.clone();
+    if pkg.sub_package.is_none() && node.sub_package.is_some() {
+        pkg.sub_package.clone_from(&node.sub_package);
+    }
+    find_prebuilt_info_for_package(&pkg, &node.registry_handle, &node.version)
 }
 
 /// Finds source bundle info for an install node.

@@ -402,12 +402,8 @@ fn fetch_and_apply_delta(
     pgp_identifiers: Option<&[String]>
 ) -> Result<PathBuf> {
     // Look up explicit delta info from repo.yaml
-    let Some(delta_info) = crate::util::find_delta_info(
-        &node.pkg,
-        &node.registry_handle,
-        base_version,
-        to_version
-    )?
+    let Some(delta_info) =
+        crate::util::find_delta_info_for_node(node, base_version)?
     else {
         return Err(anyhow!(
             "No delta configuration found for '{}' v{to_version}",
@@ -545,10 +541,35 @@ fn try_delta_upgrade_sequence(
 
     // Find the newest cached archive of the same package on the same
     // platform that is older than the target version. Archive names follow
-    // `{name}-{version}-{platform}.zpa`.
+    // `{name}-{version}-{platform}.zpa` or
+    // `{name}-{version}-{platform}.{sub}.zpa`.
     let platform = zoi_core::utils::get_platform().unwrap_or_default();
     let prefix = format!("{}-", node.pkg.name);
-    let suffix = format!("-{platform}.zpa");
+    let sub_opt = node
+        .sub_package
+        .as_deref()
+        .or(node.pkg.sub_package.as_deref())
+        .or_else(|| {
+            if node
+                .pkg
+                .sub_packages
+                .as_ref()
+                .is_some_and(|subs| !subs.is_empty())
+            {
+                node.pkg
+                    .main_subs
+                    .as_ref()
+                    .and_then(|ms| ms.first().map(String::as_str))
+                    .or(Some("main"))
+            } else {
+                None
+            }
+        });
+    let suffix = if let Some(sub) = sub_opt {
+        format!("-{platform}.{sub}.zpa")
+    } else {
+        format!("-{platform}.zpa")
+    };
     let mut best: Option<(semver::Version, PathBuf)> = None;
     let entries = std::fs::read_dir(archive_cache_root).ok();
     let Some(entries) = entries else {

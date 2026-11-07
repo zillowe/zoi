@@ -579,7 +579,7 @@ fn build_for_platform(
 
     let lua_code = fs::read_to_string(package_file)?;
 
-    for sub_package in subs_to_build {
+    for sub_package in &subs_to_build {
         let sub_pkg_name = if sub_package.is_empty() {
             None
         } else {
@@ -721,7 +721,7 @@ fn build_for_platform(
 
             process_build_operations(
                 &lua,
-                &sub_package,
+                sub_package,
                 pkg_lua_dir_str,
                 build_dir.path(),
                 v_staging.path(),
@@ -773,21 +773,157 @@ fn build_for_platform(
                 }
             }
         }
-        mappings.insert(sub_package, sub_mapping);
+        mappings.insert(sub_package.clone(), sub_mapping);
     }
 
-    let pooled_manifest = PooledZpaManifest {
-        version: "2".to_string(),
-        pool,
-        mappings
+    let output_base = if let Some(dir) = output_dir {
+        dir.to_path_buf()
+    } else {
+        package_file
+            .parent()
+            .ok_or_else(|| {
+                anyhow!("package_file should have a parent directory")
+            })?
+            .to_path_buf()
     };
 
-    let manifest_json = serde_json::to_string_pretty(&pooled_manifest)?;
-    fs::write(staging_dir.join("manifest.json"), manifest_json)?;
+    let is_split_package = pkg_for_meta
+        .sub_packages
+        .as_ref()
+        .is_some_and(|subs| !subs.is_empty());
 
-    // Embedded signatures must be created BEFORE the archive is built so the
-    // signature file becomes part of the tar payload. It covers the manifest
-    // bytes verbatim, which in turn cover every pool hash.
+    if is_split_package {
+        // Build an independent .zpa archive for each sub-package in
+        // subs_to_build
+        for sub_package in &subs_to_build {
+            let sub_id = if sub_package.is_empty() {
+                "main"
+            } else {
+                sub_package.as_str()
+            };
+
+            let Some(sub_mapping) = mappings.get(sub_package) else {
+                continue;
+            };
+
+            // Collect only the pool files needed by this specific sub-package
+            let mut sub_pool: BTreeMap<String, PoolFileEntry> = BTreeMap::new();
+            for scope_mapping in sub_mapping.scopes.values() {
+                for file in &scope_mapping.files {
+                    if let Some(entry) = pool.get(&file.hash) {
+                        sub_pool.insert(file.hash.clone(), entry.clone());
+                    }
+                }
+            }
+
+            let sub_staging = Builder::new()
+                .prefix(&format!("zoi-stage-{sub_id}-"))
+                .tempdir()?;
+            let sub_pool_dir = sub_staging.path().join("pool");
+            fs::create_dir_all(&sub_pool_dir)?;
+
+            for hash in sub_pool.keys() {
+                let src = pool_dir.join(hash);
+                let dst = sub_pool_dir.join(hash);
+                if src.exists() {
+                    fs::copy(&src, &dst)?;
+                }
+            }
+
+            let mut sub_mappings = BTreeMap::new();
+            sub_mappings.insert(sub_package.clone(), sub_mapping.clone());
+            if sub_package == "main" {
+                sub_mappings.insert(String::new(), sub_mapping.clone());
+            } else if sub_package.is_empty() {
+                sub_mappings.insert("main".to_string(), sub_mapping.clone());
+            }
+
+            let sub_manifest = PooledZpaManifest {
+                version: "2".to_string(),
+                pool: sub_pool,
+                mappings: sub_mappings
+            };
+
+            let manifest_json = serde_json::to_string_pretty(&sub_manifest)?;
+            fs::write(sub_staging.path().join("manifest.json"), manifest_json)?;
+
+            fs::copy(
+                package_file,
+                sub_staging.path().join(package_file.file_name().ok_or_else(
+                    || anyhow!("package_file should have a name")
+                )?)
+            )?;
+
+            let output_filename = format!(
+                "{}-{version}-{platform}.{sub_id}.zpa",
+                pkg_for_meta.name
+            );
+            let output_path = output_base.join(output_filename);
+
+            package_single_zpa(
+                &output_path,
+                sub_staging.path(),
+                &sub_manifest,
+                fakeroot,
+                sign_key.map(std::string::String::as_str),
+                sign_mode,
+                quiet
+            )?;
+        }
+    } else {
+        let pooled_manifest = PooledZpaManifest {
+            version: "2".to_string(),
+            pool,
+            mappings
+        };
+
+        let manifest_json = serde_json::to_string_pretty(&pooled_manifest)?;
+        fs::write(staging_dir.join("manifest.json"), manifest_json)?;
+
+        fs::copy(
+            package_file,
+            staging_dir.join(
+                package_file.file_name().ok_or_else(|| {
+                    anyhow!("package_file should have a name")
+                })?
+            )
+        )?;
+
+        let output_filename =
+            format!("{}-{version}-{platform}.zpa", pkg_for_meta.name);
+        let output_path = output_base.join(output_filename);
+
+        package_single_zpa(
+            &output_path,
+            &staging_dir,
+            &pooled_manifest,
+            fakeroot,
+            sign_key.map(std::string::String::as_str),
+            sign_mode,
+            quiet
+        )?;
+    }
+
+    Ok(())
+}
+
+/// Packages a staging directory into a single `.zpa` archive, including
+/// optional embedded or detached PGP signatures, and writing the `.hash`,
+/// `.size`, and `.files` sidecar files.
+///
+/// # Errors
+///
+/// Returns an error if archive creation, file reading, compression, hashing,
+/// or signing operations fail.
+fn package_single_zpa(
+    output_path: &Path,
+    staging_dir: &Path,
+    pooled_manifest: &PooledZpaManifest,
+    fakeroot: bool,
+    sign_key: Option<&str>,
+    sign_mode: types::SignMode,
+    quiet: bool
+) -> Result<()> {
     if let Some(key_id) = sign_key
         && sign_mode == types::SignMode::Embed
         && !quiet
@@ -804,31 +940,8 @@ fn build_for_platform(
         )?;
     }
 
-    fs::copy(
-        package_file,
-        staging_dir.join(
-            package_file
-                .file_name()
-                .ok_or_else(|| anyhow!("package_file should have a name"))?
-        )
-    )?;
-
-    let output_filename =
-        format!("{}-{version}-{platform}.zpa", pkg_for_meta.name);
-    let output_base = if let Some(dir) = output_dir {
-        dir.to_path_buf()
-    } else {
-        package_file
-            .parent()
-            .ok_or_else(|| {
-                anyhow!("package_file should have a parent directory")
-            })?
-            .to_path_buf()
-    };
-    let output_path = output_base.join(output_filename);
-
     {
-        let file = File::create(&output_path)?;
+        let file = File::create(output_path)?;
         let encoder = ZstdEncoder::new(file, 0)?.auto_finish();
         let mut tar_builder = TarBuilder::new(encoder);
 
@@ -839,10 +952,10 @@ fn build_for_platform(
                     "::".bold().blue()
                 );
             }
-            for entry in WalkDir::new(&staging_dir).min_depth(1) {
+            for entry in WalkDir::new(staging_dir).min_depth(1) {
                 let entry = entry?;
                 let path = entry.path();
-                let rel_path = path.strip_prefix(&staging_dir)?;
+                let rel_path = path.strip_prefix(staging_dir)?;
 
                 let mut header = tar::Header::new_gnu();
                 let metadata = fs::symlink_metadata(path)?;
@@ -872,7 +985,7 @@ fn build_for_platform(
                 }
             }
         } else {
-            tar_builder.append_dir_all(".", &staging_dir)?;
+            tar_builder.append_dir_all(".", staging_dir)?;
         }
         tar_builder.finish()?;
     }
@@ -933,8 +1046,8 @@ fn build_for_platform(
     )?;
 
     let size_path = PathBuf::from(format!("{}.size", output_path.display()));
-    let compressed_size = fs::metadata(&output_path)?.len();
-    let uncompressed_size: u64 = WalkDir::new(&staging_dir)
+    let compressed_size = fs::metadata(output_path)?.len();
+    let uncompressed_size: u64 = WalkDir::new(staging_dir)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| e.file_type().is_file())
@@ -970,7 +1083,7 @@ fn build_for_platform(
                     fs::remove_file(&signature_path)?;
                 }
                 zoi_core::pgp::sign_detached(
-                    &output_path,
+                    output_path,
                     &signature_path,
                     key_id
                 )?;

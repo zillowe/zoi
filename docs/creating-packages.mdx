@@ -390,8 +390,16 @@ metadata({
 })
 ```
 
-- `zoi install linux` will install `linux:kernel` and `linux:headers`.
-- `zoi install linux:docs` will install only the documentation.
+- `zoi install linux` installs the default sub-packages defined in `main_subs` (`linux:kernel` and `linux:headers`).
+- `zoi install linux:headers` installs only the headers sub-package. Sub-packages can also declare dependencies on other sub-packages of the same package.
+
+### Sub-package Archive Structure
+
+Split packages build an independent `.zpa` archive for each sub-package:
+
+- **Naming Convention:** `<pkgname>-<version>-<platform>.<subpkg>.zpa` (for example, `linux-7.2.14.parlex.1-linux-amd64.main.zpa` and `linux-7.2.14.parlex.1-linux-amd64.headers.zpa`). Single packages without split sub-packages retain `<pkgname>-<version>-<platform>.zpa`.
+- **Shared Source Bundle:** All sub-packages of a package share a single source bundle archive (`<pkgname>-<version>.zsa`).
+- **Independent Pool & Deltas:** Each sub-package archive bundles only the files needed for its specific scopes, keeping download sizes minimal. Each sub-package also gets its own `.zdelta` patch (e.g. `<pkgname>-<version>-<platform>.<subpkg>.zdelta`) generated against its corresponding older sub-package release.
 
 ### Lifecycle Functions in Split Packages
 
@@ -408,10 +416,6 @@ function package(args)
   end
 end
 ```
-
-### Staging Files
-
-When building a split package, `zcp` automatically stages files into a sub-package-specific directory (e.g. `data/kernel/...`, `data/headers/...`) within the final archive. This ensures that installing a sub-package only extracts the correct files.
 
 ---
 

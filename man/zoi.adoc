@@ -87,7 +87,8 @@ These options may appear before any command.
 
 *install*, *i*, *in*, *add* [_SOURCES_...] [_OPTIONS_]::
   Install one or more packages from registry names, local files, URLs, or
-  git repositories.
+  git repositories. Sub-packages are targeted directly using the syntax
+  `<package>:<subpackage>` (for example, `linux:headers`).
 +
 *--repo*=_REPO_:: Clone a repository and install a package exported by its
   root `zoi.lua` (conflicts with sources). Select a named export with
@@ -371,7 +372,9 @@ a detached signature (*--file*, *--sig*, and *--key* are required).
   `.pkg.lua` scripts; see *zoi-lua*(5).
 
 *build* _FILE_ [_OPTIONS_]::
-  Build a distributable archive from a `.pkg.lua` definition.
+  Build a distributable archive from a `.pkg.lua` definition. Split packages
+  produce independent `<name>-<version>-<platform>.<subpkg>.zpa` archives for
+  each sub-package while sharing a single `.zsa` source bundle.
 +
 *--type*=_TYPE_:: Build type. *-p*, *--platform*=_P_:: Target platforms,
 repeatable (default: current; accepts values such as `linux-amd64` or
@@ -404,7 +407,8 @@ bwrap). *--root-package*=_PKG_:: Root package for the build environment.
 
 *delta* _OLD_ _NEW_ [_OPTIONS_]::
   Generate a `.zdelta` patch transforming the _OLD_ archive into the
-  _NEW_ archive, plus `.hash` and `.size` sidecars.
+  _NEW_ archive (including matching sub-package archive pairs), plus
+  `.hash` and `.size` sidecars.
 +
 *-o*, *--output*=_FILE_:: Output path (default: _NEW_ with a `.zdelta`
 extension). *--sign*=_KEY_:: Also write a detached `.sig` sidecar.

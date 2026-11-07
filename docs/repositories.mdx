@@ -416,8 +416,9 @@ The `url`, `pgp`, `hash`, and `size` fields within a `DeltaLink` object can cont
 
 Zoi uses a smart URL construction strategy:
 
-- If your `url` template ends with `.zpa`, Zoi uses it exactly as generated. This gives you full control over the file path.
-- If it does not end with `.zpa`, Zoi assumes the URL points to a directory and automatically appends the standard filename format: `{name}-{version}-{platform}.zpa`.
+- If your `url` template ends with `.zpa`, Zoi uses it as the archive path template. For split packages or sub-package requests (e.g. `zoi install linux:headers`), the `.zpa` suffix is automatically adjusted to `.{subpkg}.zpa` (and `.{subpkg}.zdelta` for delta patches).
+- If it does not end with `.zpa`, Zoi assumes the URL points to a directory and automatically appends the standard filename format: `{name}-{version}-{platform}.zpa` (or `{name}-{version}-{platform}.{subpkg}.zpa` for sub-packages).
+- Source bundles (`.zsa`) are shared across all sub-packages of a package and follow the standard `{name}-{version}.zsa` naming.
 
 ### Example
 
