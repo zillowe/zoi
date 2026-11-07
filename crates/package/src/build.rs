@@ -625,11 +625,15 @@ fn build_for_platform(
                     .map_err(|e| anyhow!(e.to_string()))?;
             }
 
+            let is_prepare_quiet =
+                pkg_for_meta.is_stage_quiet("prepare", quiet);
+            zoi_lua::api::system::set_session_quiet(&lua_sub, is_prepare_quiet);
+
             if !skip_prepare
                 && let Ok(prepare_fn) =
                     lua_sub.globals().get::<mlua::Function>("prepare")
             {
-                if !quiet {
+                if !is_prepare_quiet {
                     println!("Running prepare()...");
                 }
                 prepare_fn
@@ -637,10 +641,13 @@ fn build_for_platform(
                     .map_err(|e| anyhow!(e.to_string()))?;
             }
 
+            let is_build_quiet = pkg_for_meta.is_stage_quiet("build", quiet);
+            zoi_lua::api::system::set_session_quiet(&lua_sub, is_build_quiet);
+
             if let Ok(build_fn) =
                 lua_sub.globals().get::<mlua::Function>("build")
             {
-                if !quiet {
+                if !is_build_quiet {
                     println!("Running build()...");
                 }
                 build_fn
@@ -697,10 +704,14 @@ fn build_for_platform(
                     .map_err(|e| anyhow!(e.to_string()))?;
             }
 
+            let is_package_quiet =
+                pkg_for_meta.is_stage_quiet("package", quiet);
+            zoi_lua::api::system::set_session_quiet(&lua, is_package_quiet);
+
             if let Ok(package_fn) =
                 lua.globals().get::<mlua::Function>("package")
             {
-                if !quiet {
+                if !is_package_quiet {
                     println!("Running package()...");
                 }
                 package_fn

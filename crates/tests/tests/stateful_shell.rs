@@ -173,3 +173,99 @@ fn test_shell_recovers_if_killed() {
         "Shell should auto-respawn if killed"
     );
 }
+
+#[test]
+fn test_cmd_quiet_options_and_dynamic_toggle() {
+    let _ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("failed to create temp dir");
+    let root = tmp.path().to_path_buf();
+    let build_dir = root.join("build_quiet");
+    fs::create_dir(&build_dir).expect("unwrap failed");
+
+    let lua = Lua::new();
+    functions::setup_lua_environment(
+        &lua,
+        "linux-amd64",
+        None,
+        None,
+        None,
+        Some(build_dir.to_str().expect("unwrap failed")),
+        None,
+        None,
+        None,
+        None,
+        false // Start not quiet
+    )
+    .expect("unwrap failed");
+
+    // Dynamic set_quiet in Lua
+    lua.load(r"set_quiet(true)")
+        .exec()
+        .expect("set_quiet(true) should succeed");
+
+    let (stdout, _, _) = lua
+        .load(r#"return cmd("echo silenced")"#)
+        .eval::<(String, String, i32)>()
+        .expect("unwrap failed");
+    assert_eq!(stdout.trim(), "silenced");
+
+    // Override per-command with table option or boolean
+    let (stdout2, _, _) = lua
+        .load(r#"return cmd("echo override_table", { quiet = true })"#)
+        .eval::<(String, String, i32)>()
+        .expect("unwrap failed");
+    assert_eq!(stdout2.trim(), "override_table");
+
+    let (stdout3, _, _) = lua
+        .load(r#"return cmd("echo override_bool", false)"#)
+        .eval::<(String, String, i32)>()
+        .expect("unwrap failed");
+    assert_eq!(stdout3.trim(), "override_bool");
+
+    // Dynamic set_quiet to false
+    lua.load(r"set_quiet(false)")
+        .exec()
+        .expect("set_quiet(false) should succeed");
+}
+
+#[test]
+fn test_package_metadata_quiet_stage_resolution() {
+    use std::collections::HashMap;
+
+    use zoi_core::types::{Package, QuietOption};
+
+    // 1. None
+    let pkg_default = Package::default();
+    assert!(!pkg_default.is_stage_quiet("build", false));
+    assert!(pkg_default.is_stage_quiet("build", true));
+
+    // 2. Boolean true
+    let pkg_bool = Package {
+        quiet: Some(QuietOption::Boolean(true)),
+        ..Default::default()
+    };
+    assert!(pkg_bool.is_stage_quiet("build", false));
+    assert!(pkg_bool.is_stage_quiet("prepare", false));
+    assert!(pkg_bool.is_stage_quiet("package", false));
+
+    // 3. List
+    let pkg_list = Package {
+        quiet: Some(QuietOption::List(vec!["build".into(), "prepare".into()])),
+        ..Default::default()
+    };
+    assert!(pkg_list.is_stage_quiet("build", false));
+    assert!(pkg_list.is_stage_quiet("prepare", false));
+    assert!(!pkg_list.is_stage_quiet("package", false));
+
+    // 4. Map
+    let mut map = HashMap::new();
+    map.insert("build".to_string(), true);
+    map.insert("prepare".to_string(), false);
+    let pkg_map = Package {
+        quiet: Some(QuietOption::Map(map)),
+        ..Default::default()
+    };
+    assert!(pkg_map.is_stage_quiet("build", false));
+    assert!(!pkg_map.is_stage_quiet("prepare", false));
+    assert!(!pkg_map.is_stage_quiet("package", false));
+}

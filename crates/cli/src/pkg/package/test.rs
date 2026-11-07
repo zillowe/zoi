@@ -119,22 +119,34 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
                 .map_err(|e| anyhow!(e.to_string()))?;
         }
 
+        let is_prep_quiet = pkg_for_meta.is_stage_quiet("prepare", false);
+        zoi_lua::api::system::set_session_quiet(&lua, is_prep_quiet);
         if let Ok(prepare_fn) = lua.globals().get::<mlua::Function>("prepare") {
-            println!("Running prepare()...");
+            if !is_prep_quiet {
+                println!("Running prepare()...");
+            }
             prepare_fn
                 .call::<()>(lua_args.clone())
                 .map_err(|e| anyhow!(e.to_string()))?;
         }
 
+        let is_pkg_quiet = pkg_for_meta.is_stage_quiet("package", false);
+        zoi_lua::api::system::set_session_quiet(&lua, is_pkg_quiet);
         if let Ok(package_fn) = lua.globals().get::<mlua::Function>("package") {
-            println!("Running package()...");
+            if !is_pkg_quiet {
+                println!("Running package()...");
+            }
             package_fn
                 .call::<()>(lua_args.clone())
                 .map_err(|e| anyhow!(e.to_string()))?;
         }
 
+        let is_test_quiet = pkg_for_meta.is_stage_quiet("test", false);
+        zoi_lua::api::system::set_session_quiet(&lua, is_test_quiet);
         if let Ok(test_fn) = lua.globals().get::<mlua::Function>("test") {
-            println!("Running test()...");
+            if !is_test_quiet {
+                println!("Running test()...");
+            }
             let success: bool = match test_fn
                 .call::<mlua::Value>(lua_args.clone())
             {

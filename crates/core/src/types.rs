@@ -551,13 +551,54 @@ pub struct Package {
     pub sandbox: Option<SandboxConfig>,
     /// Shell completion scripts provided by the package.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub completions: Option<Vec<ShellCompletion>>
+    pub completions: Option<Vec<ShellCompletion>>,
+    /// Quiet configuration for package lifecycle functions (e.g. prepare,
+    /// build, package, test).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quiet: Option<QuietOption>
+}
+
+/// Specifies quiet options for package lifecycle functions.
+///
+/// Can be specified in `pkg.lua` as:
+/// - A boolean: `quiet = true`
+/// - A list of function names: `quiet = { "prepare", "build" }`
+/// - A map of function names to booleans: `quiet = { build = true, prepare =
+///   false }`
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum QuietOption {
+    /// Silence all lifecycle functions.
+    Boolean(bool),
+    /// List of lifecycle function names to silence (e.g. `["prepare",
+    /// "build"]`).
+    List(Vec<String>),
+    /// Map of lifecycle function names to booleans.
+    Map(HashMap<String, bool>)
+}
+
+impl QuietOption {
+    /// Checks whether a given lifecycle stage should run quietly.
+    pub fn is_quiet(&self, stage: &str) -> bool {
+        match self {
+            Self::Boolean(b) => *b,
+            Self::List(list) => {
+                list.iter().any(|s| s.eq_ignore_ascii_case(stage))
+            }
+            Self::Map(map) => map.get(stage).copied().unwrap_or(false)
+        }
+    }
 }
 
 impl Package {
     /// Returns true if ZSA source archiving is disabled for this package.
     pub fn is_zsa_disabled(&self) -> bool {
         self.zsa == Some(false) || self.no_zsa == Some(true)
+    }
+
+    /// Returns true if the specified lifecycle stage should be run quietly.
+    pub fn is_stage_quiet(&self, stage: &str, cli_quiet: bool) -> bool {
+        cli_quiet || self.quiet.as_ref().is_some_and(|q| q.is_quiet(stage))
     }
 }
 

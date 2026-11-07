@@ -69,6 +69,7 @@ ZOI = {}
 ---@field rollback boolean? Whether to enable rollback for this package.
 ---@field installed_size integer? Expected size on disk (bytes).
 ---@field archive_size integer? Size of the pre-compiled archive (bytes).
+---@field quiet (boolean | string[] | table<string, boolean>)? Lifecycle functions to silence command output for (e.g. {"prepare", "build"}, {build = true}, or true).
 PKG = {}
 
 ---@type string Absolute path to the temporary build directory.
@@ -181,9 +182,14 @@ function test(args) end
 function uninstall() end
 
 --- Executes a shell command within BUILD_DIR.
----@param command string
+---@param command string The shell command to execute.
+---@param opts? boolean|{quiet?: boolean} Optional execution options or boolean flag to silence command output.
 ---@return string stdout, string stderr, integer exit_code
-function cmd(command) end
+function cmd(command, opts) end
+
+--- Sets whether commands in the current shell session should run quietly.
+---@param quiet boolean Whether to silence command output.
+function set_quiet(quiet) end
 
 --- Stages a file or directory for inclusion in the final package.
 ---@param source string Path relative to BUILD_DIR or ${pkgluadir}.

@@ -1,10 +1,17 @@
 use std::fmt::Write as _;
 use std::io::{BufRead, BufReader, Write as _};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 use mlua::{self, Lua, Table, Value};
+
+/// Configuration for the Lua shell session.
+pub struct ShellSessionConfig {
+    /// Whether command output should be silenced.
+    pub quiet: Arc<AtomicBool>
+}
 
 /// Represents an active shell process used for executing commands from Lua.
 struct InnerSession {
@@ -30,7 +37,9 @@ impl Drop for InnerSession {
 /// A wrapper around `InnerSession` providing thread-safe access.
 struct ShellSession {
     /// The inner session state, protected by a mutex.
-    inner: Mutex<InnerSession>
+    inner: Mutex<InnerSession>,
+    /// Whether command output should be silenced.
+    quiet: Arc<AtomicBool>
 }
 
 impl ShellSession {
@@ -38,7 +47,7 @@ impl ShellSession {
     fn new(
         lua: &Lua,
         build_dir: &str,
-        quiet: bool
+        quiet: Arc<AtomicBool>
     ) -> Result<Self, anyhow::Error> {
         let sentinel =
             format!("---ZOI_CMD_COMPLETE_{}---", uuid::Uuid::new_v4());
@@ -72,13 +81,14 @@ impl ShellSession {
 
         let stderr_buffer = Arc::new(Mutex::new(String::new()));
         let buffer_clone = Arc::clone(&stderr_buffer);
+        let quiet_clone = Arc::clone(&quiet);
 
         // Spawn a thread to consume stderr continuously
         thread::spawn(move || {
             let mut reader = BufReader::new(stderr);
             let mut line = String::new();
             while reader.read_line(&mut line).unwrap_or(0) > 0 {
-                if !quiet {
+                if !quiet_clone.load(Ordering::Relaxed) {
                     eprint!("{line}");
                     let _ = std::io::stderr().flush();
                 }
@@ -180,8 +190,19 @@ impl ShellSession {
                 stdout,
                 stderr_buffer,
                 sentinel
-            })
+            }),
+            quiet
         })
+    }
+}
+
+/// Sets whether the shell session in the Lua environment should run quietly.
+pub fn set_session_quiet(lua: &Lua, quiet: bool) {
+    if let Some(config) = lua.app_data_ref::<ShellSessionConfig>() {
+        config.quiet.store(quiet, Ordering::Relaxed);
+    }
+    if let Some(session) = lua.app_data_ref::<ShellSession>() {
+        session.quiet.store(quiet, Ordering::Relaxed);
     }
 }
 
@@ -196,155 +217,188 @@ impl ShellSession {
 ///
 /// Panics if the internal shell session mutex is poisoned.
 pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
-    let cmd_fn = lua.create_function(move |lua, command: String| {
-        let build_dir: String = lua.globals().get("BUILD_DIR")?;
+    let session_config = ShellSessionConfig {
+        quiet: Arc::new(AtomicBool::new(quiet))
+    };
+    let _ = lua.set_app_data(session_config);
 
-        // A command such as `exit` can terminate the shell mid-call. Retry the
-        // command once against a freshly spawned session so `cmd` transparently
-        // recovers instead of failing on the next invocation.
-        let mut retried = false;
+    let cmd_fn = lua.create_function(
+        move |lua, (command, opts): (String, Option<Value>)| {
+            let build_dir: String = lua.globals().get("BUILD_DIR")?;
 
-        let (stdout_accum, stderr, exit_code) = loop {
-            let session_is_dead = if let Some(session) =
-                lua.app_data_ref::<ShellSession>()
-            {
-                let mut inner = session.inner.lock().expect("lock poisoned");
-                inner.child.try_wait().map_or(true, |s| s.is_some())
-            } else {
-                true
-            };
+            // A command such as `exit` can terminate the shell mid-call. Retry
+            // the command once against a freshly spawned session so `cmd`
+            // transparently recovers instead of failing on the next invocation.
+            let mut retried = false;
 
-            if retried || session_is_dead {
-                let session = ShellSession::new(lua, &build_dir, quiet)
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                lua.set_app_data(session);
-            }
+            let (stdout_accum, stderr, exit_code) = loop {
+                let session_is_dead =
+                    if let Some(session) = lua.app_data_ref::<ShellSession>() {
+                        let mut inner =
+                            session.inner.lock().expect("lock poisoned");
+                        inner.child.try_wait().map_or(true, |s| s.is_some())
+                    } else {
+                        true
+                    };
 
-            let session = lua
-                .app_data_ref::<ShellSession>()
-                .expect("ShellSession missing from app_data");
-            let mut inner = session.inner.lock().expect("lock poisoned");
-
-            if !quiet {
-                println!("Executing: {command}");
-            }
-
-            // Clear stderr buffer before running command
-            if let Ok(mut buf) = inner.stderr_buffer.lock() {
-                buf.clear();
-            }
-
-            let sentinel = inner.sentinel.clone();
-
-            if cfg!(target_os = "windows") {
-                let cmd_text = format!(
-                    "$ErrorActionPreference = 'Continue'; & {{ {command} }}; \
-                     \"{sentinel} $LASTEXITCODE\"\n"
-                );
-                inner
-                    .stdin
-                    .write_all(cmd_text.as_bytes())
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                inner
-                    .stdin
-                    .flush()
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            } else {
-                let cmd_text = format!(
-                    "{{\n{command}\n}}\nprintf \"\\n%s %d\\n\" {sentinel:?} \
-                     $?\n"
-                );
-                inner
-                    .stdin
-                    .write_all(cmd_text.as_bytes())
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                inner
-                    .stdin
-                    .flush()
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            }
-
-            let mut stdout_accum = String::new();
-            let mut line = String::new();
-            let mut exit_code = 0;
-
-            let mut session_died = false;
-            loop {
-                line.clear();
-                let n = inner
-                    .stdout
-                    .read_line(&mut line)
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                if n == 0 {
-                    session_died = true;
-                    break;
+                if retried || session_is_dead {
+                    let quiet_flag =
+                        lua.app_data_ref::<ShellSessionConfig>().map_or_else(
+                            || Arc::new(AtomicBool::new(quiet)),
+                            |c| Arc::clone(&c.quiet)
+                        );
+                    let session =
+                        ShellSession::new(lua, &build_dir, quiet_flag)
+                            .map_err(|e| {
+                                mlua::Error::RuntimeError(e.to_string())
+                            })?;
+                    lua.set_app_data(session);
                 }
 
-                if let Some(idx) = line.find(&sentinel) {
-                    let out_part = &line[..idx];
-                    stdout_accum.push_str(out_part);
-                    if !quiet && !out_part.is_empty() {
-                        print!("{out_part}");
-                        let _ = std::io::stdout().flush();
+                let session = lua
+                    .app_data_ref::<ShellSession>()
+                    .expect("ShellSession missing from app_data");
+
+                let session_quiet = session.quiet.load(Ordering::Relaxed);
+                let cmd_quiet = match &opts {
+                    Some(Value::Boolean(b)) => *b,
+                    Some(Value::Table(t)) => t
+                        .get::<Option<bool>>("quiet")
+                        .ok()
+                        .flatten()
+                        .unwrap_or(session_quiet),
+                    _ => session_quiet
+                };
+
+                let mut inner = session.inner.lock().expect("lock poisoned");
+
+                if !cmd_quiet {
+                    println!("Executing: {command}");
+                }
+
+                // Clear stderr buffer before running command
+                if let Ok(mut buf) = inner.stderr_buffer.lock() {
+                    buf.clear();
+                }
+
+                let sentinel = inner.sentinel.clone();
+
+                if cfg!(target_os = "windows") {
+                    let cmd_text = format!(
+                        "$ErrorActionPreference = 'Continue'; & {{ {command} \
+                         }}; \"{sentinel} $LASTEXITCODE\"\n"
+                    );
+                    inner.stdin.write_all(cmd_text.as_bytes()).map_err(
+                        |e| mlua::Error::RuntimeError(e.to_string())
+                    )?;
+                    inner.stdin.flush().map_err(|e| {
+                        mlua::Error::RuntimeError(e.to_string())
+                    })?;
+                } else {
+                    let cmd_text = format!(
+                        "{{\n{command}\n}}\nprintf \"\\n%s %d\\n\" \
+                         {sentinel:?} $?\n"
+                    );
+                    inner.stdin.write_all(cmd_text.as_bytes()).map_err(
+                        |e| mlua::Error::RuntimeError(e.to_string())
+                    )?;
+                    inner.stdin.flush().map_err(|e| {
+                        mlua::Error::RuntimeError(e.to_string())
+                    })?;
+                }
+
+                let mut stdout_accum = String::new();
+                let mut line = String::new();
+                let mut exit_code = 0;
+
+                let mut session_died = false;
+                loop {
+                    line.clear();
+                    let n = inner.stdout.read_line(&mut line).map_err(|e| {
+                        mlua::Error::RuntimeError(e.to_string())
+                    })?;
+                    if n == 0 {
+                        session_died = true;
+                        break;
                     }
 
-                    let rest = line[idx..]
-                        .strip_prefix(&sentinel)
-                        .expect("sentinel missing")
-                        .trim();
-                    exit_code = rest.parse::<i32>().unwrap_or(0);
-                    break;
-                }
-                stdout_accum.push_str(&line);
-                if !quiet {
-                    print!("{line}");
-                    let _ = std::io::stdout().flush();
-                }
-            }
+                    if let Some(idx) = line.find(&sentinel) {
+                        let out_part = &line[..idx];
+                        stdout_accum.push_str(out_part);
+                        if !cmd_quiet && !out_part.is_empty() {
+                            print!("{out_part}");
+                            let _ = std::io::stdout().flush();
+                        }
 
-            if session_died && !retried {
-                retried = true;
-                continue;
-            }
-            if session_died {
+                        let rest = line[idx..]
+                            .strip_prefix(&sentinel)
+                            .expect("sentinel missing")
+                            .trim();
+                        exit_code = rest.parse::<i32>().unwrap_or(0);
+                        break;
+                    }
+                    stdout_accum.push_str(&line);
+                    if !cmd_quiet {
+                        print!("{line}");
+                        let _ = std::io::stdout().flush();
+                    }
+                }
+
+                if session_died && !retried {
+                    retried = true;
+                    continue;
+                }
+                if session_died {
+                    let stderr = inner
+                        .stderr_buffer
+                        .lock()
+                        .map(|b| b.clone())
+                        .unwrap_or_default();
+                    let err_text = if !stderr.trim().is_empty() {
+                        stderr.trim().to_string()
+                    } else if !stdout_accum.trim().is_empty() {
+                        stdout_accum.trim().to_string()
+                    } else {
+                        String::new()
+                    };
+                    return Err(mlua::Error::RuntimeError(
+                        if err_text.is_empty() {
+                            "Shell session ended unexpectedly".to_string()
+                        } else {
+                            format!(
+                                "Shell session ended unexpectedly:\n{err_text}"
+                            )
+                        }
+                    ));
+                }
+
+                // Retrieve captured stderr
                 let stderr = inner
                     .stderr_buffer
                     .lock()
                     .map(|b| b.clone())
                     .unwrap_or_default();
-                let err_text = if !stderr.trim().is_empty() {
-                    stderr.trim().to_string()
-                } else if !stdout_accum.trim().is_empty() {
-                    stdout_accum.trim().to_string()
-                } else {
-                    String::new()
-                };
-                return Err(mlua::Error::RuntimeError(
-                    if err_text.is_empty() {
-                        "Shell session ended unexpectedly".to_string()
-                    } else {
-                        format!("Shell session ended unexpectedly:\n{err_text}")
-                    }
-                ));
-            }
 
-            // Retrieve captured stderr
-            let stderr = inner
-                .stderr_buffer
-                .lock()
-                .map(|b| b.clone())
-                .unwrap_or_default();
+                if exit_code != 0 && !cmd_quiet {
+                    eprintln!(
+                        "[cmd] Command failed with exit code: {exit_code}"
+                    );
+                }
 
-            if exit_code != 0 && !quiet {
-                eprintln!("[cmd] Command failed with exit code: {exit_code}");
-            }
+                break (stdout_accum.trim_end().to_string(), stderr, exit_code);
+            };
 
-            break (stdout_accum.trim_end().to_string(), stderr, exit_code);
-        };
-
-        Ok((stdout_accum, stderr, exit_code))
-    })?;
+            Ok((stdout_accum, stderr, exit_code))
+        }
+    )?;
     lua.globals().set("cmd", cmd_fn)?;
+
+    let set_quiet_fn = lua.create_function(|lua, quiet: bool| {
+        set_session_quiet(lua, quiet);
+        Ok(())
+    })?;
+    lua.globals().set("set_quiet", set_quiet_fn)?;
+
     Ok(())
 }
 

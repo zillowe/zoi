@@ -120,9 +120,11 @@ declare *project*, *packages*, *registries*, *tasks*, *environments*,
   *author*, *platforms* (such as `"linux-amd64"`), *scope* or *scopes*,
   *sub_packages* and *main_subs*, *type* (`package`, `app`,
   `collection`, or `extension`), *conflicts*, *replaces*, *provides*,
-  *tags*, *bins*, *versions* (channel map), *rollback*, *zoios*, and *zsa*
+  *tags*, *bins*, *versions* (channel map), *rollback*, *zoios*, *zsa*
   (boolean; set to `false` or set `no_zsa = true` to disable `.zsa` source
-  bundling for large repositories).
+  bundling for large repositories), and *quiet* (boolean, list of stage
+  names such as `{"prepare", "build"}`, or a table of booleans like
+  `{build = true}` to silence command output during lifecycle functions).
 
 *dependencies*(_table_)::
   Define build-time and runtime requirements with the keys *runtime*,
@@ -230,10 +232,16 @@ immediately.
 
 == Utility functions
 
-*cmd*(_command_)::
+*cmd*(_command_, [_opts_])::
   Execute a shell command in a persistent session shared across calls in
-  the same phase. Returns *stdout*, *stderr*, and *exit_code*; a nonzero
-  exit does not abort the script, so check *exit_code*.
+  the same phase. An optional boolean or `{quiet = true}` table may be
+  passed to control live output streaming. Returns *stdout*, *stderr*,
+  and *exit_code*; a nonzero exit does not abort the script, so check
+  *exit_code*.
+
+*set_quiet*(_boolean_)::
+  Dynamically enable or disable command output streaming for the current
+  shell session.
 
 *IMPORT*(_file_name_)::
   Read a file located next to the script. JSON, YAML, and TOML files are
