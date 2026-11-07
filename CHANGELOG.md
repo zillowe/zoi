@@ -4,31 +4,41 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](./INSTALL.md).
 
-## [Prod. Release 1.29.11](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/tags/Prod-Release-1.29.11) - 2026-11-07
+## [Prod. Release 1.29.12](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.12) - 2026-11-08
+
+### ✨ Features
+
+- [`4f8cd582`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/4f8cd582f8985350055f0ef3208ffa4eda562c46) *(package)* Support independent per-subpackage .zpa archives and deltas
+
+### 🛡️ Dependencies
+
+- [`098e6de2`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/098e6de2d0489af67550b0ef6cf8d3ffb95a9b8c) Update cargo
+
+## [Prod. Release 1.29.11](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.11) - 2026-11-07
 
 ### ✨ Features
 
 - [`ec6e9376`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/ec6e93768bf7ba4fbbb80011df34fa01531d5643) *(package)* Add flexible quiet configuration options for lifecycle stages
 
-## [Prod. Release 1.29.10](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/tags/Prod-Release-1.29.10) - 2026-11-06
+## [Prod. Release 1.29.10](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.10) - 2026-11-06
 
 ### ✨ Features
 
 - [`3bec9922`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/3bec9922a9357f13803ab1910946c7ecf3947155) *(cli)* Improve file ownership querying and command output handling
 
-## [Prod. Release 1.29.9](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/tags/Prod-Release-1.29.9) - 2026-11-05
+## [Prod. Release 1.29.9](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.9) - 2026-11-05
 
 ### ✨ Features
 
 - [`c440e83c`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/c440e83c79981b0f41da94d882b4f5977438b3e3) *(core)* Preserve file modification times and improve shell session error handling
 
-## [Prod. Release 1.29.8](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/tags/Prod-Release-1.29.8) - 2026-11-04
+## [Prod. Release 1.29.8](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.8) - 2026-11-04
 
 ### 🩹 Bug Fixes
 
 - [`c8e56132`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/c8e5613267ac4602a2885fc0fc38e43561c50824) *(package)* Include sibling asset files and subdirectories in bundle
 
-## [Prod. Release 1.29.6](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/tags/Prod-Release-1.29.6) - 2026-11-04
+## [Prod. Release 1.29.6](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.6) - 2026-11-04
 
 ### ✨ Features
 
