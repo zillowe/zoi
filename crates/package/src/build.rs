@@ -1003,6 +1003,13 @@ fn package_single_zpa(
                 files_list.insert(s.link.clone());
             }
             for d in &scope_mapping.dirs {
+                if d.path == "${pkgstore}"
+                    || d.path == "${usrroot}"
+                    || d.path == "${usrhome}"
+                    || d.path == "${createpkgdir}"
+                {
+                    continue;
+                }
                 // Ensure directories end with / to distinguish them in search
                 let mut dir_path = d.path.clone();
                 if !dir_path.ends_with('/') {

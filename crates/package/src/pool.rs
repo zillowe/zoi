@@ -43,26 +43,38 @@ pub fn pool_files(
         let metadata = fs::symlink_metadata(path)?;
         let rel_path = path.strip_prefix(virtual_staging_dir)?;
         let rel_path_str = rel_path.to_string_lossy().to_string();
+        let normalized = rel_path_str.replace('\\', "/");
+
+        // The top-level staging directories themselves (pkgstore, usrroot,
+        // usrhome, createpkgdir) represent the destination roots and must not
+        // be mapped into scope_mapping.dirs as relative paths inside
+        // ${pkgstore}.
+        if normalized == "pkgstore"
+            || normalized == "usrroot"
+            || normalized == "usrhome"
+            || normalized == "createpkgdir"
+        {
+            continue;
+        }
 
         // Determine destination placeholder based on top-level directory
         let (dest_prefix, dest_rel) = if let Some(stripped) =
-            rel_path_str.strip_prefix("pkgstore/")
+            normalized.strip_prefix("pkgstore/")
         {
             ("${pkgstore}", stripped)
-        } else if let Some(stripped) = rel_path_str.strip_prefix("usrroot/") {
+        } else if let Some(stripped) = normalized.strip_prefix("usrroot/") {
             ("${usrroot}", stripped)
-        } else if let Some(stripped) = rel_path_str.strip_prefix("usrhome/") {
+        } else if let Some(stripped) = normalized.strip_prefix("usrhome/") {
             ("${usrhome}", stripped)
-        } else if let Some(stripped) =
-            rel_path_str.strip_prefix("createpkgdir/")
+        } else if let Some(stripped) = normalized.strip_prefix("createpkgdir/")
         {
             ("${createpkgdir}", stripped)
         } else {
             // Fallback for direct writes to staging dir
-            ("${pkgstore}", rel_path_str.as_str())
+            ("${pkgstore}", normalized.as_str())
         };
 
-        let dest = format!("{dest_prefix}/{}", dest_rel.replace('\\', "/"));
+        let dest = format!("{dest_prefix}/{dest_rel}");
 
         #[cfg(unix)]
         let (owner, group) = {
