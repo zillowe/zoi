@@ -131,24 +131,26 @@ ZoiOS uses two primary Lua files to manage its state:
 - **[system.lua Reference](/docs/zds/zoi/guides/system-lua)**: Manage system-wide packages, users, bootloaders, and filesystems.
 - **[home.lua Reference](/docs/zds/zoi/guides/home-lua)**: Manage your personal user environment, dotfiles, and user-scoped packages.
 
-A functional ZoiOS system is defined by a `collection` package, typically **`@core/base`**. This package provides a foundational set of utilities (POSIX tools, C library, Shell) and allows you to choose your primary system components via interactive or declarative options.
+A functional ZoiOS system is defined by `collection` packages. Parlex Linux uses two layers:
 
-### The `@core/base` Profile
+| Collection       | Contents                                                                                                                                       |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@core/base`     | The minimal userland: C library, shell, POSIX tools, compression tools, networking utilities and Zoi itself. No kernel, bootloader or init.   |
+| `@core/base:dev` | `@core/base` plus the standard build toolchain (GCC, binutils, make, autotools, pkgconf, ...). Used as the root of `--pure` package builds. |
+| `@core/parlex`   | A bootable system: `@core/base` plus the kernel, firmware, dracut, GRUB, systemd, sudo and `zoid`.                                             |
 
-When installing or building a ZoiOS system, you can pre-select your core components in `system.lua` to avoid interactive prompts:
+### The `@core/parlex` Profile
+
+To install or build a bootable Parlex Linux system, list the profile in `system.lua`:
 
 ```lua
 -- /etc/zoi/system.lua
 packages({
-    ["@core/base"] = {
-        options = {
-            "zoi:@core/systemd",         -- Choose your Init system
-            "zoi:@core/linux-hardened", -- Choose your Kernel
-            "zoi:@core/doas"            -- Choose your privilege escalator
-        }
-    }
+    "@core/parlex",
 })
 ```
+
+Containers and build roots that do not need to boot can use `@core/base` on its own.
 
 ### Multi-Init and Escalation Support
 

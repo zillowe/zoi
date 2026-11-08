@@ -77,12 +77,14 @@ packages({
     -- Pinning to a channel
     ["@core/zoi"] = { version = "@stable" },
 
-    -- Advanced pinning and options
-    ["@core/base"] = {
+    -- The bootable Parlex Linux profile
+    "@core/parlex",
+
+    -- Pre-selecting dependency options for a package that declares
+    -- option groups, to avoid interactive prompts
+    ["@main/some-package"] = {
         options = {
-            "zoi:@core/systemd",
-            "zoi:@core/linux",
-            "zoi:@core/sudo"
+            "zoi:@main/some-provider",
         }
     }
 })

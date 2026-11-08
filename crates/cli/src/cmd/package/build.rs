@@ -84,9 +84,10 @@ pub struct BuildCommand {
     #[arg(long)]
     pub fakeroot: bool,
 
-    /// Build in a clean, isolated sysroot.
-    /// Requires a base package (specified by --root-package) to be installed
-    /// into the sysroot.
+    /// Build in a clean, isolated sysroot (implies bwrap).
+    /// The base package (--root-package) and the package's build dependencies
+    /// are installed into the sysroot. Only `zoi:` dependencies are allowed,
+    /// including nested ones; host package managers are rejected.
     #[arg(long)]
     pub pure: bool,
 
@@ -108,7 +109,11 @@ pub struct BuildCommand {
 /// Returns an error if the build fails, dependencies cannot be installed, or
 /// the pure environment cannot be initialized.
 pub fn run(mut args: BuildCommand) -> Result<()> {
+    // Declared before the guard so the sysroot directory outlives it: the
+    // guard (dropped first) clears the global sysroot, then the directory is
+    // removed.
     let mut _temp_root = None;
+    let mut _pure_guard = None;
 
     if args.pure {
         if args.method == "docker" {
@@ -136,7 +141,30 @@ pub fn run(mut args: BuildCommand) -> Result<()> {
         )?;
 
         crate::pkg::sysroot::set_sysroot(temp.path().to_path_buf());
+        // From here on, no dependency (including nested build dependencies
+        // of source-built Zoi packages) may be installed by a host package
+        // manager. Cleared again, with the sysroot, when the guard drops.
+        crate::pkg::sysroot::set_host_managers_denied(true);
+        _pure_guard = Some(PureEnvGuard);
         _temp_root = Some(temp);
+
+        // Resolve dependencies in the target (ZoiOS sysroot) context, so
+        // `SYSTEM.DISTRO` and friends match what the build will see. Fail
+        // before populating the sysroot if any would come from the host.
+        let dep_sets = collect_build_dependencies(&args, args.test)?;
+        let all_deps: Vec<String> =
+            dep_sets.iter().flatten().cloned().collect();
+        let foreign =
+            crate::pkg::package::build::non_zoi_dependencies(&all_deps)?;
+        if !foreign.is_empty() {
+            return Err(anyhow::anyhow!(
+                "--pure builds can only use Zoi build dependencies, but this \
+                 package declares: {}.\nThese would be installed on the host \
+                 instead of the isolated sysroot. Declare them as Zoi \
+                 packages (e.g. 'zoi:@core/<name>') or build without --pure.",
+                foreign.join(", ")
+            ));
+        }
 
         // Install the root base environment package
         let root_dep = crate::pkg::dependencies::parse_dependency_string(
@@ -152,9 +180,12 @@ pub fn run(mut args: BuildCommand) -> Result<()> {
             &mut Vec::new(),
             None
         )?;
-    }
 
-    if args.install_deps {
+        // A pure sysroot starts with only the root package, so the checked
+        // build dependencies are always installed into it, with or without
+        // --install-deps.
+        install_dependency_sets(&dep_sets)?;
+    } else if args.install_deps {
         install_dependencies_for_build(&args, args.test)?;
     }
 
@@ -217,6 +248,17 @@ pub fn run(mut args: BuildCommand) -> Result<()> {
     )
 }
 
+/// Clears the global sysroot and the host package manager restriction set up
+/// for a `--pure` build, on every exit path.
+struct PureEnvGuard;
+
+impl Drop for PureEnvGuard {
+    fn drop(&mut self) {
+        crate::pkg::sysroot::set_host_managers_denied(false);
+        crate::pkg::sysroot::clear_sysroot();
+    }
+}
+
 /// Install dependencies required for building the package.
 ///
 /// # Errors
@@ -227,6 +269,64 @@ pub fn install_dependencies_for_build(
     args: &BuildCommand,
     include_test: bool
 ) -> Result<()> {
+    install_dependency_sets(&collect_build_dependencies(args, include_test)?)
+}
+
+/// Install per-platform dependency sets.
+///
+/// Each platform gets its own de-duplication state, so a package required
+/// with different versions on different platforms is checked against every
+/// requirement instead of only the first one seen.
+fn install_dependency_sets(dep_sets: &[Vec<String>]) -> Result<()> {
+    if dep_sets.iter().all(Vec::is_empty) {
+        return Ok(());
+    }
+
+    println!(
+        "{} Installing build/test dependencies...",
+        "::".bold().blue()
+    );
+    let scope = if crate::pkg::sysroot::get_sysroot().is_some() {
+        crate::pkg::types::Scope::System
+    } else {
+        crate::pkg::types::Scope::User
+    };
+    for dep_strings in dep_sets {
+        let processed = std::sync::Mutex::new(std::collections::HashSet::new());
+        let mut installed = Vec::new();
+        for dep_str in dep_strings {
+            let dep =
+                crate::pkg::dependencies::parse_dependency_string(dep_str)?;
+            crate::pkg::install::dep_install::install_dependency(
+                &dep,
+                "build",
+                scope,
+                true,
+                true,
+                &processed,
+                &mut installed,
+                None
+            )?;
+        }
+    }
+    Ok(())
+}
+
+/// Collect the build (and optionally test) dependency strings declared by the
+/// package, one de-duplicated set per requested platform.
+///
+/// Test dependencies are collected even when a platform declares no build
+/// dependencies.
+///
+/// # Errors
+///
+/// Returns an error if the platform cannot be determined or the package
+/// definition fails to parse.
+pub fn collect_build_dependencies(
+    args: &BuildCommand,
+    include_test: bool
+) -> Result<Vec<Vec<String>>> {
+    let mut dep_sets = Vec::new();
     for platform in &args.platform {
         let current_platform = if platform == "current" {
             crate::pkg::utils::get_platform()?
@@ -234,7 +334,7 @@ pub fn install_dependencies_for_build(
             platform.clone()
         };
 
-        if let Some(mut dep_strings) =
+        let mut dep_strings =
             crate::pkg::package::build::get_build_dependencies(
                 &args.package_file,
                 args.r#type.as_deref(),
@@ -242,49 +342,27 @@ pub fn install_dependencies_for_build(
                 args.version_override.as_deref(),
                 false
             )?
-        {
-            if include_test
-                && let Some(test_deps) =
-                    crate::pkg::package::build::get_test_dependencies(
-                        &args.package_file,
-                        &current_platform,
-                        args.version_override.as_deref(),
-                        false
-                    )?
-            {
-                dep_strings.extend(test_deps);
-            }
+            .unwrap_or_default();
 
-            if !dep_strings.is_empty() {
-                println!(
-                    "{} Installing build/test dependencies...",
-                    "::".bold().blue()
-                );
-                let processed =
-                    std::sync::Mutex::new(std::collections::HashSet::new());
-                let mut installed = Vec::new();
-                for dep_str in dep_strings {
-                    let dep =
-                        crate::pkg::dependencies::parse_dependency_string(
-                            &dep_str
-                        )?;
-                    crate::pkg::install::dep_install::install_dependency(
-                        &dep,
-                        "build",
-                        if crate::pkg::sysroot::get_sysroot().is_some() {
-                            crate::pkg::types::Scope::System
-                        } else {
-                            crate::pkg::types::Scope::User
-                        },
-                        true,
-                        true,
-                        &processed,
-                        &mut installed,
-                        None
-                    )?;
-                }
+        if include_test
+            && let Some(test_deps) =
+                crate::pkg::package::build::get_test_dependencies(
+                    &args.package_file,
+                    &current_platform,
+                    args.version_override.as_deref(),
+                    false
+                )?
+        {
+            dep_strings.extend(test_deps);
+        }
+
+        let mut unique: Vec<String> = Vec::new();
+        for dep in dep_strings {
+            if !unique.contains(&dep) {
+                unique.push(dep);
             }
         }
+        dep_sets.push(unique);
     }
-    Ok(())
+    Ok(dep_sets)
 }

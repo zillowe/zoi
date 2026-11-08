@@ -688,8 +688,8 @@ zoi package build --type <build-type> --test /path/to/your-package.pkg.lua
 - `--install-deps`: Automatically install build-time dependencies from other package managers (e.g. Pacman, APT, Cargo) before building.
 - `--version-override <VERSION>`: Override the package version defined in the `.pkg.lua` file.
 - `--method <native|docker>`: The build method to use. Defaults to `native`. Use `docker` for containerized builds.
-- `--pure`: Build in a clean, isolated sysroot. This ensures the build process only has access to explicitly declared dependencies and a minimal base system.
-- `--root-package <SOURCE>`: The base package to install into the sysroot when using `--pure`. Defaults to `@core/base:dev`.
+- `--pure`: Build in a clean, isolated sysroot using Bubblewrap (Linux only, not compatible with `--method docker`). Zoi installs the root package and the package's build dependencies (plus test dependencies with `--test`) into the sysroot, so `--install-deps` is implied. The build then only sees those packages, not your host system. Dependencies are resolved for the ZoiOS sysroot, so `SYSTEM.DISTRO` is `zoios` while they are evaluated. Every build dependency must be a Zoi package (e.g. `zoi:@core/make`). Dependencies from host package managers such as `pacman:` or `native:` would be installed on the host rather than the sysroot, so Zoi rejects them before populating the sysroot. The same restriction applies for the whole build, including the build dependencies of any Zoi package that has to be built from source along the way.
+- `--root-package <SOURCE>`: The base package to install into the sysroot when using `--pure`. Defaults to `@core/base:dev`, the minimal base system plus the standard build toolchain.
 - `--image <IMAGE>`: The Docker image to use for the build (required when `--method docker` is used).
 - `--fakeroot`: Force root ownership (UID/GID 0) in the built archive. Useful for official registry packages. Supports both native and `--pure` builds.
 
