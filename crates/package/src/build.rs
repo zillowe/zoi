@@ -166,6 +166,29 @@ pub fn get_test_dependencies(
     Ok(None)
 }
 
+/// Returns the dependency strings that cannot be satisfied inside a `--pure`
+/// sysroot.
+///
+/// A pure build only sees what Zoi installs into its sysroot, which is limited
+/// to `zoi:` packages. Any other manager (`pacman:`, `apt:`, `native:`, ...)
+/// would be checked and installed on the host instead, leaving the tool
+/// missing from the isolated build. Dependencies without an explicit manager
+/// prefix are Zoi packages and are therefore allowed.
+///
+/// # Errors
+///
+/// Returns an error if any dependency string cannot be parsed.
+pub fn non_zoi_dependencies(deps: &[String]) -> Result<Vec<String>> {
+    let mut foreign = Vec::new();
+    for dep_str in deps {
+        let dep = zoi_deps::parse_dependency_string(dep_str)?;
+        if dep.manager != "zoi" && !foreign.contains(dep_str) {
+            foreign.push(dep_str.clone());
+        }
+    }
+    Ok(foreign)
+}
+
 /// Recursively collects dependencies from a dependency group without prompting
 /// the user.
 fn collect_deps_from_group_no_prompt(

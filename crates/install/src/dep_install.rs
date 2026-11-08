@@ -41,6 +41,18 @@ pub fn install_dependency<S: std::hash::BuildHasher>(
     installed_deps: &mut Vec<String>,
     m: Option<&MultiProgress>
 ) -> Result<()> {
+    if dep.manager != "zoi" && zoi_core::sysroot::host_managers_denied() {
+        return Err(anyhow!(
+            "Dependency '{}:{}' (required by '{}') would be installed on the \
+             host by '{}', which is not allowed in an isolated (--pure) \
+             build. Declare it as a Zoi package (e.g. 'zoi:@core/<name>').",
+            dep.manager,
+            dep.package,
+            parent_id,
+            dep.manager
+        ));
+    }
+
     let dep_id = format!("{}:{}", dep.manager, dep.package);
     {
         let mut lock = processed_deps

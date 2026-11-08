@@ -387,7 +387,13 @@ Output directory. *--install-deps*:: Install build dependencies first.
 *--method*=_M_:: Build method: `native` (default), `bwrap`, or `docker`.
 *--image*=_IMG_:: Container image for docker builds. *--fakeroot*:: Fake
 UID/GID 0 during the build. *--pure*:: Build in a clean sysroot (forces
-bwrap). *--root-package*=_PKG_:: Root package for the build environment.
+bwrap). Installs the root package and build dependencies into the
+sysroot (implies *--install-deps*). Dependencies are resolved for the
+ZoiOS sysroot. All build dependencies, including those of Zoi packages
+built from source along the way, must be `zoi:` packages; host managers
+such as `pacman:` are rejected.
+*--root-package*=_PKG_:: Root package for the build environment
+(default `@core/base:dev`).
 *--no-zsa*:: Skip writing the .zsa source bundle.
 
 *bundle* _FILE_ [_OPTIONS_]::

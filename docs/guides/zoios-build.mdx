@@ -31,19 +31,10 @@ system({
     kernel_params = "quiet splash rw",
 })
 
--- Essential base packages required for a bootable system
+-- The bootable Parlex Linux package set: the minimal @core/base userland
+-- plus the kernel, firmware, bootloader, init system, sudo and zoid
 packages({
-    "@parlex/base",
-    "@parlex/linux",
-    "@parlex/glibc",
-    "@parlex/systemd",
-    "@parlex/bash",
-    "@parlex/coreutils",
-    "@parlex/filesystem",
-    "@parlex/dracut",
-    "@parlex/grub",
-    "@parlex/shadow",
-    "@parlex/sudo",
+    "@core/parlex",
 })
 
 services({

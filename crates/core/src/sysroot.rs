@@ -12,7 +12,26 @@
 /// When a sysroot is set, Zoi transparently redirects all absolute and
 /// relative paths to reside within this target directory.
 use std::path::{Component, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{OnceLock, RwLock};
+
+/// Whether dependencies from host package managers are currently forbidden.
+static HOST_MANAGERS_DENIED: AtomicBool = AtomicBool::new(false);
+
+/// Forbids or allows installing dependencies through host package managers
+/// (anything other than `zoi:`) for the rest of the process.
+///
+/// Isolated (`--pure`) builds set this so that no dependency, including the
+/// build dependencies of a nested source-built Zoi dependency, can install
+/// software on the host instead of the isolated sysroot.
+pub fn set_host_managers_denied(denied: bool) {
+    HOST_MANAGERS_DENIED.store(denied, Ordering::SeqCst);
+}
+
+/// Returns `true` when dependencies from host package managers are forbidden.
+pub fn host_managers_denied() -> bool {
+    HOST_MANAGERS_DENIED.load(Ordering::SeqCst)
+}
 
 /// Provides thread-safe access to the optional global sysroot path.
 fn sysroot_store() -> &'static RwLock<Option<PathBuf>> {
