@@ -164,17 +164,19 @@ pub fn build_archive(
         ));
     }
 
-    let archive_filename =
-        format!("{}-{}-{}.zpa", pkg.name, version, current_platform);
-    let archive_path = pkg_lua_path
-        .parent()
-        .ok_or_else(|| {
-            anyhow!(
-                "pkg_lua_path should have a parent: {}",
-                pkg_lua_path.display()
-            )
-        })?
-        .join(archive_filename);
+    let output_dir = pkg_lua_path.parent().ok_or_else(|| {
+        anyhow!(
+            "pkg_lua_path should have a parent: {}",
+            pkg_lua_path.display()
+        )
+    })?;
+    let archive_path = built_archive_path(
+        output_dir,
+        pkg,
+        sub_package,
+        version,
+        &current_platform
+    );
     if !archive_path.exists() {
         return Err(anyhow!(
             "Package archive '{}' was not created after a successful build. \
@@ -190,4 +192,41 @@ pub fn build_archive(
     }
 
     Ok(Some(archive_path))
+}
+
+/// Returns the archive a source build produced for `pkg` in `output_dir`.
+///
+/// A requested sub-package (`pkg:sub`, including the generated `:debug`)
+/// and every archive of a split package are named
+/// `<name>-<version>-<platform>.<sub>.zpa`; without a requested sub-package,
+/// a split package uses its first `main_subs` entry (or `main`), the same
+/// archive a download would fetch. Other packages build
+/// `<name>-<version>-<platform>.zpa`, which is also the fallback when no
+/// sub-package archive exists.
+#[must_use]
+pub fn built_archive_path(
+    output_dir: &std::path::Path,
+    pkg: &types::Package,
+    sub_package: Option<&str>,
+    version: &str,
+    platform: &str
+) -> PathBuf {
+    let is_split = pkg.sub_packages.as_ref().is_some_and(|s| !s.is_empty());
+    let sub_id = sub_package.filter(|s| !s.is_empty()).or_else(|| {
+        is_split.then(|| {
+            pkg.main_subs
+                .as_ref()
+                .and_then(|m| m.first().map(String::as_str))
+                .unwrap_or("main")
+        })
+    });
+
+    let name = &pkg.name;
+    let plain = output_dir.join(format!("{name}-{version}-{platform}.zpa"));
+    sub_id
+        .map(|sub| {
+            output_dir.join(format!("{name}-{version}-{platform}.{sub}.zpa"))
+        })
+        .filter(|path| path.exists())
+        .unwrap_or(plain)
 }

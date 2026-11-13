@@ -565,3 +565,48 @@ function package() end
     let error = result.expect_err("duplicate debug sub-package").to_string();
     assert!(error.contains("sub_packages already declares"), "{error}");
 }
+
+fn archive_pkg(sub_packages: Option<Vec<&str>>) -> zoi::pkg::types::Package {
+    zoi::pkg::types::Package {
+        name: "striptest".to_string(),
+        sub_packages: sub_packages
+            .map(|subs| subs.into_iter().map(String::from).collect()),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn source_builds_pick_the_archive_of_the_requested_sub_package() {
+    use zoi_install::prebuilt::built_archive_path;
+
+    let tmp = tempdir().expect("tempdir");
+    let dir = tmp.path();
+    let plat = "linux-amd64";
+    let touch = |name: &str| fs::write(dir.join(name), "").expect("write");
+    touch("striptest-1.0.0-linux-amd64.zpa");
+    touch("striptest-1.0.0-linux-amd64.debug.zpa");
+
+    // `pkg:debug` of a plain package must not install the main archive.
+    let plain = archive_pkg(None);
+    assert_eq!(
+        built_archive_path(dir, &plain, Some("debug"), "1.0.0", plat),
+        dir.join("striptest-1.0.0-linux-amd64.debug.zpa")
+    );
+    assert_eq!(
+        built_archive_path(dir, &plain, None, "1.0.0", plat),
+        dir.join("striptest-1.0.0-linux-amd64.zpa")
+    );
+
+    // A split package's main archive is `.main.zpa`.
+    touch("striptest-1.0.0-linux-amd64.main.zpa");
+    touch("striptest-1.0.0-linux-amd64.headers.zpa");
+    let split = archive_pkg(Some(vec!["headers"]));
+    assert_eq!(
+        built_archive_path(dir, &split, None, "1.0.0", plat),
+        dir.join("striptest-1.0.0-linux-amd64.main.zpa")
+    );
+    assert_eq!(
+        built_archive_path(dir, &split, Some("headers"), "1.0.0", plat),
+        dir.join("striptest-1.0.0-linux-amd64.headers.zpa")
+    );
+}
