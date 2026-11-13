@@ -79,8 +79,15 @@ pub fn create_install_plan<S: std::hash::BuildHasher + Sync>(
 
             let action = match util::find_prebuilt_info(node) {
                 Ok(Some(info)) => {
+                    // The node's sub-package lives on the node, not on its
+                    // `pkg`. Without it, `gcc:libgcc` was sized as the whole
+                    // of gcc.
+                    let mut pkg = node.pkg.clone();
+                    if pkg.sub_package.is_none() {
+                        pkg.sub_package.clone_from(&node.sub_package);
+                    }
                     let (down_size, inst_size) = util::get_package_sizes(
-                        &node.pkg,
+                        &pkg,
                         &node.registry_handle,
                         &node.version
                     );
