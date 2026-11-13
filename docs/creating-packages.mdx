@@ -83,6 +83,7 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `archive_size`   | `integer` | The size of the pre-compiled archive (in bytes).                                                                                                                                                                                            |
 | `quiet`          | `boolean` \| `list` \| `table` | Silence command output during lifecycle functions. Can be a boolean (`true`), a list of stage names (`{ "prepare", "build" }`), or a map (`{ build = true }`).                                                                           |
 | `sandbox`        | `table`   | Configuration for Linux-native Bubblewrap isolation. See the [Sandboxing Apps](/docs/zds/zoi/guides/sandboxing) guide.                                                                                                                      |
+| `debug`          | `table`   | How ELF files are stripped at build time, and whether the removed debug information ships as a `<name>:debug` sub-package. See [Stripping and Debug Sub-packages](#stripping-and-debug-sub-packages).                                       |
 
 ### Licensing
 
@@ -416,6 +417,44 @@ function package(args)
   end
 end
 ```
+
+### Stripping and Debug Sub-packages
+
+When a package is built for Linux, Zoi strips the ELF files that `package()` staged before archiving them, as distribution build tools such as `makepkg` do. Every ELF file in the staging area is found by its file header, so binaries outside `bins` (compiler back ends, plugins, shared libraries) are included. The strip depends on the file type:
+
+- **Executables:** `--strip-all`.
+- **Shared libraries:** `--strip-unneeded`, which keeps the symbols the dynamic linker needs.
+- **Static libraries (`.a`) and object files:** `--strip-debug`, which keeps their symbol tables and LTO data, so they still link.
+
+Files that are already stripped are left alone. Stripping needs `strip` and `objcopy` from binutils on the build machine (pure builds get them from `@core/base:dev`); the `STRIP` and `OBJCOPY` environment variables select other tools, for example a cross toolchain. Without them, Zoi prints a warning and packages the files unstripped. Mach-O (macOS) and PE (Windows) files are not stripped.
+
+The optional `debug` table in `metadata` changes this:
+
+```lua
+metadata({
+  -- ...
+  debug = {
+    strip = "full",       -- "full" (default), "debug", or "none"/false
+    sub_package = true,   -- also build <name>:debug (default false)
+    exclude = { "usr/lib/firmware/**" },
+  },
+})
+```
+
+| Field         | Type                  | Description                                                                                                                                                                                       |
+| ------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `strip`       | `string` \| `boolean` | `"full"` (default) strips as described above. `"debug"` removes only debug information and keeps symbol tables, for profiling and readable backtraces. `"none"` or `false` leaves every file as built. |
+| `sub_package` | `boolean`             | When `true`, the debug information of each executable and shared library is split off with `objcopy --only-keep-debug` and shipped as a separate `<name>:debug` sub-package.                    |
+| `exclude`     | `list`                | Glob patterns of staged files never to strip. A pattern matches the path inside its root (`usr/lib/firmware/**` for `${usrroot}/usr/lib/firmware/...`) or the full placeholder path (`${pkgstore}/lib/**`). |
+
+Without a `debug` table, packages are fully stripped and no debug sub-package is built.
+
+The debug sub-package:
+
+- **Archive:** `<pkgname>-<version>-<platform>.debug.zpa`, next to the regular archives. A split package gets one `:debug` for all of its sub-packages.
+- **Layout:** debug files are installed under `/usr/lib/debug/.build-id/xx/yyyy.debug` (or `${pkgstore}/lib/debug/...` for files in the package store), where gdb and debuginfod look them up by the binary's build-id. Binaries without a build-id get `/usr/lib/debug/<path>.debug` and a `.gnu_debuglink` section pointing at it.
+- **Installation:** it is never installed by default, and never part of `main_subs`. Install it explicitly, for example `zoi install @core/gcc:debug`.
+- **Naming:** the name `debug` is reserved: a package with `sub_package = true` cannot also declare a `debug` entry in `sub_packages`.
 
 ---
 

@@ -26,3 +26,5 @@ pub mod pool;
 pub mod registry;
 /// ELF binary relocation for portability.
 pub mod relocate;
+/// Build-time ELF stripping and debug-information splitting.
+pub mod strip;

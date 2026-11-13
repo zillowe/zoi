@@ -21,8 +21,8 @@ use tar::{Archive, Builder as TarBuilder};
 use tempfile::Builder;
 use walkdir::WalkDir;
 use zoi_core::types::{
-    self, PoolFileEntry, PooledZpaManifest, Scope, ScopeMapping,
-    SubPackageMapping
+    self, DEBUG_SUB_PACKAGE, PoolFileEntry, PooledZpaManifest, Scope,
+    ScopeMapping, StripMode, SubPackageMapping
 };
 use zoi_core::utils;
 use zoi_lua;
@@ -516,6 +516,23 @@ fn process_build_operations(
 }
 
 /// Core implementation of the build process for a single platform.
+/// The sub-packages built when none are requested: every declared
+/// sub-package plus the main one, or just the main package when the package
+/// is not split.
+fn default_subs_to_build(pkg: &types::Package) -> Vec<String> {
+    if let Some(subs) = &pkg.sub_packages {
+        if subs.contains(&String::new()) || subs.contains(&"main".to_string()) {
+            subs.clone()
+        } else {
+            let mut all_subs = vec![String::new()];
+            all_subs.extend(subs.clone());
+            all_subs
+        }
+    } else {
+        vec![String::new()]
+    }
+}
+
 fn build_for_platform(
     package_file: &Path,
     build_type: Option<&str>,
@@ -617,18 +634,54 @@ fn build_for_platform(
     let mut pool: BTreeMap<String, PoolFileEntry> = BTreeMap::new();
     let mut mappings: BTreeMap<String, SubPackageMapping> = BTreeMap::new();
 
+    // Stripping only understands ELF, and needs the host's binutils, so it
+    // runs for Linux targets built on Linux.
+    let debug_config = pkg_for_meta.debug.clone().unwrap_or_default();
+    let strip_enabled = cfg!(target_os = "linux")
+        && platform.starts_with("linux")
+        && debug_config.strip != StripMode::None;
+    let debug_sub = strip_enabled && debug_config.sub_package;
+    if debug_config.sub_package {
+        if pkg_for_meta
+            .sub_packages
+            .as_ref()
+            .is_some_and(|subs| subs.iter().any(|s| s == DEBUG_SUB_PACKAGE))
+        {
+            return Err(anyhow!(
+                "debug.sub_package = true generates the '{DEBUG_SUB_PACKAGE}' \
+                 sub-package, but metadata.sub_packages already declares one. \
+                 Rename that sub-package or disable debug.sub_package."
+            ));
+        }
+        if debug_config.strip == StripMode::None && !quiet {
+            println!(
+                "{} debug.sub_package is ignored because debug.strip is \
+                 \"none\": nothing is stripped, so there is no debug \
+                 information to split off.",
+                "::".bold().yellow()
+            );
+        }
+    }
+    // Split-off debug information, one staging directory per scope, shared
+    // by all sub-packages: a split package gets a single `:debug`.
+    let mut debug_stagings: BTreeMap<Scope, tempfile::TempDir> =
+        BTreeMap::new();
+
     let subs_to_build = if let Some(subs) = sub_packages {
-        subs.clone()
-    } else if let Some(subs) = &pkg_for_meta.sub_packages {
-        if subs.contains(&String::new()) || subs.contains(&"main".to_string()) {
-            subs.clone()
+        // `:debug` is generated from the other sub-packages, never built by
+        // running package() for it.
+        let subs: Vec<String> = subs
+            .iter()
+            .filter(|s| !(debug_sub && s.as_str() == DEBUG_SUB_PACKAGE))
+            .cloned()
+            .collect();
+        if subs.is_empty() {
+            default_subs_to_build(&pkg_for_meta)
         } else {
-            let mut all_subs = vec![String::new()];
-            all_subs.extend(subs.clone());
-            all_subs
+            subs
         }
     } else {
-        vec![String::new()]
+        default_subs_to_build(&pkg_for_meta)
     };
 
     let scopes_to_process = pkg_for_meta.scopes.clone().unwrap_or(vec![
@@ -802,6 +855,33 @@ fn build_for_platform(
                 );
             }
 
+            // Strip after relocation (which rewrites the dynamic section)
+            // and before pooling, so the archive records the final bytes.
+            if strip_enabled {
+                let debug_dir = if debug_sub {
+                    let dir = match debug_stagings.entry(*scope) {
+                        std::collections::btree_map::Entry::Occupied(e) => {
+                            e.into_mut()
+                        }
+                        std::collections::btree_map::Entry::Vacant(e) => e
+                            .insert(
+                                Builder::new()
+                                    .prefix("zoi-debugstage-")
+                                    .tempdir()?
+                            )
+                    };
+                    Some(dir.path().to_path_buf())
+                } else {
+                    None
+                };
+                super::strip::strip_staging(
+                    v_staging.path(),
+                    &debug_config,
+                    debug_dir.as_deref(),
+                    is_package_quiet
+                )?;
+            }
+
             let mut scope_mapping = ScopeMapping::default();
             super::pool::pool_files(
                 v_staging.path(),
@@ -866,65 +946,17 @@ fn build_for_platform(
                 continue;
             };
 
-            // Collect only the pool files needed by this specific sub-package
-            let mut sub_pool: BTreeMap<String, PoolFileEntry> = BTreeMap::new();
-            for scope_mapping in sub_mapping.scopes.values() {
-                for file in &scope_mapping.files {
-                    if let Some(entry) = pool.get(&file.hash) {
-                        sub_pool.insert(file.hash.clone(), entry.clone());
-                    }
-                }
-            }
-
-            let sub_staging = Builder::new()
-                .prefix(&format!("zoi-stage-{sub_id}-"))
-                .tempdir()?;
-            let sub_pool_dir = sub_staging.path().join("pool");
-            fs::create_dir_all(&sub_pool_dir)?;
-
-            for hash in sub_pool.keys() {
-                let src = pool_dir.join(hash);
-                let dst = sub_pool_dir.join(hash);
-                if src.exists() {
-                    fs::copy(&src, &dst)?;
-                }
-            }
-
-            let mut sub_mappings = BTreeMap::new();
-            sub_mappings.insert(sub_package.clone(), sub_mapping.clone());
-            if sub_package == "main" {
-                sub_mappings.insert(String::new(), sub_mapping.clone());
-            } else if sub_package.is_empty() {
-                sub_mappings.insert("main".to_string(), sub_mapping.clone());
-            }
-
-            let sub_manifest = PooledZpaManifest {
-                version: "2".to_string(),
-                pool: sub_pool,
-                mappings: sub_mappings
-            };
-
-            let manifest_json =
-                pooled_manifest_json(&sub_manifest, package_file)?;
-            fs::write(sub_staging.path().join("manifest.json"), manifest_json)?;
-
-            fs::copy(
-                package_file,
-                sub_staging.path().join(package_file.file_name().ok_or_else(
-                    || anyhow!("package_file should have a name")
-                )?)
-            )?;
-
             let output_filename = format!(
                 "{}-{version}-{platform}.{sub_id}.zpa",
                 pkg_for_meta.name
             );
-            let output_path = output_base.join(output_filename);
-
-            package_single_zpa(
-                &output_path,
-                sub_staging.path(),
-                &sub_manifest,
+            write_sub_archive(
+                sub_package,
+                sub_mapping,
+                &pool,
+                &pool_dir,
+                package_file,
+                &output_base.join(output_filename),
                 fakeroot,
                 sign_key.map(std::string::String::as_str),
                 sign_mode,
@@ -966,7 +998,143 @@ fn build_for_platform(
         )?;
     }
 
+    if debug_sub {
+        // The debug files live in their own pool so they never end up in the
+        // main archive of a non-split package.
+        let debug_pool_dir = build_dir.path().join("debug-pool");
+        fs::create_dir_all(&debug_pool_dir)?;
+        let mut debug_pool: BTreeMap<String, PoolFileEntry> = BTreeMap::new();
+        let mut debug_mapping = SubPackageMapping {
+            scopes: BTreeMap::new()
+        };
+        for (scope, dir) in &debug_stagings {
+            let mut scope_mapping = ScopeMapping::default();
+            super::pool::pool_files(
+                dir.path(),
+                &debug_pool_dir,
+                &mut debug_pool,
+                &mut scope_mapping,
+                fakeroot
+            )?;
+            debug_mapping.scopes.insert(*scope, scope_mapping);
+        }
+
+        if debug_pool.is_empty() {
+            if !quiet {
+                println!(
+                    "{} No debug information found; not creating the '{}' \
+                     sub-package.",
+                    "::".bold().yellow(),
+                    DEBUG_SUB_PACKAGE
+                );
+            }
+        } else {
+            let output_filename = format!(
+                "{}-{version}-{platform}.{DEBUG_SUB_PACKAGE}.zpa",
+                pkg_for_meta.name
+            );
+            write_sub_archive(
+                DEBUG_SUB_PACKAGE,
+                &debug_mapping,
+                &debug_pool,
+                &debug_pool_dir,
+                package_file,
+                &output_base.join(output_filename),
+                fakeroot,
+                sign_key.map(std::string::String::as_str),
+                sign_mode,
+                quiet
+            )?;
+        }
+    }
+
     Ok(())
+}
+
+/// Writes the `.zpa` archive of one sub-package: the pool files its mapping
+/// references, a manifest with only its mapping, and the package definition.
+///
+/// # Errors
+///
+/// Returns an error if staging, manifest serialization or archive creation
+/// fails.
+fn write_sub_archive(
+    sub_package: &str,
+    sub_mapping: &SubPackageMapping,
+    pool: &BTreeMap<String, PoolFileEntry>,
+    pool_dir: &Path,
+    package_file: &Path,
+    output_path: &Path,
+    fakeroot: bool,
+    sign_key: Option<&str>,
+    sign_mode: types::SignMode,
+    quiet: bool
+) -> Result<()> {
+    let sub_id = if sub_package.is_empty() {
+        "main"
+    } else {
+        sub_package
+    };
+
+    // Collect only the pool files needed by this specific sub-package
+    let mut sub_pool: BTreeMap<String, PoolFileEntry> = BTreeMap::new();
+    for scope_mapping in sub_mapping.scopes.values() {
+        for file in &scope_mapping.files {
+            if let Some(entry) = pool.get(&file.hash) {
+                sub_pool.insert(file.hash.clone(), entry.clone());
+            }
+        }
+    }
+
+    let sub_staging = Builder::new()
+        .prefix(&format!("zoi-stage-{sub_id}-"))
+        .tempdir()?;
+    let sub_pool_dir = sub_staging.path().join("pool");
+    fs::create_dir_all(&sub_pool_dir)?;
+
+    for hash in sub_pool.keys() {
+        let src = pool_dir.join(hash);
+        let dst = sub_pool_dir.join(hash);
+        if src.exists() {
+            fs::copy(&src, &dst)?;
+        }
+    }
+
+    let mut sub_mappings = BTreeMap::new();
+    sub_mappings.insert(sub_package.to_string(), sub_mapping.clone());
+    if sub_package == "main" {
+        sub_mappings.insert(String::new(), sub_mapping.clone());
+    } else if sub_package.is_empty() {
+        sub_mappings.insert("main".to_string(), sub_mapping.clone());
+    }
+
+    let sub_manifest = PooledZpaManifest {
+        version: "2".to_string(),
+        pool: sub_pool,
+        mappings: sub_mappings
+    };
+
+    let manifest_json = pooled_manifest_json(&sub_manifest, package_file)?;
+    fs::write(sub_staging.path().join("manifest.json"), manifest_json)?;
+
+    fs::copy(
+        package_file,
+        sub_staging.path().join(
+            package_file
+                .file_name()
+                .ok_or_else(|| anyhow!("package_file should have a name"))?
+        )
+    )?;
+
+    package_single_zpa(
+        output_path,
+        sub_staging.path(),
+        &sub_manifest,
+        fakeroot,
+        sign_key,
+        sign_mode,
+        quiet
+    )
 }
 
 /// Packages a staging directory into a single `.zpa` archive, including

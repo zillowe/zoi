@@ -555,7 +555,87 @@ pub struct Package {
     /// Quiet configuration for package lifecycle functions (e.g. prepare,
     /// build, package, test).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub quiet: Option<QuietOption>
+    pub quiet: Option<QuietOption>,
+    /// Build-time stripping of debug information, and the optional `:debug`
+    /// sub-package that ships it. When absent, ELF files are fully stripped
+    /// and no debug sub-package is produced.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub debug: Option<DebugConfig>
+}
+
+/// Name of the sub-package that carries split-off debug information.
+pub const DEBUG_SUB_PACKAGE: &str = "debug";
+
+/// How much of an ELF file's symbol and debug information is removed when a
+/// package is built.
+///
+/// Declared in `pkg.lua` as `debug = { strip = "full" }`; `"debug"`, `"none"`
+/// and the booleans `true` (same as `"full"`) and `false` (same as `"none"`)
+/// are also accepted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StripMode {
+    /// Strip as much as each file type allows: `--strip-all` for
+    /// executables, `--strip-unneeded` for shared libraries and
+    /// `--strip-debug` for static libraries and object files.
+    #[default]
+    Full,
+    /// Only remove debug information and keep symbol tables, so profilers
+    /// and backtraces still see function names.
+    Debug,
+    /// Leave every file untouched.
+    None
+}
+
+impl<'de> Deserialize<'de> for StripMode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>
+    {
+        /// The accepted spellings: a boolean or a level name.
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Raw {
+            /// `true` (full) or `false` (none).
+            Bool(bool),
+            /// A level name such as `"full"`.
+            Text(String)
+        }
+
+        match Raw::deserialize(deserializer)? {
+            Raw::Bool(true) => Ok(Self::Full),
+            Raw::Bool(false) => Ok(Self::None),
+            Raw::Text(text) => match text.to_ascii_lowercase().as_str() {
+                "full" | "all" => Ok(Self::Full),
+                "debug" => Ok(Self::Debug),
+                "none" | "off" => Ok(Self::None),
+                other => Err(serde::de::Error::custom(format!(
+                    "invalid debug.strip value '{other}': expected \"full\", \
+                     \"debug\", \"none\" or a boolean"
+                )))
+            }
+        }
+    }
+}
+
+/// Debug-information handling for a package build (`debug = { ... }` in the
+/// metadata block).
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+pub struct DebugConfig {
+    /// How much to strip from ELF files in the staged package.
+    #[serde(default)]
+    pub strip: StripMode,
+    /// Whether to split the removed debug information into a separate
+    /// `<name>:debug` sub-package, laid out under
+    /// `/usr/lib/debug/.build-id/` where debuggers look for it.
+    #[serde(default)]
+    pub sub_package: bool,
+    /// Glob patterns of staged files never to strip. A pattern matches the
+    /// path inside its root (`usr/lib/firmware/**` for
+    /// `${usrroot}/usr/lib/firmware/...`) or the full placeholder path
+    /// (`${pkgstore}/lib/**`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude: Vec<String>
 }
 
 /// Specifies quiet options for package lifecycle functions.

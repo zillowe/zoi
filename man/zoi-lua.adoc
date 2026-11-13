@@ -138,8 +138,28 @@ tag), *alternatives* (a list of `{name, path, link, priority}` entries;
 *priority* defaults to 100), *sandbox* (a table with booleans *enabled*,
 *network*, *system*, *cwd* and string lists *read*, *write*, *env*),
 *extension* (a table with *type* and a *changes* list, for extension
-packages), *alt* (a pointer to an alternative package definition), and
-*completions* (a list of `{shell, filename}` entries).
+packages), *alt* (a pointer to an alternative package definition),
+*completions* (a list of `{shell, filename}` entries), and *debug* (see
+below).
++
+*debug* is a table controlling how ELF files are stripped when the package
+is built for Linux. Every ELF file staged by *package*() is found by its
+header, not only those in *bins*. *strip* is `"full"` (the default:
+`--strip-all` for executables, `--strip-unneeded` for shared libraries,
+`--strip-debug` for static libraries and objects), `"debug"` (remove only
+debug information, keep symbol tables) or `"none"` (also `false`).
+*sub_package* (default `false`) splits the debug information of
+executables and shared libraries off with `objcopy --only-keep-debug` into a
+`<name>:debug` sub-package, archived as
+`<name>-<version>-<platform>.debug.zpa`, laid out under
+`/usr/lib/debug/.build-id/` and never installed by default; split packages
+get one `:debug` for all sub-packages. *exclude* lists glob patterns of
+staged files never to strip, matched against the path inside its root (such
+as `usr/lib/firmware/**`) or the placeholder path (such as
+`${pkgstore}/lib/**`). Without a *debug* table, files are fully stripped
+and no debug sub-package is built. Stripping needs binutils *strip* and
+*objcopy* (overridable with the *STRIP* and *OBJCOPY* environment
+variables); without them Zoi warns and packages the files unstripped.
 
 *dependencies*(_table_)::
   Define build-time and runtime requirements with the keys *runtime*,

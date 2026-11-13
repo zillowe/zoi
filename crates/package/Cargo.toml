@@ -26,6 +26,7 @@ zoi-project.workspace = true
 zoi-resolver.workspace = true
 anyhow.workspace = true
 elb.workspace = true
+glob.workspace = true
 colored.workspace = true
 ignore.workspace = true
 mlua.workspace = true

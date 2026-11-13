@@ -70,6 +70,11 @@ LOCATION = {}
 ---@field write string[]? Paths allowed for writing.
 ---@field env string[]? Environment variables passed into the sandbox.
 
+---@class DebugConfig
+---@field strip ("full"|"debug"|"none"|boolean)? How much to strip from ELF files at build time (defaults to "full"). "full": --strip-all for executables, --strip-unneeded for shared libraries, --strip-debug for static libraries and objects. "debug": only remove debug information, keeping symbol tables. "none" or false: leave files untouched. Linux (ELF) only; needs binutils strip/objcopy.
+---@field sub_package boolean? Also produce a "<name>:debug" sub-package with the split-off debug information under /usr/lib/debug/.build-id/ (defaults to false). Never installed by default.
+---@field exclude string[]? Glob patterns of staged files never to strip, matched against the path inside its root (e.g. "usr/lib/firmware/**") or the full placeholder path (e.g. "${pkgstore}/lib/**").
+
 ---@class ExtensionChange
 ---@field type "repo-git"|"registry-repo"|"registry-add"|"repo-add"|"project"|"pgp"|"plugin"|"hook" The kind of change.
 ---@field add string? Value for repo-git, registry-repo, registry-add, repo-add and project changes.
@@ -126,6 +131,7 @@ LOCATION = {}
 ---@field alt string? Pointer to an alternative package definition.
 ---@field completions ShellCompletion[]? Shell completion scripts provided by the package.
 ---@field quiet (boolean | string[] | table<string, boolean>)? Lifecycle functions to silence command output for (e.g. {"prepare", "build"}, {build = true}, or true).
+---@field debug DebugConfig? Build-time stripping of debug information and the optional "<name>:debug" sub-package. Without it, ELF files are fully stripped and no debug sub-package is built.
 PKG = {}
 
 ---@type string Absolute path to the temporary build directory.
