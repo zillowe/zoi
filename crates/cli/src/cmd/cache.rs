@@ -125,7 +125,10 @@ fn list_dir(dir: &std::path::Path, show_path: bool) -> Result<usize> {
         }
         let filename = entry.file_name().to_string_lossy().to_string();
         let size = fs::metadata(&path)?.len();
-        let note = if filename.ends_with(".part") {
+        let is_partial = path
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("part"));
+        let note = if is_partial {
             " (incomplete download)".dimmed().to_string()
         } else {
             String::new()
