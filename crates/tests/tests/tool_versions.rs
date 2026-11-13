@@ -37,7 +37,12 @@ fn test_shim_resolves_version_from_tool_versions() {
 
     match res {
         Err(e) => {
-            assert!(e.to_string().contains("DB"));
+            // The provider is indexed but nothing is installed, so there is
+            // no installed manifest to take a version from.
+            assert!(
+                e.to_string().contains("no installed manifest"),
+                "unexpected error: {e}"
+            );
         }
         _ => panic!("Expected error because version is not installed")
     }
@@ -74,7 +79,12 @@ fn test_tool_versions_traversal() {
 
     match res {
         Err(e) => {
-            assert!(e.to_string().contains("DB"));
+            // The provider is indexed but nothing is installed, so there is
+            // no installed manifest to take a version from.
+            assert!(
+                e.to_string().contains("no installed manifest"),
+                "unexpected error: {e}"
+            );
         }
         _ => panic!("Expected error")
     }
