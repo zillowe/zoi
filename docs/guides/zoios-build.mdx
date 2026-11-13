@@ -135,7 +135,7 @@ sudo zoi system distro build --target /mnt --config ./target-system.lua --dry-ru
 In this single step, Zoi:
 
 1. **Pre-flight**: Validates that every package in `system.lua` exists in your registry, before touching the disk.
-2. **Initializes Sysroot**: Drops the `/etc/os-release` marker (`ID=zoios`) so the disk is recognized as ZoiOS.
+2. **Initializes Sysroot**: Writes the hostname to `/etc/hostname` and a temporary marker (`ID=zoios`, in `/etc/zoi/bootstrap-os-release`) so the disk is recognized as ZoiOS while packages install. Once they are installed, the marker is removed if a package provided `/etc/os-release` (Parlex's `filesystem` does), or becomes `/etc/os-release` otherwise.
 3. **Bootstrap Installation**: Directly installs the entire base package set into the target Zoi store and then into the system root.
 4. **Configures Accounts**: Reconciles the declared `users` and `groups` against the target's `/etc/passwd`, `/etc/shadow`, `/etc/group` and `/etc/gshadow`.
 5. **Generates fstab**: Writes `/etc/fstab` from the declared `filesystems`.
@@ -274,6 +274,6 @@ sync
 
 You might wonder why you can't run `zoi system apply` on a standard Ubuntu or macOS host.
 
-Zoi includes a **ZoiOS Environment Guard**. Commands like `zoi system apply`, `list`, and `rollback` check for specific OS markers (like `ID=zoios` or `ID=parlex` in `/etc/os-release`). If the system is not a recognized ZoiOS distribution, these commands are safely disabled to prevent accidental damage to a standard generic Linux environment.
+Zoi includes a **ZoiOS Environment Guard**. Commands like `zoi system apply`, `list`, and `rollback` check for specific OS markers (like `ID=zoios`, `ID=parlex` or `ID_LIKE=zoios` in `/etc/os-release`, or `/usr/lib/os-release`). If the system is not a recognized ZoiOS distribution, these commands are safely disabled to prevent accidental damage to a standard generic Linux environment.
 
 The `zoi system distro build` command is explicitly allowed on generic systems so that you can bootstrap new disks, and its primary job is to establish that initial marker so the target disk becomes a valid ZoiOS environment.

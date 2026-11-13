@@ -539,10 +539,22 @@ pub fn retry_backoff_sleep(attempt: u32) {
 }
 
 /// Retrieves information about the current Linux distribution from
-/// /etc/os-release.
+/// `/etc/os-release`.
+///
+/// Falls back to `/usr/lib/os-release`, as os-release(5) specifies, and last
+/// to the temporary marker `zoi system distro build` writes into a target
+/// before its packages provide a real os-release.
 pub fn get_linux_distribution_info() -> Option<HashMap<String, String>> {
-    let path = crate::sysroot::apply_sysroot("/etc/os-release");
-    if let Ok(contents) = fs::read_to_string(path) {
+    let contents = [
+        "/etc/os-release",
+        "/usr/lib/os-release",
+        "/etc/zoi/bootstrap-os-release"
+    ]
+    .into_iter()
+    .find_map(|path| {
+        fs::read_to_string(crate::sysroot::apply_sysroot(path)).ok()
+    });
+    if let Some(contents) = contents {
         let info: HashMap<String, String> = contents
             .lines()
             .filter_map(|line| {

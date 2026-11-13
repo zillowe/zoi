@@ -371,6 +371,11 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                     }
                 }
 
+                zoi_system::distro::finalize_zoios_marker(
+                    target_path,
+                    dry_run
+                )?;
+
                 // Finalize Generation
                 zoi_system::distro::finalize_first_generation(
                     target_path,

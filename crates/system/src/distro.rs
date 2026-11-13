@@ -7,11 +7,26 @@ use zoi_core::sysroot;
 
 use crate::generation::GenerationManager;
 
-/// Writes the `/etc/os-release` marker that identifies the target as `ZoiOS`.
+/// Where `zoi system distro build` writes its temporary os-release marker,
+/// relative to the target root.
+///
+/// It is not `/etc/os-release`: the distribution's own packages (Parlex's
+/// `filesystem`) install that, and a stray file there would collide with
+/// them. [`zoi_core::utils::get_linux_distribution_info`] reads this file
+/// only when the target has no real os-release yet.
+pub const BOOTSTRAP_OS_RELEASE: &str = "etc/zoi/bootstrap-os-release";
+
+/// Marks `target` as a `ZoiOS` root for the duration of the build and makes
+/// it the sysroot.
+///
+/// Installing `zoios = true` packages requires the target to identify as
+/// `ZoiOS`. Until a package provides the real `/etc/os-release`, that is done
+/// with a temporary marker at [`BOOTSTRAP_OS_RELEASE`]; see
+/// [`finalize_zoios_marker`]. The hostname goes to `/etc/hostname`.
 ///
 /// # Errors
 ///
-/// Returns an error if the os-release marker cannot be written.
+/// Returns an error if the marker or hostname cannot be written.
 pub fn initialize_zoios_marker(
     target: &Path,
     hostname: Option<&str>,
@@ -19,7 +34,7 @@ pub fn initialize_zoios_marker(
 ) -> Result<()> {
     if dry_run {
         println!(
-            "  {} Would initialize ZoiOS marker at {}/etc/os-release",
+            "  {} Would mark {} as ZoiOS and set its hostname",
             "[DRY-RUN]".dimmed(),
             target.display()
         );
@@ -27,16 +42,41 @@ pub fn initialize_zoios_marker(
     }
 
     sysroot::set_sysroot(target.to_path_buf());
-    let etc_zoi = target.join("etc/zoi");
-    fs::create_dir_all(&etc_zoi)?;
+    fs::create_dir_all(target.join("etc/zoi"))?;
 
-    let os_release = target.join("etc/os-release");
-    let marker = format!(
-        "ID=zoios\nNAME=ZoiOS\nID_LIKE=zoios\nPRETTY_NAME=\"ZoiOS\"\\
-         nHOSTNAME={}\n",
-        hostname.unwrap_or("zoios")
-    );
-    fs::write(os_release, marker)?;
+    let marker = "ID=zoios\n\
+                  NAME=ZoiOS\n\
+                  PRETTY_NAME=\"ZoiOS\"\n";
+    fs::write(target.join(BOOTSTRAP_OS_RELEASE), marker)?;
+
+    let hostname = hostname.unwrap_or("zoios");
+    fs::write(target.join("etc/hostname"), format!("{hostname}\n"))?;
+    Ok(())
+}
+
+/// Resolves the temporary marker once the packages are installed.
+///
+/// If a package installed `/etc/os-release` (or `/usr/lib/os-release`), the
+/// marker is removed. Otherwise it becomes `/etc/os-release`, so the target
+/// is still recognized as `ZoiOS`.
+///
+/// # Errors
+///
+/// Returns an error if the marker cannot be moved or removed.
+pub fn finalize_zoios_marker(target: &Path, dry_run: bool) -> Result<()> {
+    let marker = target.join(BOOTSTRAP_OS_RELEASE);
+    if dry_run || !marker.exists() {
+        return Ok(());
+    }
+    let etc = target.join("etc/os-release");
+    let has_os_release = etc.exists()
+        || etc.is_symlink()
+        || target.join("usr/lib/os-release").exists();
+    if has_os_release {
+        fs::remove_file(&marker)?;
+    } else {
+        fs::rename(&marker, &etc)?;
+    }
     Ok(())
 }
 
