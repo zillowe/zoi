@@ -50,9 +50,9 @@ pub mod doctor {
 pub mod resolve {
     pub use zoi_resolver::resolve::{
         PackageRequest, ResolvedSource, get_db_root, get_default_version,
-        parse_source_string, resolve_channel, resolve_package_and_version,
-        resolve_requested_version_spec, resolve_source,
-        resolve_version_from_url
+        get_host_db_root, parse_source_string, resolve_channel,
+        resolve_package_and_version, resolve_requested_version_spec,
+        resolve_source, resolve_version_from_url
     };
 }
 /// Minimal package resolution utilities.

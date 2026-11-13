@@ -202,7 +202,12 @@ pub fn get_db_root() -> Result<PathBuf> {
 ///
 /// Returns an error if the home directory cannot be found.
 pub fn get_host_db_root() -> Result<PathBuf> {
-    zoi_core::utils::get_db_base_dir(zoi_core::types::Scope::User)
+    // Not `get_db_base_dir(Scope::User)`: that applies the sysroot, so inside
+    // a fresh target it pointed at the target's own (empty) database and
+    // `zoi system distro build` failed with "No synced registries found".
+    Ok(zoi_core::utils::get_host_user_data_dir()?
+        .join("pkgs")
+        .join("db"))
 }
 
 /// Parses a source string into a `PackageRequest`.

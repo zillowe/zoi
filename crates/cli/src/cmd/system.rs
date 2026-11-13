@@ -311,6 +311,8 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                         target.cyan()
                     );
 
+                    seed_target_registries()?;
+
                     // Use CLI's install engine
                     let project_config = zoi_project::config::ProjectConfig {
                         name: "system".to_string(),
@@ -850,6 +852,68 @@ fn handle_response(response: Response) -> Result<()> {
         Response::Generations(_) => {
             return Err(anyhow!("Unexpected response from daemon"));
         }
+    }
+    Ok(())
+}
+
+/// Copies the host's synced registries into the target sysroot, so a fresh
+/// `zoi system distro build` target can resolve and download packages
+/// without a separate `zoi sync --root`.
+///
+/// Must run after the sysroot is set to the target. Only registry data is
+/// copied (each registry's directory and `<handle>.db`); the host's
+/// `local.db`, which records what is installed on the host, never is.
+/// Registries the target already has are left as they are.
+///
+/// # Errors
+///
+/// Returns an error if the host has no synced registry, or copying fails.
+fn seed_target_registries() -> Result<()> {
+    let host = zoi_resolver::resolve::get_host_db_root()?;
+    let target = zoi_resolver::resolve::get_db_root()?;
+    if host == target {
+        return Ok(());
+    }
+
+    let mut seeded = 0;
+    if let Ok(entries) = std::fs::read_dir(&host) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+            if name_str == "local.db" || name_str.starts_with("local.db-") {
+                continue;
+            }
+            let src = entry.path();
+            let dst = target.join(&name);
+            if dst.exists() {
+                continue;
+            }
+            std::fs::create_dir_all(&target)?;
+            if src.is_dir() {
+                zoi_core::utils::copy_dir_all(&src, &dst)?;
+                seeded += 1;
+            } else if name_str.ends_with(".db") {
+                std::fs::copy(&src, &dst)?;
+            }
+        }
+    }
+
+    if seeded == 0
+        && !std::fs::read_dir(&target).is_ok_and(|mut e| e.next().is_some())
+    {
+        return Err(anyhow!(
+            "No synced registries found on the host ({}). Run 'zoi sync' \
+             first.",
+            host.display()
+        ));
+    }
+    if seeded > 0 {
+        println!(
+            "{} Copied {seeded} synced registr{} from the host into the \
+             target.",
+            "::".bold().blue(),
+            if seeded == 1 { "y" } else { "ies" }
+        );
     }
     Ok(())
 }

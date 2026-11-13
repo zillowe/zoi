@@ -191,11 +191,26 @@ pub fn get_user_config_dir() -> Result<PathBuf> {
 ///
 /// Returns an error if no suitable user data directory can be found.
 pub fn get_user_data_dir() -> Result<PathBuf> {
+    Ok(crate::sysroot::apply_sysroot(get_host_user_data_dir()?))
+}
+
+/// Returns the invoking user's Zoi data directory on the host, ignoring any
+/// sysroot.
+///
+/// While building into a sysroot (`zoi system distro build`, `--root`,
+/// `--pure`) every other path is redirected into the target. This one is
+/// not, so the host's synced registry can be found to bootstrap a target
+/// that has none yet.
+///
+/// # Errors
+///
+/// Returns an error if no suitable user data directory can be found.
+pub fn get_host_user_data_dir() -> Result<PathBuf> {
     let root =
         xdg_or_platform_dir("XDG_DATA_HOME", dirs::data_local_dir, |home| {
             home.join(".local/share")
         })?;
-    Ok(crate::sysroot::apply_sysroot(root.join("zoi")))
+    Ok(root.join("zoi"))
 }
 
 /// Returns Zoi's user cache directory according to the XDG Base Directory

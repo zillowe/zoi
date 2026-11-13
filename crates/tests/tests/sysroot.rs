@@ -48,3 +48,18 @@ fn test_sysroot_should_contain_parent_traversal() {
         PathBuf::from("/mnt/root/etc/passwd")
     );
 }
+
+#[test]
+fn host_db_root_ignores_the_sysroot() {
+    // `zoi system distro build` bootstraps an empty target from the host's
+    // synced registry. With the sysroot applied to it, the "host" database
+    // was the target's own empty one: "No synced registries found".
+    let mut ctx = common::TestContextGuard::acquire();
+    let home = tempfile::tempdir().expect("tempdir");
+    ctx.set_env_var("HOME", home.path());
+    ctx.set_env_var("XDG_DATA_HOME", home.path().join(".local/share"));
+    common::TestContextGuard::set_sysroot(PathBuf::from("/mnt/new-disk"));
+
+    let host = zoi::pkg::resolve::get_host_db_root().expect("host db root");
+    assert_eq!(host, home.path().join(".local/share/zoi/pkgs/db"));
+}
