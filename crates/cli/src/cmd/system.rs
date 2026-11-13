@@ -312,6 +312,10 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                     );
 
                     seed_target_registries()?;
+                    // Builtin keys are written once at startup, before the
+                    // sysroot pointed at the target, so the target's keyring
+                    // is still empty and archive signatures would not verify.
+                    crate::pkg::pgp::ensure_builtin_keys()?;
 
                     // Use CLI's install engine
                     let project_config = zoi_project::config::ProjectConfig {
