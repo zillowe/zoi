@@ -7,6 +7,36 @@ use std::thread;
 
 use mlua::{self, Lua, Table, Value};
 
+/// Quotes a value for a POSIX shell using single quotes.
+///
+/// Inside single quotes nothing is expanded (`$`, backticks, `\`), so the
+/// only character needing care is `'` itself, which is written as `'\''`.
+pub(crate) fn sh_single_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+/// Reports whether `name` is safe to use as an environment variable name in a
+/// generated `export`/`$env:` statement.
+fn is_valid_env_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.starts_with(|c: char| c.is_ascii_digit())
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// Appends a statement that sets environment variable `name` to `value` in the
+/// session shell, quoting the value so it is never expanded.
+fn push_env_assignment(env_cmds: &mut String, name: &str, value: &str) {
+    if !is_valid_env_name(name) {
+        return;
+    }
+    if cfg!(target_os = "windows") {
+        let _ =
+            writeln!(env_cmds, "$env:{name} = '{}'", value.replace('\'', "''"));
+    } else {
+        let _ = writeln!(env_cmds, "export {name}={}", sh_single_quote(value));
+    }
+}
+
 /// Configuration for the Lua shell session.
 pub struct ShellSessionConfig {
     /// Whether command output should be silenced.
@@ -58,6 +88,7 @@ impl ShellSession {
                 .arg("-NonInteractive")
                 .arg("-Command")
                 .arg("-")
+                .env_remove("GPG_PASSWORD")
                 .current_dir(build_dir)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
@@ -67,6 +98,8 @@ impl ShellSession {
             Command::new("bash")
                 .arg("--noprofile")
                 .arg("--norc")
+                // The signing passphrase must never reach package code.
+                .env_remove("GPG_PASSWORD")
                 .current_dir(build_dir)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
@@ -106,38 +139,27 @@ impl ShellSession {
         let vars = [
             ("BUILD_TYPE", "BUILD_TYPE"),
             ("SUBPKG", "SUBPKG"),
-            ("BUILD_DIR", "BUILD_DIR"),
-            ("STAGING_DIR", "STAGING_DIR"),
             ("PKGLUADIR", "PKGLUADIR")
         ];
 
         for (lua_name, env_name) in vars {
             if let Ok(val) = globals.get::<String>(lua_name) {
-                if cfg!(target_os = "windows") {
-                    let _ = writeln!(
-                        env_cmds,
-                        "$env:{env_name} = '{}'",
-                        val.replace('\'', "''")
-                    );
-                } else {
-                    let _ = writeln!(env_cmds, "export {env_name}={val:?}");
-                }
+                push_env_assignment(&mut env_cmds, env_name, &val);
             }
+        }
+
+        // BUILD_DIR and STAGING_DIR come from the Rust-side environment state,
+        // not from (script-writable) Lua globals.
+        push_env_assignment(&mut env_cmds, "BUILD_DIR", build_dir);
+        if let Some(staging_dir) = super::opt_staging_dir(lua) {
+            push_env_assignment(&mut env_cmds, "STAGING_DIR", &staging_dir);
         }
 
         // Also resolve PKGLUADIR from LOCATION table if not set in globals
         if let Ok(loc) = globals.get::<Table>("LOCATION")
             && let Ok(pkg_dir) = loc.get::<String>("PKGLUADIR")
         {
-            if cfg!(target_os = "windows") {
-                let _ = writeln!(
-                    env_cmds,
-                    "$env:PKGLUADIR = '{}'",
-                    pkg_dir.replace('\'', "''")
-                );
-            } else {
-                let _ = writeln!(env_cmds, "export PKGLUADIR={pkg_dir:?}");
-            }
+            push_env_assignment(&mut env_cmds, "PKGLUADIR", &pkg_dir);
         }
 
         // Allow GNU autotools builds to run as root in containerized CI
@@ -164,18 +186,11 @@ impl ShellSession {
                         _ => continue
                     };
                     let k_upper = k.to_uppercase();
-                    if cfg!(target_os = "windows") {
-                        let _ = writeln!(
-                            env_cmds,
-                            "$env:{prefix}{k_upper} = '{}'",
-                            val_str.replace('\'', "''")
-                        );
-                    } else {
-                        let _ = writeln!(
-                            env_cmds,
-                            "export {prefix}{k_upper}={val_str:?}"
-                        );
-                    }
+                    push_env_assignment(
+                        &mut env_cmds,
+                        &format!("{prefix}{k_upper}"),
+                        &val_str
+                    );
                 }
             }
         }
@@ -224,7 +239,7 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 
     let cmd_fn = lua.create_function(
         move |lua, (command, opts): (String, Option<Value>)| {
-            let build_dir: String = lua.globals().get("BUILD_DIR")?;
+            let build_dir = super::build_dir(lua)?;
 
             // A command such as `exit` can terminate the shell mid-call. Retry
             // the command once against a freshly spawned session so `cmd`
@@ -411,7 +426,7 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 pub fn add_zpatch(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let zpatch_fn = lua.create_function(
         move |lua, (patch_file, strip): (String, Option<u32>)| {
-            let build_dir: String = lua.globals().get("BUILD_DIR")?;
+            let build_dir = super::build_dir(lua)?;
             let strip_level = strip.unwrap_or(1);
 
             if !quiet {

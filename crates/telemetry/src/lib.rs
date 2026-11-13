@@ -55,7 +55,9 @@ pub struct PackageEvent<'a> {
     pub package_type: &'a str,
     /// Installation scope (e.g. "global", "user").
     pub scope: String,
-    /// Reason for the installation (e.g. "direct", "dependency").
+    /// Reason for the installation: "direct", "dependency" or "unknown".
+    ///
+    /// The parent package of a dependency is deliberately not included.
     pub reason: String,
     /// How the package was installed (e.g. "source", "binary").
     pub install_type: Option<String>
@@ -72,8 +74,6 @@ pub struct MinimalPackage<'a> {
     pub repo: &'a str,
     /// Package version.
     pub version: &'a str,
-    /// Brief description of the package.
-    pub description: &'a str,
     /// License of the package.
     pub license: &'a str,
     /// Maintainer of the package.
@@ -82,19 +82,75 @@ pub struct MinimalPackage<'a> {
     pub author: Option<MinimalPerson<'a>>,
     /// Registry handle.
     pub registry: &'a str,
-    /// URL of the registry.
-    pub registry_url: &'a str
+    /// Scheme and host of the registry URL, without credentials, port, path,
+    /// query or fragment (see [`sanitize_registry_url`]).
+    pub registry_url: String
 }
 
 /// A minimal representation of a person (maintainer or author) for telemetry.
+///
+/// Email addresses are deliberately not included.
 #[derive(Debug, Serialize)]
 pub struct MinimalPerson<'a> {
     /// Name of the person.
     pub name: &'a str,
-    /// Email address of the person.
-    pub email: &'a str,
     /// Optional website URL.
     pub website: Option<&'a String>
+}
+
+/// Reduces a registry URL to the part that is safe to report.
+///
+/// Registry URLs can embed credentials (userinfo before the host), access
+/// tokens in the query string, or private paths, none of which belong in
+/// analytics. Only `scheme://host` is kept; scp-style git URLs
+/// (`git@host:path`) reduce to `ssh://host`. Anything else, such as a local
+/// path, is reported as `"local"`, and an empty value as `"unknown"`.
+pub fn sanitize_registry_url(url: &str) -> String {
+    let url = url.trim();
+    if url.is_empty() || url == "unknown" {
+        return "unknown".to_string();
+    }
+
+    let host_of = |authority: &str| -> String {
+        // Drop userinfo (`user:pass@`) and any port.
+        let host = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
+        let host = if host.starts_with('[') {
+            // IPv6 literal: keep the bracketed address, drop the port.
+            host.split_once(']')
+                .map_or(host.to_string(), |(addr, _)| format!("{addr}]"))
+        } else {
+            host.split(':').next().unwrap_or_default().to_string()
+        };
+        host.to_ascii_lowercase()
+    };
+
+    if let Some((scheme, rest)) = url.split_once("://") {
+        let scheme = scheme.to_ascii_lowercase();
+        if scheme == "file" {
+            return "local".to_string();
+        }
+        let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+        let host = host_of(authority);
+        if host.is_empty() {
+            return "unknown".to_string();
+        }
+        return format!("{scheme}://{host}");
+    }
+
+    // scp-like syntax: `[user@]host:path`, where the host part contains no
+    // slash. Anything else without a scheme is a local path.
+    if let Some((authority, _path)) = url.split_once(':')
+        && !authority.contains(['/', '\\'])
+        // A single letter is a Windows drive (`C:\...`), not a host.
+        && authority.len() > 1
+    {
+        let host = host_of(authority);
+        if !host.is_empty() {
+            return format!("ssh://{host}");
+        }
+    }
+
+    "local".to_string()
 }
 
 /// Returns the path to the file where the anonymous client ID is stored.
@@ -374,9 +430,19 @@ fn prompt_pending_crashes() {
 ///   CLI.)
 /// - The detached flusher child itself never enqueues.
 ///
-/// Data collected is limited to: event type (install/uninstall), package
-/// metadata (name, version, license), and basic environment info (OS, Arch,
-/// Shell).
+/// Data collected is limited to exactly:
+/// - the anonymous `client_id`, the event name (e.g. install/uninstall) and a
+///   timestamp;
+/// - the Zoi version and basic environment info: OS, CPU architecture, Linux
+///   distribution name and the current shell;
+/// - public package metadata: name, sub-package, repo, version, license,
+///   package type, and the maintainer's and author's name and website (never
+///   their email addresses, and never the package description);
+/// - the registry handle and the registry's `scheme://host` only (credentials,
+///   port, path, query and fragment are stripped, see
+///   [`sanitize_registry_url`]);
+/// - the install scope, the install reason (`direct`, `dependency` or
+///   `unknown`, without naming the parent package) and the install type.
 ///
 /// # Errors
 ///
@@ -430,8 +496,8 @@ pub fn posthog_capture_event(
     let scope_str = format!("{:?}", pkg.scope).to_lowercase();
     let reason_str = match &pkg.reason {
         Some(zoi_core::types::InstallReason::Direct) => "direct".to_string(),
-        Some(zoi_core::types::InstallReason::Dependency { parent }) => {
-            format!("dependency:{parent}")
+        Some(zoi_core::types::InstallReason::Dependency { .. }) => {
+            "dependency".to_string()
         }
         None => "unknown".to_string()
     };
@@ -448,7 +514,7 @@ pub fn posthog_capture_event(
                 .find(|r| r.handle == registry_handle)
                 .map(|r| r.url.as_str())
         })
-        .unwrap_or("unknown");
+        .map_or_else(|| "unknown".to_string(), sanitize_registry_url);
 
     let ev = PackageEvent {
         client_id: &client_id,
@@ -464,16 +530,13 @@ pub fn posthog_capture_event(
             sub_package: pkg.sub_package.as_ref(),
             repo: &pkg.repo,
             version: pkg.version.as_deref().unwrap_or("unknown"),
-            description: &pkg.description,
             license: &pkg.license,
             maintainer: MinimalPerson {
                 name: &pkg.maintainer.name,
-                email: &pkg.maintainer.email,
                 website: pkg.maintainer.website.as_ref()
             },
             author: pkg.author.as_ref().map(|a| MinimalPerson {
                 name: &a.name,
-                email: a.email.as_deref().unwrap_or_default(),
                 website: a.website.as_ref()
             }),
             registry: registry_handle,

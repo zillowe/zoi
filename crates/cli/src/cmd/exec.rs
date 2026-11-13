@@ -4,7 +4,7 @@
 //! installing it into the global or user scope. It handles temporary
 //! installation and cleanup.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -43,10 +43,13 @@ pub fn run(
         println!("{} Resolving package...", "::".bold().blue());
     }
 
-    let installed_before: HashSet<String> = local::get_installed_packages()?
-        .into_iter()
-        .map(|m| local::installed_manifest_source(&m))
-        .collect();
+    // Ephemeral packages are written into the shared store, so the store
+    // lock is held while they are resolved and installed. It is released
+    // before the user's program runs: holding it for the lifetime of an
+    // interactive session would block every other Zoi command.
+    let install_lock = crate::pkg::lock::acquire_lock()?;
+
+    let installed_manifests = local::get_installed_packages()?;
 
     let (graph, _non_zoi_deps) = install::resolver::resolve_dependency_graph(
         &[source.to_string()],
@@ -59,8 +62,13 @@ pub fn run(
         None
     )?;
 
-    let install_plan =
+    let mut install_plan =
         install::plan::create_install_plan(&graph.nodes, None, false)?;
+    crate::cmd::shell::drop_already_installed(
+        &mut install_plan,
+        &graph.nodes,
+        &installed_manifests
+    );
     let stages = graph.toposort()?;
 
     let mut session_installed = Vec::new();
@@ -84,12 +92,10 @@ pub fn run(
                          during preparation"
                     )
                 })?;
-                let action = install_plan.get(pkg_id).ok_or_else(|| {
-                    anyhow!(
-                        "Install action missing for package '{pkg_id}' during \
-                         preparation"
-                    )
-                })?;
+                // Packages that are already installed have no plan entry.
+                let Some(action) = install_plan.get(pkg_id) else {
+                    return Ok(());
+                };
 
                 let prepared = install::installer::prepare_node(
                     node,
@@ -124,6 +130,9 @@ pub fn run(
 
         for stage in stages {
             stage.into_par_iter().try_for_each(|pkg_id| -> Result<()> {
+                if !install_plan.contains_key(&pkg_id) {
+                    return Ok(());
+                }
                 let node = graph.nodes.get(&pkg_id).ok_or_else(|| {
                     anyhow!("Package node missing from graph for '{pkg_id}'")
                 })?;
@@ -327,70 +336,38 @@ pub fn run(
         c
     };
 
+    drop(install_lock);
     let status = cmd.status()?;
 
-    if !session_installed.is_empty() {
-        if verbose {
-            println!(
-                "{} Cleaning up ephemeral packages...",
-                "::".bold().blue()
-            );
-        }
-        for manifest in session_installed {
-            let ident = crate::pkg::local::installed_manifest_source(&manifest);
-            if installed_before.contains(&ident) {
-                continue;
-            }
-            let version_dir = match get_version_dir_from_manifest(&manifest) {
-                Ok(d) => d,
-                Err(e) => {
-                    eprintln!(
-                        "Warning: failed to resolve path for {ident}: {e}"
-                    );
-                    continue;
-                }
-            };
-            if version_dir.exists()
-                && let Err(e) = fs::remove_dir_all(&version_dir)
-            {
+    // Cleanup removes store directories, so it needs the lock back. If
+    // another Zoi process holds it now, skipping cleanup is safer than
+    // deleting files underneath it.
+    let cleanup_lock = if session_installed.is_empty() {
+        None
+    } else {
+        match crate::pkg::lock::acquire_lock() {
+            Ok(guard) => Some(guard),
+            Err(e) => {
                 eprintln!(
-                    "Warning: failed to cleanup ephemeral package {ident}: {e}"
+                    "Warning: skipping cleanup of ephemeral packages: {e}"
                 );
-            }
-            let package_dir = version_dir
-                .parent()
-                .expect("Version directory must have a parent")
-                .to_path_buf();
-            if let Ok(mut entries) = fs::read_dir(&package_dir) {
-                let has_other_entries = entries.any(|e| {
-                    e.as_ref().is_ok_and(|e| {
-                        e.file_name() != "latest"
-                            && e.file_name() != "dependents"
-                    })
-                });
-                if !has_other_entries {
-                    let _ = fs::remove_dir_all(&package_dir);
-                }
+                session_installed.clear();
+                None
             }
         }
-    }
+    };
+
+    crate::cmd::shell::cleanup_ephemeral_installs(
+        session_installed,
+        &installed_manifests,
+        verbose
+    );
+
+    drop(cleanup_lock);
 
     if !status.success() {
         std::process::exit(status.code().unwrap_or(1));
     }
 
     Ok(())
-}
-
-/// Resolves the version directory path from an install manifest.
-fn get_version_dir_from_manifest(
-    manifest: &zoi_core::types::InstallManifest
-) -> Result<PathBuf> {
-    crate::pkg::local::get_package_version_dir(
-        manifest.scope,
-        &manifest.registry_handle,
-        &manifest.repo,
-        &manifest.name,
-        &manifest.version
-    )
 }

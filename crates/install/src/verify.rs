@@ -97,7 +97,16 @@ pub fn verify_archive(archive_path: &Path) -> Result<ArchiveReport> {
             continue;
         };
 
-        if file_name == "manifest.json" && manifest_json.is_none() {
+        // Only the root manifest is the one installation reads; nested
+        // copies are payload (or an attempt to confuse verification).
+        let is_root_entry = matches!(
+            crate::archive_trust::classify_entry(Path::new(&name)),
+            Some((_, Some(_)))
+        );
+        if file_name == "manifest.json"
+            && is_root_entry
+            && manifest_json.is_none()
+        {
             let mut json = String::new();
             entry.read_to_string(&mut json)?;
             manifest_json = Some(json);

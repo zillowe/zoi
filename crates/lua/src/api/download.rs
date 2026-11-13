@@ -61,7 +61,8 @@ pub fn download_with_progress(
         }
     };
 
-    let total_size = response.content_length().unwrap_or(0);
+    let expected_size = response.content_length();
+    let total_size = expected_size.unwrap_or(0);
 
     let pb = if quiet {
         None
@@ -87,9 +88,25 @@ pub fn download_with_progress(
         .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
 
     let mut buffer = [0; 8192];
-    let mut downloaded = 0;
+    let mut downloaded: u64 = 0;
 
-    while let Ok(n) = response.read(&mut buffer) {
+    loop {
+        // A read error (e.g. the connection dropped mid-transfer) must fail
+        // the download instead of silently leaving a truncated file behind.
+        let n = match response.read(&mut buffer) {
+            Ok(n) => n,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(e) => {
+                drop(dest_file);
+                let _ = fs::remove_file(dest_path);
+                if let Some(p) = &pb {
+                    p.abandon();
+                }
+                let err_msg = format!("Failed to download {url}: {e}");
+                eprintln!("{}: {err_msg}", "Error:".bold().red());
+                return Err(mlua::Error::RuntimeError(err_msg));
+            }
+        };
         if n == 0 {
             break;
         }
@@ -108,6 +125,23 @@ pub fn download_with_progress(
 
     if let Some(p) = pb {
         p.finish_and_clear();
+    }
+
+    dest_file
+        .flush()
+        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+    drop(dest_file);
+
+    if let Some(expected) = expected_size
+        && expected != downloaded
+    {
+        let _ = fs::remove_file(dest_path);
+        let err_msg = format!(
+            "Failed to download {url}: received {downloaded} bytes but the \
+             server announced {expected} bytes (truncated download)."
+        );
+        eprintln!("{}: {err_msg}", "Error:".bold().red());
+        return Err(mlua::Error::RuntimeError(err_msg));
     }
 
     Ok(())
@@ -130,17 +164,27 @@ pub fn add_download_util(
             Option<String>,
             Option<String>
         )| {
-            let build_dir_str: String = lua.globals().get("BUILD_DIR")?;
+            let build_dir_str = super::build_dir(lua)?;
             let build_dir = Path::new(&build_dir_str);
 
             let filename = out_name.unwrap_or_else(|| {
-                url.split('/')
+                url.split(['?', '#'])
+                    .next()
+                    .unwrap_or_default()
+                    .split('/')
                     .next_back()
+                    .filter(|name| utils::validate_path_component(name).is_ok())
                     .unwrap_or("download.tmp")
                     .to_string()
             });
 
-            let dest_path = build_dir.join(&filename);
+            // The destination must stay inside the build directory.
+            let dest_path = utils::safe_join(build_dir, Path::new(&filename))
+                .map_err(|e| {
+                mlua::Error::RuntimeError(format!(
+                    "Invalid download file name '{filename}': {e}"
+                ))
+            })?;
 
             download_with_progress(&url, &dest_path, quiet)?;
 

@@ -24,7 +24,6 @@ git2.workspace = true
 indicatif.workspace = true
 rayon.workspace = true
 reqwest.workspace = true
-serde_json.workspace = true
 serde_yaml.workspace = true
 tar.workspace = true
 tempfile.workspace = true

@@ -26,20 +26,14 @@ ignored = [
     "regex",
     "rusqlite",
     "serde",
-    "walkdir",
-    "zoi-core",
-    "zoi-db",
     "zoi-deps",
-    "zoi-hooks",
     "zoi-install",
     "zoi-lua",
     "zoi-package",
     "zoi-plugins",
     "zoi-project",
     "zoi-purl",
-    "zoi-resolver",
     "zoi-sandbox",
-    "zoi-sync",
     "zoi-telemetry",
     "zoi-transaction",
     "zoi-uninstall",
@@ -79,7 +73,6 @@ tar.workspace = true
 tempfile.workspace = true
 walkdir.workspace = true
 zip.workspace = true
-zbsdiff.workspace = true
 zstd.workspace = true
 zync-rs.workspace = true
 rusqlite.workspace = true

@@ -185,6 +185,11 @@ if [ -d "$COMPILED_DIR/packages" ]; then
     done
 fi
 
+# SHA-512 of each raw `zoi` binary, appended to checksums.txt below as
+# `<name>.bin` entries. `zoi upgrade` uses them to verify a binary rebuilt from
+# a delta patch; the raw binaries themselves are not published.
+BIN_CHECKSUMS=$(mktemp)
+
 for binary_path in "$COMPILED_DIR"/*; do
     [ -f "$binary_path" ] || continue
     filename=$(basename "$binary_path")
@@ -204,6 +209,11 @@ for binary_path in "$COMPILED_DIR"/*; do
     cp "$binary_path" "${TMP_ARCHIVE_DIR}/${final_binary_name}"
 
     archive_basename=${filename%.exe}
+
+    if [[ "$binary_base" == "zoi" ]]; then
+        printf '%s  ./%s.bin\n' "$(sha512sum "$binary_path" | cut -d' ' -f1)" \
+            "$archive_basename" >>"$BIN_CHECKSUMS"
+    fi
 
     echo -e "${CYAN}  -> Archiving ${filename}...${NC}"
 
@@ -313,6 +323,8 @@ echo -e "${CYAN}🔐 Generating sha512 checksums...${NC}"
         -not -name "checksums-256.txt" -not -name "*.asc" \
         -exec sha512sum {} +
 ) >"$CHECKSUM_FILE"
+cat "$BIN_CHECKSUMS" >>"$CHECKSUM_FILE"
+rm -f "$BIN_CHECKSUMS"
 
 if [ -n "${CI_COMMIT_TAG:-}" ]; then
     echo -e "${CYAN}🔐 Generating checksum for source archive ${CI_COMMIT_TAG}...${NC}"

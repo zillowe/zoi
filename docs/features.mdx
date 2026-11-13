@@ -154,7 +154,7 @@ Zoi is packed with features designed to make package management and environment 
   - `zoi list`: List all installed packages, or all available packages from active repositories.
   - `zoi man`: Read package manuals directly in the terminal.
   - `zoi mark`: Change the installation reason of a package (explicit vs dependency).
-  - `zoi migrate scoop`: Convert a Scoop manifest (`.json`) into a Zoi `.pkg.lua`.
+  - `zoi package migrate scoop`: Convert a Scoop manifest (`.json`) into a Zoi `.pkg.lua`.
   - `zoi owner`: Find which package owns a specific file on the system.
   - `zoi pin`: Lock a package to a specific version to prevent updates.
   - `zoi provides`: Find which package provides a specific command or file.
@@ -265,6 +265,25 @@ Enter a development shell for the current project. This command reads `zoi.lua`,
 **Options:**
 
 - `-r`, `--run <COMMAND>`: Run a command in the dev shell instead of starting an interactive shell.
+- `--repo <REPO>`: Clone a git repository into a temporary directory and enter its development shell instead of using the current project. Accepts a full URL, a `provider:owner/repo` shorthand (e.g. `gl:zillowe/hello`), or `owner/repo` (GitHub).
+
+---
+
+### `zoi download <package>`
+
+(alias: `dl`)
+
+Downloads the binary archive (`.zpa`) or source bundle (`.zsa`) for a package without installing it. By default the file is saved to Zoi's archive cache.
+
+**Arguments:**
+
+- `<package>`: Package name, `@repo/name`, local `.pkg.lua` path, or URL.
+
+**Options:**
+
+- `--archive`: Download the binary archive (`.zpa`). This is the default.
+- `--source`: Download the source bundle (`.zsa`). Cannot be combined with `--archive`.
+- `-o`, `--output-dir <DIR>`: Directory to save the downloaded file to instead of the archive cache.
 
 ---
 
@@ -447,7 +466,7 @@ If the package is installed in a different scope than requested, Zoi notes that 
 
 **Options:**
 
-- `--purl <PURL>`: Install a package by its Package URL (PURL), e.g. `pkg:zoi/zoidberg/core/curl`.
+- `--purl`: Treat each source as a Package URL (PURL) and resolve it before installing, e.g. `zoi install --purl pkg:zoi/zoidberg/core/curl`.
 - `--repo <REPO>`: Install from a git repository (e.g. 'zillowe/hello', 'gh:zillowe/hello').
 - `--force`: Force re-installation even if the package is already installed.
 - `--all-optional`: Accept all optional dependencies.
@@ -463,7 +482,7 @@ If the package is installed in a different scope than requested, Zoi notes that 
 - `--retry <N>`: Retry failed downloads up to `N` attempts (minimum `1`, default `3`).
 - `-v`, `--verbose`: Show additional install details, including package origins and preflight information.
 - `--explain`: Print a dependency-selection and install-decision explanation, including why each package was chosen and which action will be taken.
-- `--plan-json`: Emit machine-readable install plan JSON.
+- `--plan-json`: Emit machine-readable install plan JSON (requires `--dry-run`).
 - `--dry-run`: Do not actually install, just show what would be done.
 
 ---
@@ -546,9 +565,11 @@ Build, create, and manage Zoi packages.
   - `--test`: Run package tests before building.
   - `--install-deps`: Automatically install build-time dependencies defined in the package before building.
   - `--version-override <VERSION>`: Override the package version.
-  - `--method <native|docker>`: The build method to use (default: `native`).
+  - `--method <native|bwrap|docker>`: The build method to use (default: `native`). `bwrap` runs the build inside a bubblewrap sandbox.
   - `--image <IMAGE>`: The Docker image to use for the build (required for `--method docker`).
   - `--fakeroot`: Force root ownership (UID/GID 0) in the built archive.
+  - `--pure`: Build in a clean, isolated sysroot (implies `bwrap`). The base package (`--root-package`) and the package's build dependencies are installed into the sysroot. Only `zoi:` dependencies are allowed, including nested ones; host package managers are rejected.
+  - `--root-package <PACKAGE>`: The base package to install into the sysroot when using `--pure` (default: `@core/base:dev`).
 - `test <package_file>`: Run tests for a package. This command accepts the same arguments as `build`.
   - `--type <TYPE>`: The build type to use for testing. If omitted, Zoi chooses `pre-compiled`, then `source`, then the first listed type.
   - `-p`, `--platform <PLATFORM>`: The platform to test on.
@@ -569,7 +590,7 @@ Build, create, and manage Zoi packages.
 - `init-lsp`: Initialize LSP support with EmmyLua type definitions and `.luarc.json`.
 - `verify [installed|archive]`: Verify package integrity. Without arguments, checks every installed package's files against digests recorded at install time. With `archive --file <PATH>`, checks a `.zpa` archive against its internal pooled manifest.
   - `--scope <user|system>`: Scope to verify (installed mode).
-  - `--archive <PATH>`: Path to the `.zpa` archive to verify (archive mode).
+  - `--file <PATH>`: Path to the `.zpa` archive to verify (required in archive mode).
   - `--json`: Output results as JSON.
 - `delta <old_archive> <new_archive>`: Generate a `.zdelta` patch between an older and a newer `.zpa` archive. The delta contains only the changed content as bsdiff patches, transferred through a zstd-compressed tar container. Also generates `.zdelta.hash`, `.zdelta.size`, and optionally `.zdelta.sig` sidecar files.
   - `-o, --output <PATH>`: Output path for the `.zdelta` file (defaults to `<new_archive>.zdelta`).
@@ -713,6 +734,8 @@ Manage background services for installed packages. This command uses the native 
 - `stop <package>`: Stop the service.
 - `restart <package>`: Restart the service.
 - `status <package>`: Show the current status of the service.
+- `enable <package>`: Enable the service so it starts at boot.
+- `disable <package>`: Disable the service so it no longer starts at boot.
 - `list` (alias `ls`): List all installed packages that define a service and their current status.
 
 ---
@@ -731,6 +754,7 @@ Installs completion scripts for a given shell and setup PATH for Zoi. If `--hook
 - `-p`, `--package <PACKAGE>`: Package(s) to include in the ephemeral environment.
 - `-r`, `--run <COMMAND>`: Run a command in the ephemeral environment and exit.
 - `--scope <user|system>`: The scope to apply the shell setup to (default: `user`).
+- `-v`, `--verbose`: Show additional details (resolution, installation progress, etc.).
 
 ---
 
@@ -745,7 +769,7 @@ Shows detailed information about a package.
 **Options:**
 
 - `--raw`: Display the raw, unformatted package file.
-- `--purl`: Display the Package URL (PURL) for the package.
+- `--purl`: Treat `<package_name>` as a Package URL (PURL) spec and resolve the package from it, e.g. `zoi show --purl pkg:zoi/zoidberg/core/curl`.
 
 If the package is installed more than once across scopes or registries, Zoi will prompt you to choose which installed package status to display.
 
@@ -764,7 +788,8 @@ Downloads or updates the package database from the remote repository.
 - `--no-pm`: Do not check for installed native package managers.
 - `--force`: Rebuild all registry databases from scratch by removing existing caches, git clones, and re-cloning. Installed packages and their records are preserved.
 - `--local`: Sync registries to the project's local `.zoi/pkgs/db/` using revisions from `zoi.lua`.
-- `--frozen`: When used with `--local`, sync using revisions from `zoi.lock` instead of `zoi.lua`.
+- `--frozen`: Sync using revisions from `zoi.lock` instead of `zoi.lua`. Requires `--local`.
+- `--scope <user|system>`: The scope to sync the registries to. Cannot be combined with `--local`.
 
 **Subcommands:**
 
@@ -816,9 +841,10 @@ If multiple installed packages match the same name, Zoi will prompt you to choos
 With no scope flag, the scope is resolved the same way `zoi install` resolves it: a directory containing a `zoi.lua` uses the project scope, otherwise the user scope.
 
 - `--save`: Remove the package from the project's `zoi.lua`. Only applies to project-scoped uninstalls. Works with both plain entries and keyed entries such as `["@core/fzf"] = { version = "0.44.1" }`. Removing a base package also removes its sub-package entries; removing `name:sub` removes only that sub-package.
-- `-s`, `--recursive`: Recursively remove dependencies that are no longer needed.
+- `-r`, `--recursive`: Recursively remove dependencies that are no longer needed.
 - `--explain`: Show uninstall reasoning and reverse-dependency impact.
-- `--plan-json`: Emit machine-readable uninstall plan JSON.
+- `--dry-run`: Do not actually uninstall, just show what would be done.
+- `--plan-json`: Emit machine-readable uninstall plan JSON (requires `--dry-run`).
 
 ---
 
@@ -838,7 +864,7 @@ Clears both halves of a `zoi pin`: the `pinned.json` entry and the `versions:` e
 
 (alias: `up`)
 
-Updates one or more packages to their latest versions.
+Updates one or more packages to their latest versions. The command exits with a non-zero status if any package fails to update.
 When using `--all`, Zoi also prints explicit pinned/skipped summaries and advisory deltas for each upgrade candidate.
 
 **Arguments:**
@@ -848,9 +874,11 @@ When using `--all`, Zoi also prints explicit pinned/skipped summaries and adviso
 **Options:**
 
 - `--all`: Update all installed packages.
+- `--scope <user|system|project>`: Only update packages installed in this scope.
 - `--interactive`: Interactively choose a subset of upgrade candidates (requires `--all`).
 - `--explain`: Explain why each package is selected or skipped.
-- `--plan-json`: Emit machine-readable update plan JSON.
+- `-v`, `--verbose`: Show additional update details.
+- `--plan-json`: Emit machine-readable update plan JSON (requires `--dry-run`).
 - `--dry-run`: Do not actually perform the update, just show what would be done.
 
 ---

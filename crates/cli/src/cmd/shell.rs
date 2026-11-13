@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
@@ -424,6 +424,70 @@ end
     Ok(())
 }
 
+/// Removes plan entries for packages that are already installed.
+///
+/// Ephemeral environments (`zoi shell -p`, `zoi exec`) only install what is
+/// missing and never modify a persistent installation. Installing over an
+/// installed package would rebuild and replace its version directory without
+/// updating its manifest, file index or database record (ephemeral installs
+/// are not recorded), leaving the new files paired with stale records.
+///
+/// A node counts as installed when an installed manifest matches it on
+/// registry, repo, name, sub-package, version and scope (split packages share
+/// a version directory, and another scope's copy does not provide the files)
+/// and its version directory exists. The installed copy is used as-is even
+/// if the registry now has a newer revision of that version; a warning points
+/// to `zoi update` in that case.
+pub fn drop_already_installed<P, N>(
+    install_plan: &mut HashMap<String, install::plan::InstallAction, P>,
+    nodes: &HashMap<String, install::resolver::InstallNode, N>,
+    installed: &[types::InstallManifest]
+) where
+    P: std::hash::BuildHasher,
+    N: std::hash::BuildHasher
+{
+    install_plan.retain(|pkg_id, _| {
+        let Some(node) = nodes.get(pkg_id) else {
+            return true;
+        };
+        let ident = local::package_source_string(
+            &node.registry_handle,
+            &node.pkg.repo,
+            &node.pkg.name,
+            node.sub_package.as_deref(),
+            &node.version
+        );
+        let Some(manifest) = installed.iter().find(|manifest| {
+            manifest.scope == node.pkg.scope
+                && local::installed_manifest_source(manifest) == ident
+        }) else {
+            return true;
+        };
+        let present = local::get_package_version_dir(
+            node.pkg.scope,
+            &node.registry_handle,
+            &node.pkg.repo,
+            &node.pkg.name,
+            &node.version
+        )
+        .is_ok_and(|dir| dir.exists());
+        if !present {
+            return true;
+        }
+        if manifest.revision != node.revision {
+            eprintln!(
+                "{}: using installed {} revision {} (the registry has \
+                 revision {}); run `zoi update` to upgrade it.",
+                "Warning".yellow(),
+                ident,
+                manifest.revision,
+                node.revision
+            );
+        }
+        false
+    });
+}
+
 /// Enters an ephemeral shell with the given packages installed.
 ///
 /// # Errors
@@ -448,10 +512,13 @@ pub fn enter_ephemeral_shell(
         println!("{} Resolving ephemeral environment...", "::".bold().blue());
     }
 
-    let installed_before: HashSet<String> = local::get_installed_packages()?
-        .into_iter()
-        .map(|m| local::installed_manifest_source(&m))
-        .collect();
+    // Ephemeral packages are written into the shared store, so the store
+    // lock is held while they are resolved and installed. It is released
+    // before the user's program runs: holding it for the lifetime of an
+    // interactive session would block every other Zoi command.
+    let install_lock = crate::pkg::lock::acquire_lock()?;
+
+    let installed_manifests = local::get_installed_packages()?;
 
     let (graph, _non_zoi_deps) = install::resolver::resolve_dependency_graph(
         package_sources,
@@ -464,8 +531,13 @@ pub fn enter_ephemeral_shell(
         None
     )?;
 
-    let install_plan =
+    let mut install_plan =
         install::plan::create_install_plan(&graph.nodes, None, false)?;
+    drop_already_installed(
+        &mut install_plan,
+        &graph.nodes,
+        &installed_manifests
+    );
     let stages = graph.toposort()?;
 
     let mut session_installed = Vec::new();
@@ -490,9 +562,10 @@ pub fn enter_ephemeral_shell(
                 let node = graph.nodes.get(&pkg_id).ok_or_else(|| {
                     anyhow!("Package node missing from graph for '{pkg_id}'")
                 })?;
-                let action = install_plan.get(&pkg_id).ok_or_else(|| {
-                    anyhow!("Install action missing for package '{pkg_id}'")
-                })?;
+                // Packages that are already installed have no plan entry.
+                let Some(action) = install_plan.get(&pkg_id) else {
+                    return Ok(());
+                };
 
                 let manifest = install::installer::install_node(
                     node,
@@ -664,58 +737,144 @@ pub fn enter_ephemeral_shell(
         }
     };
 
+    drop(install_lock);
     let status = shell_command.status()?;
 
-    if !session_installed.is_empty() {
-        if verbose {
-            println!(
-                "{} Cleaning up ephemeral packages...",
-                "::".bold().blue()
-            );
-        }
-        for manifest in session_installed {
-            let ident = local::installed_manifest_source(&manifest);
-            if installed_before.contains(&ident) {
-                continue;
-            }
-            let version_dir = match get_version_dir_from_manifest(&manifest) {
-                Ok(d) => d,
-                Err(e) => {
-                    eprintln!(
-                        "Warning: failed to resolve path for {ident}: {e}"
-                    );
-                    continue;
-                }
-            };
-            if version_dir.exists()
-                && let Err(e) = fs::remove_dir_all(&version_dir)
-            {
+    // Cleanup removes store directories, so it needs the lock back. If
+    // another Zoi process holds it now, skipping cleanup is safer than
+    // deleting files underneath it.
+    let cleanup_lock = if session_installed.is_empty() {
+        None
+    } else {
+        match crate::pkg::lock::acquire_lock() {
+            Ok(guard) => Some(guard),
+            Err(e) => {
                 eprintln!(
-                    "Warning: failed to cleanup ephemeral package {ident}: {e}"
+                    "Warning: skipping cleanup of ephemeral packages: {e}"
                 );
-            }
-            let package_dir = version_dir
-                .parent()
-                .expect("version directory should have a parent");
-            if let Ok(mut entries) = fs::read_dir(package_dir) {
-                let has_other_entries = entries.any(|e| {
-                    e.as_ref().is_ok_and(|e| {
-                        e.file_name() != "latest"
-                            && e.file_name() != "dependents"
-                    })
-                });
-                if !has_other_entries {
-                    let _ = fs::remove_dir_all(package_dir);
-                }
+                session_installed.clear();
+                None
             }
         }
-    }
+    };
+
+    cleanup_ephemeral_installs(
+        session_installed,
+        &installed_manifests,
+        verbose
+    );
+
+    drop(cleanup_lock);
 
     if !status.success() {
         std::process::exit(status.code().unwrap_or(1));
     }
 
     Ok(())
+}
+
+/// Removes the packages an ephemeral session installed.
+///
+/// `installed_before` is the snapshot of installed manifests taken before the
+/// session. A session manifest that matches one of them exactly (same package,
+/// sub-package, version and scope) belongs to a persistent installation and is
+/// left alone. When another persistently installed sub-package shares the
+/// version directory, only the session's own store files are removed, since
+/// deleting the directory would also remove that sub-package. Otherwise the
+/// version directory (and an emptied package directory) is removed.
+pub fn cleanup_ephemeral_installs(
+    session_installed: Vec<types::InstallManifest>,
+    installed_before: &[types::InstallManifest],
+    verbose: bool
+) {
+    if session_installed.is_empty() {
+        return;
+    }
+    if verbose {
+        println!("{} Cleaning up ephemeral packages...", "::".bold().blue());
+    }
+    for manifest in session_installed {
+        let ident = local::installed_manifest_source(&manifest);
+        if installed_before.iter().any(|before| {
+            before.scope == manifest.scope
+                && local::installed_manifest_source(before) == ident
+        }) {
+            continue;
+        }
+        let version_dir = match get_version_dir_from_manifest(&manifest) {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("Warning: failed to resolve path for {ident}: {e}");
+                continue;
+            }
+        };
+
+        let shares_version_dir = installed_before.iter().any(|before| {
+            get_version_dir_from_manifest(before)
+                .is_ok_and(|dir| dir == version_dir)
+        });
+        if shares_version_dir {
+            for file in &manifest.installed_files {
+                let Some(rel) = file.strip_prefix("${pkgstore}/") else {
+                    continue;
+                };
+                let Some(path) = store_entry_path(&version_dir, rel) else {
+                    continue;
+                };
+                // `symlink_metadata` and `remove_file` act on a final symlink
+                // itself, so links are removed even when their target is
+                // outside the store or already gone.
+                if fs::symlink_metadata(&path).is_ok_and(|m| !m.is_dir())
+                    && let Err(e) = fs::remove_file(&path)
+                {
+                    eprintln!(
+                        "Warning: failed to remove ephemeral file {}: {e}",
+                        path.display()
+                    );
+                }
+            }
+            continue;
+        }
+
+        if version_dir.exists()
+            && let Err(e) = fs::remove_dir_all(&version_dir)
+        {
+            eprintln!(
+                "Warning: failed to cleanup ephemeral package {ident}: {e}"
+            );
+        }
+        if let Some(package_dir) = version_dir.parent()
+            && let Ok(mut entries) = fs::read_dir(package_dir)
+        {
+            let has_other_entries = entries.any(|e| {
+                e.as_ref().is_ok_and(|e| {
+                    e.file_name() != "latest" && e.file_name() != "dependents"
+                })
+            });
+            if !has_other_entries {
+                let _ = fs::remove_dir_all(package_dir);
+            }
+        }
+    }
+}
+
+/// Resolves a `${pkgstore}`-relative entry inside `version_dir` without
+/// following its final component.
+///
+/// Only the parent directories are checked against `version_dir` (with
+/// symlinks resolved); the last component is appended as-is, so a symlink
+/// there can be inspected and unlinked even when its target lies outside the
+/// directory or no longer exists. Returns `None` for absolute paths, `..`
+/// components, or parents that resolve outside `version_dir`.
+fn store_entry_path(
+    version_dir: &std::path::Path,
+    rel: &str
+) -> Option<PathBuf> {
+    let rel = std::path::Path::new(rel);
+    let name = rel.file_name()?;
+    let parent = rel.parent().unwrap_or_else(|| std::path::Path::new(""));
+    let parent_dir = zoi_core::utils::safe_join(version_dir, parent).ok()?;
+    Some(parent_dir.join(name))
 }
 
 /// Returns the version directory for a given install manifest.

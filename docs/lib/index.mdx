@@ -70,6 +70,18 @@ These are the primary functions for building and managing packages.
   description="Compatibility wrapper for installing a local package archive."
 />
 
+<Card
+  title="update_packages"
+  href="#update_packages-function"
+  description="Updates installed packages to their latest versions."
+/>
+
+<Card
+  title="bundle_package"
+  href="#bundle_package-function"
+  description="Bundles a package and its local assets into a .zsa source archive."
+/>
+
   <Card title="uninstall_package" href="#uninstall_package-function" description="Uninstalls a Zoi package." />
 </Cards>
 
@@ -101,12 +113,41 @@ pub struct BuildOptions<'a> {
     pub build_type: Option<&'a str>,
     pub platforms: Vec<String>,
     pub sign_key: Option<String>,
+    pub sign_mode: types::SignMode,
+    pub output_dir: Option<PathBuf>,
+    pub sub_packages: Option<Vec<String>>,
     pub install_deps: bool,
+    pub test: bool,
     pub method: &'a str,
     pub image: Option<&'a str>,
     pub version_override: Option<&'a str>,
+    pub fakeroot: bool,
 }
 ```
+
+`BuildOptions` implements `Default`, so set only the fields you need and fill the rest with `..Default::default()`. The defaults are:
+
+| Field              | Default                    | Description                                                                                       |
+| ------------------ | -------------------------- | ------------------------------------------------------------------------------------------------- |
+| `build_type`       | `None`                     | Build type. When unset, Zoi picks `pre-compiled`, then `source`, then the first listed type.      |
+| `platforms`        | the current platform       | Platforms to build for (e.g. `linux-amd64`).                                                      |
+| `sign_key`         | `None`                     | PGP key name or fingerprint used to sign the archive.                                             |
+| `sign_mode`        | `SignMode::Embed`          | How to attach the signature: `Embed` stores it inside the archive, `File` writes a `.sig` sidecar. |
+| `output_dir`       | `None`                     | Directory to write the built archive to.                                                          |
+| `sub_packages`     | `None`                     | For split packages, build only these sub-packages.                                                |
+| `install_deps`     | `true`                     | Install build-time dependencies before building.                                                  |
+| `test`             | `false`                    | Run the package's `test()` function before building.                                              |
+| `method`           | `"native"`                 | Build method: `"native"`, `"bwrap"`, or `"docker"`.                                               |
+| `image`            | `None`                     | Docker image to use when `method` is `"docker"`.                                                  |
+| `version_override` | `None`                     | Override the version declared in the `.pkg.lua` file.                                             |
+| `fakeroot`         | `false`                    | Force root ownership (UID/GID 0) in the built archive.                                            |
+
+<Callout title="Build dependency scope" type="info">
+  When `install_deps` is `true`, `build_with_options` installs the build
+  dependencies for each requested platform into the **user** scope
+  (`Scope::User`) before building. There is no option to pick a different
+  scope. The library API also has no equivalent of the CLI's `--pure` flag.
+</Callout>
 
 ---
 
@@ -136,7 +177,7 @@ pub fn build(
 | `platforms`        | `&[String]`      | A slice of platform strings to build for (e.g. `["linux-amd64", "windows-amd64"]`).                    |
 | `sign_key`         | `Option<String>` | An optional PGP key name or fingerprint to sign the resulting package archive.                         |
 | `install_deps`     | `bool`           | Automatically install build-time dependencies before building.                                         |
-| `method`           | `&str`           | The build method to use (`"native"` or `"docker"`).                                                    |
+| `method`           | `&str`           | The build method to use (`"native"`, `"bwrap"`, or `"docker"`).                                        |
 | `image`            | `Option<&str>`   | The Docker image to use (required if `method` is `"docker"`).                                          |
 | `version_override` | `Option<&str>`   | Optionally override the package version defined in the `.pkg.lua` file.                                |
 
@@ -201,9 +242,66 @@ pub struct ResolvedPackage {
     pub sharable_manifest: Option<types::SharableInstallManifest>,
     pub source_path: PathBuf,
     pub registry_handle: Option<String>,
+    pub repo_type: Option<String>,
     pub git_sha: Option<String>,
 }
 ```
+
+`repo_type` is the `type` declared for the package's repository tier in the registry's `repo.yaml` `repos` list (for example `official`). Packages resolved from a git source report `unofficial`, and some other non-registry sources report `None`.
+
+---
+
+## `update_packages` function
+
+Updates installed packages to the newest version available in the configured registries, performing a transactional upgrade for each package that has a newer version. When specific packages are named, every package is attempted, and the function returns an error if any of them failed to update.
+
+### Signature
+
+```rust
+pub fn update_packages(
+    all: bool,
+    package_names: &[String],
+    yes: bool,
+) -> Result<()>
+```
+
+### Parameters
+
+| Parameter       | Type        | Description                                                                 |
+| --------------- | ----------- | --------------------------------------------------------------------------- |
+| `all`           | `bool`      | Update every installed package. When `true`, `package_names` is ignored.    |
+| `package_names` | `&[String]` | The packages to update when `all` is `false`.                               |
+| `yes`           | `bool`      | Automatically answer "yes" to confirmation prompts.                         |
+
+This is equivalent to `zoi update` without `--dry-run`, `--explain`, `--plan-json`, `--verbose`, or `--interactive`.
+
+---
+
+## `bundle_package` function
+
+Bundles a package definition and the local assets it references into a `.zsa` source archive, like `zoi package bundle`.
+
+### Signature
+
+```rust
+pub fn bundle_package(
+    package_file: &Path,
+    output_dir: Option<&Path>,
+    sign: Option<String>,
+    version_override: Option<&str>,
+    build_type: Option<&str>,
+) -> Result<()>
+```
+
+### Parameters
+
+| Parameter          | Type             | Description                                                                         |
+| ------------------ | ---------------- | ----------------------------------------------------------------------------------- |
+| `package_file`     | `&Path`          | The path to the `.pkg.lua` file.                                                    |
+| `output_dir`       | `Option<&Path>`  | Directory to write the `.zsa` to.                                                   |
+| `sign`             | `Option<String>` | PGP key name or fingerprint. The signature is always embedded in the archive.       |
+| `version_override` | `Option<&str>`   | Override the version declared in the `.pkg.lua` file.                               |
+| `build_type`       | `Option<&str>`   | Build type to bundle for (e.g. `"source"`).                                         |
 
 ---
 

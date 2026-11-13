@@ -20,74 +20,6 @@ use zoi_install as install;
 use zoi_resolver::local;
 use zoi_uninstall as uninstall;
 
-/// Creates a shim for the Zoi executable.
-fn create_shim(link_path: &std::path::Path) -> Result<()> {
-    let zoi_exe = std::env::current_exe()?;
-    zoi_core::utils::symlink_file(&zoi_exe, link_path)
-        .map_err(|e| anyhow!("Failed to create shim: {e}"))
-}
-
-/// Gets the root directory for shell completions based on scope and shell.
-pub(crate) fn get_completions_root(
-    scope: types::Scope,
-    shell: &str
-) -> Result<std::path::PathBuf> {
-    match scope {
-        types::Scope::User => zoi_core::utils::get_user_completions_dir(shell),
-        types::Scope::System => {
-            if cfg!(target_os = "windows") {
-                Ok(zoi_core::sysroot::apply_sysroot(std::path::PathBuf::from(
-                    format!("C:\\ProgramData\\zoi\\pkgs\\shell\\{shell}")
-                )))
-            } else {
-                let base = match shell {
-                    "bash" => "/usr/share/bash-completion/completions",
-                    "zsh" => "/usr/share/zsh/site-functions",
-                    "fish" => "/usr/share/fish/vendor_completions.d",
-                    "elvish" => "/usr/share/elvish/lib",
-                    _ => "/usr/local/share/zoi/completions"
-                };
-                Ok(zoi_core::sysroot::apply_sysroot(std::path::PathBuf::from(
-                    base
-                )))
-            }
-        }
-        types::Scope::Project => {
-            let current_dir = std::env::current_dir()?;
-            Ok(current_dir
-                .join(".zoi")
-                .join("pkgs")
-                .join("shell")
-                .join(shell))
-        }
-    }
-}
-
-/// Creates a symlink for a shell completion file.
-pub(crate) fn create_completion_symlink(
-    source: &std::path::Path,
-    link: &std::path::Path
-) -> Result<()> {
-    if link.exists() || link.is_symlink() {
-        fs::remove_file(link)?;
-    }
-    if let Some(parent) = link.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    #[cfg(unix)]
-    {
-        std::os::unix::fs::symlink(source, link)
-            .map_err(|e| anyhow!("Failed to create completion symlink: {e}"))?;
-    }
-    #[cfg(windows)]
-    {
-        std::os::windows::fs::symlink_file(source, link).map_err(|e| {
-            anyhow!("Failed to create completion symlink: {}", e)
-        })?;
-    }
-    Ok(())
-}
-
 /// High-level metadata summarizing a completed or in-progress transaction.
 #[derive(Debug, Clone)]
 pub struct TransactionMetadata {
@@ -195,7 +127,9 @@ pub fn record_operation(
 
     let path = get_transactions_dir()?.join(format!("{}.json", transaction.id));
     let content = serde_json::to_string_pretty(&transaction)?;
-    fs::write(path, content)?;
+    // Atomic so a crash mid-write never leaves a truncated log that breaks
+    // `list_transactions` and the rollback it exists for.
+    local::write_file_atomic(&path, content.as_bytes())?;
     Ok(())
 }
 
@@ -326,8 +260,23 @@ pub fn list_transactions() -> Result<Vec<TransactionMetadata>> {
             continue;
         }
 
-        let content = fs::read_to_string(&path)?;
-        let transaction: types::Transaction = serde_json::from_str(&content)?;
+        // A single unreadable log (e.g. truncated by a crash before writes
+        // were atomic) must not hide every other transaction.
+        let transaction: types::Transaction = match fs::read_to_string(&path)
+            .map_err(anyhow::Error::from)
+            .and_then(|content| {
+                serde_json::from_str(&content).map_err(anyhow::Error::from)
+            }) {
+            Ok(transaction) => transaction,
+            Err(e) => {
+                eprintln!(
+                    "{} skipping unreadable transaction log {}: {e}",
+                    "Warning:".yellow(),
+                    path.display()
+                );
+                continue;
+            }
+        };
         transactions.push(TransactionMetadata {
             id: transaction.id,
             start_time: transaction.start_time,
@@ -340,45 +289,18 @@ pub fn list_transactions() -> Result<Vec<TransactionMetadata>> {
 }
 
 /// Checks if a package has installed files outside of the Zoi store.
+///
+/// Manifest entries are placeholder strings: `${pkgstore}/...` is inside the
+/// store, while `${usrroot}`, `${usrhome}`, `${applications}` and absolute
+/// paths outside the store directory are not (see
+/// [`uninstall::files_outside_store`]).
 fn has_files_outside_store(manifest: &types::InstallManifest) -> bool {
-    if let Ok(store_base) = local::get_store_base_dir(manifest.scope) {
-        for file in &manifest.installed_files {
-            let p = std::path::Path::new(file);
-            if !p.starts_with(&store_base) {
-                return true;
-            }
-        }
-    }
-    false
+    !uninstall::files_outside_store(manifest).is_empty()
 }
 
 /// Generates an installation source string for a manifest.
 fn install_source_for_manifest(manifest: &types::InstallManifest) -> String {
     local::installed_manifest_source(manifest)
-}
-
-/// Restores shims for a package.
-fn restore_shims(manifest: &types::InstallManifest) -> Result<()> {
-    if let Some(bins) = &manifest.bins {
-        let bin_root = match manifest.scope {
-            types::Scope::User => zoi_core::utils::get_user_bin_dir()?,
-            types::Scope::System => zoi_core::utils::get_system_bin_dir(),
-            types::Scope::Project => {
-                let current_dir = std::env::current_dir()?;
-                current_dir.join(".zoi").join("pkgs").join("bin")
-            }
-        };
-
-        if !bin_root.exists() {
-            fs::create_dir_all(&bin_root)?;
-        }
-
-        for bin in bins {
-            let shim_path = bin_root.join(bin);
-            create_shim(&shim_path)?;
-        }
-    }
-    Ok(())
 }
 
 /// Reverts all operations recorded in a transaction.
@@ -469,18 +391,13 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                         "Restoring version {} from local store...",
                         manifest.version
                     );
-                    if let Err(e) = local::write_manifest(manifest) {
+                    // Restores `latest`, manifest, shims, completions,
+                    // dependent links, database row, file index and lockfile.
+                    if let Err(e) =
+                        uninstall::activate_stored_manifest(manifest, false)
+                    {
                         eprintln!(
-                            "{} Failed to restore manifest for '{}': {}",
-                            "Error:".red().bold(),
-                            manifest.name,
-                            e
-                        );
-                        rollback_failed = true;
-                    }
-                    if let Err(e) = restore_shims(manifest) {
-                        eprintln!(
-                            "{} Failed to restore shims for '{}': {}",
+                            "{} Failed to restore '{}' from the store: {}",
                             "Error:".red().bold(),
                             manifest.name,
                             e
@@ -639,18 +556,13 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                         "Restoring version {} from local store...",
                         old_manifest.version
                     );
-                    if let Err(e) = local::write_manifest(old_manifest) {
+                    // Restores `latest`, manifest, shims, completions,
+                    // dependent links, database row, file index and lockfile.
+                    if let Err(e) =
+                        uninstall::activate_stored_manifest(old_manifest, false)
+                    {
                         eprintln!(
-                            "{} Failed to restore manifest for '{}': {}",
-                            "Error:".red().bold(),
-                            old_manifest.name,
-                            e
-                        );
-                        rollback_failed = true;
-                    }
-                    if let Err(e) = restore_shims(old_manifest) {
-                        eprintln!(
-                            "{} Failed to restore shims for '{}': {}",
+                            "{} Failed to restore '{}' from the store: {}",
                             "Error:".red().bold(),
                             old_manifest.name,
                             e

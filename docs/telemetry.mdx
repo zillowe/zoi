@@ -29,15 +29,14 @@ The data we collect is strictly limited to the following fields:
   - The `sub_package` name (if applicable).
   - The `version` of the package.
   - The package's `repo` (the sub-repository path, e.g. `core`, `community/editors`).
-  - The `description` of the package.
   - The `license` of the package.
-  - The `maintainer` and `author` of the package (name, email, and website, if provided).
+  - The `maintainer` and `author` of the package (name and website only, if provided; email addresses are never sent).
 - **Registry Details:**
   - The `registry` handle (e.g. `zoidberg`, `my-custom-registry`).
-  - The `registry_url` (the git URL of the registry).
+  - The registry's host only, as `scheme://host` (e.g. `https://gitlab.com`). Credentials, ports, paths and query strings are stripped; SSH remotes such as `git@host:path` become `ssh://host`, and local registries are reported as `local`.
 - **The type of package:** This will be one of `Package`, `Collection`, `App`, or `Extension`.
 - **The installation scope:** One of `User`, `System`, or `Project`.
-- **The installation reason:** One of `Direct` or `Dependency`.
+- **The installation reason:** One of `direct` or `dependency` (the parent package is not included).
 - **The installation type:** One of `source` or `pre-compiled`.
 - **Your Environment:**
   - Your operating system and CPU architecture (e.g. `linux-amd64`, `windows-amd64`).

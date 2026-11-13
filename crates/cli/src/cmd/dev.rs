@@ -38,11 +38,21 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
             full_url.cyan()
         );
 
+        // Reject option-like URLs and end option parsing with `--`, so a
+        // value such as `--upload-pack=...` can never reach git as an option.
+        if full_url.starts_with('-') {
+            return Err(anyhow!(
+                "Refusing to clone '{full_url}': a git URL must not start \
+                 with '-'."
+            ));
+        }
+
         let temp = tempfile::Builder::new().prefix("zoi-dev-").tempdir()?;
         let status = Command::new("git")
             .arg("clone")
             .arg("--depth")
             .arg("1")
+            .arg("--")
             .arg(full_url)
             .arg(temp.path())
             .status()?;

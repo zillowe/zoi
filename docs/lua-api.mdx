@@ -16,10 +16,21 @@ These variables are automatically available in your script's scope.
 | `ZOI.scope`   | `string` | The currently requested installation scope (e.g. `"user"`).       |
 | `LOCATION`    | `table`  | Absolute paths for common package locations.                      |
 | `PKG`         | `table`  | A table populated from your `metadata{...}` fields.               |
-| `BUILD_DIR`   | `string` | Absolute path to the temporary build directory.                   |
+| `BUILD_DIR`   | `string` | Absolute path to the temporary build directory (read-only info; assigning it has no effect). |
 | `STAGING_DIR` | `string` | Absolute path to the staging directory.                           |
 | `BUILD_TYPE`  | `string` | The user-requested build method (e.g. `"source"`).                |
 | `SUBPKG`      | `string` | The name of the sub-package being processed (for split packages). |
+
+### Metadata evaluation
+
+Zoi evaluates every `.pkg.lua` to read its metadata, including during `zoi sync`, `zoi show`, `zoi search` and dependency resolution, where nothing is being built or installed yet. In that phase the script runs in a restricted, sandboxed environment:
+
+- APIs that run commands or change files are unavailable and raise an error if called from top-level code: `cmd`, `zpatch`, `zsed`, the `z*` staging functions (`zcp`, `zlicense`, `zdoc`, `zman`, `zshell`, `zln`, `zchmod`, `zchown`, `zmkdir`, `zrm`), `addPgpKey`, `UTILS.FILE`, `UTILS.DOWNLOAD`, `UTILS.EXTRACT`, `UTILS.MAKE_ARCHIVE`, and `UTILS.FS.copy`/`move`/`chmod`. Call them inside lifecycle functions (`prepare`, `build`, `package`, …), which run with the full API.
+- Read-only helpers stay available: `UTILS.FETCH.*`, `UTILS.PARSE.*`, `UTILS.FS.exists`, `UTILS.ARCHIVE.list`, `verifyHash`, `verifySignature`, `SYSTEM`, `ZOI`, and the registration functions (`metadata`, `dependencies`, …).
+- Builtin libraries and `UTILS` are read-only, so top-level code cannot redefine functions such as `string.trim`.
+- `IMPORT` and `INCLUDE` only accept relative paths inside the package directory.
+
+`cmd` always runs in the build directory Zoi created, never in a directory chosen by the script.
 
 ### The `SYSTEM` Table
 
@@ -60,17 +71,17 @@ The `LOCATION` table provides absolute paths that correspond **exactly** to the 
 
 | Variable              | Type     | Description                                                                                         |
 | :-------------------- | :------- | :-------------------------------------------------------------------------------------------------- |
-| `LOCATION.PKGSTORE`   | `string` | Staging path for package store (`STAGING_DIR/data/pkgstore/`). Corresponds to `${pkgstore}`.        |
-| `LOCATION.HOME`       | `string` | Staging path for user home (`STAGING_DIR/data/usrhome/`). Corresponds to `${usrhome}`.              |
-| `LOCATION.ROOT`       | `string` | Staging path for system root (`STAGING_DIR/data/usrroot/`). Corresponds to `${usrroot}`.            |
-| `LOCATION.TEMPLATE`   | `string` | Staging path for createpkgdir (`STAGING_DIR/data/createpkgdir/`). Corresponds to `${createpkgdir}`. |
+| `LOCATION.PKGSTORE`   | `string` | Staging path for package store (`STAGING_DIR/pkgstore/`). Corresponds to `${pkgstore}`.             |
+| `LOCATION.HOME`       | `string` | Staging path for user home (`STAGING_DIR/usrhome/`). Corresponds to `${usrhome}`.                   |
+| `LOCATION.ROOT`       | `string` | Staging path for system root (`STAGING_DIR/usrroot/`). Corresponds to `${usrroot}`.                 |
+| `LOCATION.TEMPLATE`   | `string` | Staging path for createpkgdir (`STAGING_DIR/createpkgdir/`). Corresponds to `${createpkgdir}`.      |
 | `LOCATION.PKGLUADIR`  | `string` | Directory containing the current `pkg.lua` script. Corresponds to `${pkgluadir}`.                   |
 | `LOCATION.BUILDDIR`   | `string` | Temporary build directory (`BUILD_DIR`).                                                            |
 | `LOCATION.STAGINGDIR` | `string` | Staging directory (`STAGING_DIR`).                                                                  |
 
 <Callout>
   During build, `${pkgstore}` in `zcp`/`zln` expands to
-  `STAGING_DIR/data/pkgstore/`. `LOCATION.PKGSTORE` gives you that same path for
+  `STAGING_DIR/pkgstore/`. `LOCATION.PKGSTORE` gives you that same path for
   use in `cmd()`.
 </Callout>
 
@@ -138,7 +149,7 @@ To use these paths in `cmd()` or custom Lua logic, use the `LOCATION` table, the
 
 ```lua
 function build()
-    -- Install to STAGING_DIR/data/pkgstore (same as ${pkgstore} in zcp)
+    -- Install to STAGING_DIR/pkgstore (same as ${pkgstore} in zcp)
     cmd("make DESTDIR=" .. LOCATION.PKGSTORE .. " install")
 
     -- Or install to full staging root
@@ -256,7 +267,7 @@ These top-level functions are used to define the package's structure and behavio
 
 ### `metadata(table)`
 
-Defines the package's static properties. See [Creating Packages](/docs/zds/zoi/creating-packages#metadata) for a full list of fields.
+Defines the package's static properties. See [Creating Packages](/docs/zds/zoi/creating-packages#1-metadata) for a full list of fields.
 
 ### `dependencies(table)`
 
@@ -379,7 +390,7 @@ end
 
 ### `UTILS.EXTRACT(source, out_dir)`
 
-Downloads (if URL) and extracts an archive (`.zip`, `.tar.gz`, `.tar.xz`, `.tar.zst`, `.zpa`, `.zsa`, `.7z`, `.rar`, `.deb`, `.dmg`, `.pkg`) into `BUILD_DIR/out_dir`.
+Downloads (if URL) and extracts an archive (`.zip`, `.tar.gz`, `.tar.xz`, `.tar.zst`, `.zpa`, `.zsa`, `.7z`, `.rar`, `.deb`, `.dmg`, `.pkg`) into `BUILD_DIR/out_dir`. `out_dir` is optional and defaults to `extracted`.
 
 <Callout title="Important" type="warn">
   Extraction of `.dmg` and `.pkg` files is only supported when running on macOS.

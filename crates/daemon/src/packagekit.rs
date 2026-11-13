@@ -39,6 +39,16 @@
 //! lives on a dedicated host thread that parks inside an executor for the life
 //! of the process - see [`start_packagekit`].
 //!
+//! ## Authorization
+//!
+//! The daemon runs as root and any local user can reach it over the system
+//! bus. Every mutating method (`InstallPackages`, `InstallFiles`,
+//! `RemovePackages`, `UpdatePackages`, `UpgradeSystem`, `RefreshCache`) is
+//! therefore checked against polkit for the calling bus name, using upstream
+//! `PackageKit`'s action ids, before anything is touched. Root callers are
+//! allowed without asking polkit; anything that cannot be positively
+//! authorized fails with `NOT_AUTHORIZED`.
+//!
 //! ## Package identifiers
 //!
 //! `PackageKit`'s identifier format is `name;version;arch;origin;data`, e.g.
@@ -134,23 +144,23 @@ mod info {
     /// Package is being obsoleted.
     pub(super) const OBSOLETING: u32 = 15;
     /// Package has finished processing.
-    pub(super) const FINISHED: u32 = 16;
+    pub(super) const FINISHED: u32 = 18;
     /// Package is being reinstalled.
-    pub(super) const REINSTALLING: u32 = 17;
+    pub(super) const REINSTALLING: u32 = 19;
     /// Package is being downgraded.
-    pub(super) const DOWNGRADING: u32 = 18;
+    pub(super) const DOWNGRADING: u32 = 20;
     /// Package is preparing for installation or removal.
-    pub(super) const PREPARING: u32 = 19;
+    pub(super) const PREPARING: u32 = 21;
     /// Package is decompressing.
-    pub(super) const DECOMPRESSING: u32 = 20;
+    pub(super) const DECOMPRESSING: u32 = 22;
     /// Package is untrusted.
-    pub(super) const UNTRUSTED: u32 = 21;
+    pub(super) const UNTRUSTED: u32 = 23;
     /// Package is trusted.
-    pub(super) const TRUSTED: u32 = 22;
+    pub(super) const TRUSTED: u32 = 24;
     /// Package is unavailable.
-    pub(super) const UNAVAILABLE: u32 = 23;
+    pub(super) const UNAVAILABLE: u32 = 25;
     /// Package update severity is critical.
-    pub(super) const CRITICAL: u32 = 24;
+    pub(super) const CRITICAL: u32 = 26;
 }
 
 /// `PkStatusEnum`, exposed as the transaction's `Status` property.
@@ -198,10 +208,12 @@ mod status {
     pub(super) const FINISHED: u32 = 18;
     /// Cancelling.
     pub(super) const CANCEL: u32 = 19;
+    /// Waiting for authorization.
+    pub(super) const WAITING_FOR_AUTH: u32 = 31;
     /// Copying files.
-    pub(super) const COPY_FILES: u32 = 20;
+    pub(super) const COPY_FILES: u32 = 35;
     /// Running a package hook.
-    pub(super) const RUN_HOOK: u32 = 31;
+    pub(super) const RUN_HOOK: u32 = 36;
 }
 
 /// `PkExitEnum`, sent as the first field of `Finished`.
@@ -238,6 +250,8 @@ mod role {
     pub(super) const GET_UPDATE_DETAIL: u32 = 8;
     /// Get available updates.
     pub(super) const GET_UPDATES: u32 = 9;
+    /// Install local package files.
+    pub(super) const INSTALL_FILES: u32 = 10;
     /// Install packages.
     pub(super) const INSTALL_PACKAGES: u32 = 11;
     /// Refresh the metadata cache.
@@ -256,6 +270,8 @@ mod role {
     pub(super) const DOWNLOAD_PACKAGES: u32 = 25;
     /// Get available distribution upgrades.
     pub(super) const GET_DISTRO_UPGRADES: u32 = 26;
+    /// Upgrade the whole system.
+    pub(super) const UPGRADE_SYSTEM: u32 = 33;
 }
 
 /// `PkErrorEnum`, sent as the first field of `ErrorCode`.
@@ -265,12 +281,12 @@ mod role {
 mod error_code {
     /// Unknown error.
     pub(super) const UNKNOWN: u32 = 0;
-    /// No network access available.
-    pub(super) const NO_NETWORK: u32 = 2;
     /// Request not supported.
     pub(super) const NOT_SUPPORTED: u32 = 3;
     /// Undefined internal error.
     pub(super) const INTERNAL_ERROR: u32 = 4;
+    /// No network access available.
+    pub(super) const NO_NETWORK: u32 = 2;
     /// Signature or key verification failure.
     pub(super) const GPG_FAILURE: u32 = 5;
     /// Invalid package ID provided.
@@ -290,11 +306,17 @@ mod error_code {
     /// An error occurred during the transaction.
     pub(super) const TRANSACTION_ERROR: u32 = 16;
     /// No packages to update.
-    pub(super) const NO_PACKAGES_TO_UPDATE: u32 = 26;
+    pub(super) const NO_PACKAGES_TO_UPDATE: u32 = 27;
+    /// The package file is invalid.
+    pub(super) const INVALID_PACKAGE_FILE: u32 = 38;
+    /// No space is left on the device.
+    pub(super) const NO_SPACE_ON_DEVICE: u32 = 46;
+    /// The caller is not authorized to perform the action.
+    pub(super) const NOT_AUTHORIZED: u32 = 48;
     /// The package failed to install.
-    pub(super) const PACKAGE_FAILED_TO_INSTALL: u32 = 54;
+    pub(super) const PACKAGE_FAILED_TO_INSTALL: u32 = 58;
     /// The package failed to be removed.
-    pub(super) const PACKAGE_FAILED_TO_REMOVE: u32 = 55;
+    pub(super) const PACKAGE_FAILED_TO_REMOVE: u32 = 59;
 }
 
 /// `PkRestartEnum`, sent as the first field of `RequireRestart`.
@@ -353,33 +375,33 @@ mod filter {
     /// Filter for non-free packages.
     pub(super) const NOT_FREE: u64 = 1 << 9;
     /// Filter for supported packages.
-    pub(super) const SUPPORTED: u64 = 1 << 10;
+    pub(super) const SUPPORTED: u64 = 1 << 12;
     /// Filter for packages that are not supported.
-    pub(super) const NOT_SUPPORTED: u64 = 1 << 11;
+    pub(super) const NOT_SUPPORTED: u64 = 1 << 13;
     /// Filter for packages that match the basename.
-    pub(super) const BASENAME: u64 = 1 << 12;
+    pub(super) const BASENAME: u64 = 1 << 14;
     /// Filter for packages that do not match the basename.
-    pub(super) const NOT_BASENAME: u64 = 1 << 13;
+    pub(super) const NOT_BASENAME: u64 = 1 << 15;
     /// Filter for the newest package of each name.
-    pub(super) const NEWEST: u64 = 1 << 14;
+    pub(super) const NEWEST: u64 = 1 << 16;
     /// Filter out the newest package of each name.
-    pub(super) const NOT_NEWEST: u64 = 1 << 15;
+    pub(super) const NOT_NEWEST: u64 = 1 << 17;
     /// Filter for packages matching the architecture.
-    pub(super) const ARCH: u64 = 1 << 16;
+    pub(super) const ARCH: u64 = 1 << 18;
     /// Filter for packages not matching the architecture.
-    pub(super) const NOT_ARCH: u64 = 1 << 17;
+    pub(super) const NOT_ARCH: u64 = 1 << 19;
     /// Filter for source packages.
-    pub(super) const SOURCE: u64 = 1 << 18;
+    pub(super) const SOURCE: u64 = 1 << 20;
     /// Filter for non-source packages.
-    pub(super) const NOT_SOURCE: u64 = 1 << 19;
+    pub(super) const NOT_SOURCE: u64 = 1 << 21;
     /// Filter for application packages.
-    pub(super) const APPLICATION: u64 = 1 << 20;
+    pub(super) const APPLICATION: u64 = 1 << 24;
     /// Filter for non-application packages.
-    pub(super) const NOT_APPLICATION: u64 = 1 << 21;
+    pub(super) const NOT_APPLICATION: u64 = 1 << 25;
     /// Filter for downloaded packages.
-    pub(super) const DOWNLOADED: u64 = 1 << 22;
+    pub(super) const DOWNLOADED: u64 = 1 << 26;
     /// Filter for packages that are not downloaded.
-    pub(super) const NOT_DOWNLOADED: u64 = 1 << 23;
+    pub(super) const NOT_DOWNLOADED: u64 = 1 << 27;
 }
 
 /// `PkNetworkEnum`, exposed as the root object's `NetworkState` property.
@@ -473,6 +495,38 @@ const SUPPORTED_ROLES: u64 = (1 << role::GET_PACKAGES)
 
 /// MIME types for local file installs.
 const MIME_TYPES: &[&str] = &["application/x-zpa"];
+
+/// polkit's well-known bus name.
+const POLKIT_BUS_NAME: &str = "org.freedesktop.PolicyKit1";
+
+/// Object path of polkit's authority.
+const POLKIT_AUTHORITY_PATH: &str = "/org/freedesktop/PolicyKit1/Authority";
+
+/// Interface of polkit's authority.
+const POLKIT_AUTHORITY_IFACE: &str = "org.freedesktop.PolicyKit1.Authority";
+
+/// `CheckAuthorization` flag letting polkit prompt the user for a password.
+const POLKIT_ALLOW_USER_INTERACTION: u32 = 1;
+
+/// polkit action ids, shared with upstream `PackageKit` so the policy files
+/// (and any administrator overrides of them) a desktop already ships apply.
+mod action {
+    /// Installing packages from configured repositories.
+    pub(super) const PACKAGE_INSTALL: &str =
+        "org.freedesktop.packagekit.package-install";
+    /// Installing local package files, which bypass repository trust.
+    pub(super) const PACKAGE_INSTALL_UNTRUSTED: &str =
+        "org.freedesktop.packagekit.package-install-untrusted";
+    /// Removing packages.
+    pub(super) const PACKAGE_REMOVE: &str =
+        "org.freedesktop.packagekit.package-remove";
+    /// Updating packages or the whole system.
+    pub(super) const SYSTEM_UPDATE: &str =
+        "org.freedesktop.packagekit.system-update";
+    /// Refreshing repository metadata.
+    pub(super) const SYSTEM_SOURCES_REFRESH: &str =
+        "org.freedesktop.packagekit.system-sources-refresh";
+}
 
 /// Mutable state of one transaction, shared between the D-Bus methods and the
 /// worker thread doing the work.
@@ -908,27 +962,104 @@ fn network_state() -> u32 {
     network::OFFLINE
 }
 
-/// Runs a `zoi` subcommand, streaming stderr and mapping failure to an error.
+/// Builds the argument vector for a `zoi` invocation.
 ///
 /// `PackageKit` work always targets system scope: the daemon runs as root, and
 /// a desktop package manager that quietly installed into a user's home
-/// directory would be actively harmful.
-fn run_zoi(args: &[String], reporter: &Reporter) -> Result<()> {
+/// directory would be actively harmful. Every subcommand used here (`install`,
+/// `uninstall`, `update`, `sync`) accepts `--scope`.
+///
+/// Positional arguments come from D-Bus clients, so they are placed after
+/// `--`: even if validation were bypassed, a value such as `--repo=...` could
+/// then never be parsed as an option.
+fn zoi_argv(
+    subcommand: &str,
+    flags: &[&str],
+    positionals: &[String]
+) -> Vec<String> {
+    let mut argv = vec![
+        subcommand.to_string(),
+        "--yes".to_string(),
+        "--scope".to_string(),
+        "system".to_string(),
+    ];
+    argv.extend(flags.iter().map(|f| (*f).to_string()));
+    if !positionals.is_empty() {
+        argv.push("--".to_string());
+        argv.extend(positionals.iter().cloned());
+    }
+    argv
+}
+
+/// Rejects client-supplied package names that `zoi` could misread.
+///
+/// Empty names and names starting with `-` (which would otherwise be parsed as
+/// options) are refused with `PACKAGE_ID_INVALID`.
+fn validate_package_names(names: &[String]) -> Result<()> {
+    if let Some(bad) = names
+        .iter()
+        .find(|n| n.is_empty() || n.starts_with('-') || n.contains('\0'))
+    {
+        return Err(PkError {
+            code: error_code::PACKAGE_ID_INVALID,
+            message: format!("Invalid package id '{bad}'")
+        }
+        .into());
+    }
+    Ok(())
+}
+
+/// Rejects client-supplied file paths that are not absolute.
+///
+/// `InstallFiles` takes full paths by specification. Requiring an absolute
+/// path also rules out anything `zoi` could read as an option or as a
+/// registry package name.
+fn validate_file_paths(paths: &[String]) -> Result<()> {
+    if let Some(bad) = paths.iter().find(|p| {
+        p.contains('\0') || !std::path::Path::new(p.as_str()).is_absolute()
+    }) {
+        return Err(PkError {
+            code: error_code::INVALID_PACKAGE_FILE,
+            message: format!("'{bad}' is not an absolute file path")
+        }
+        .into());
+    }
+    Ok(())
+}
+
+/// Runs `zoi` with a prepared argument vector, streaming its output and
+/// mapping failure to an error.
+///
+/// Both pipes are drained while the child runs. Reading only one would let the
+/// other fill its pipe buffer and block the child forever, which with a chatty
+/// `zoi update` is a matter of when, not if.
+fn run_zoi(argv: &[String], reporter: &Reporter) -> Result<()> {
     use std::io::{BufRead, BufReader};
     use std::process::{Command, Stdio};
 
     let mut cmd = Command::new("zoi");
-    cmd.args(args);
-    cmd.arg("--yes");
-    cmd.arg("--scope").arg("system");
+    cmd.args(argv);
+    cmd.stdin(Stdio::null());
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
     let mut child = cmd
         .spawn()
-        .with_context(|| format!("Failed to run 'zoi {}'", args.join(" ")))?;
+        .with_context(|| format!("Failed to run 'zoi {}'", argv.join(" ")))?;
 
-    // stderr must be drained while the child runs, otherwise a full pipe buffer
-    // deadlocks it. Progress is inferred from the lines it prints.
+    // stdout is drained on its own thread so stderr can be read here.
+    let stdout_drain = child.stdout.take().map(|stdout| {
+        std::thread::spawn(move || {
+            let mut captured = String::new();
+            for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+                println!("{}", line.dimmed());
+                captured.push_str(&line);
+                captured.push('\n');
+            }
+            captured
+        })
+    });
+
+    // Progress is inferred from the lines printed on stderr.
     let mut captured = String::new();
     if let Some(stderr) = child.stderr.take() {
         for line in BufReader::new(stderr).lines().map_while(Result::ok) {
@@ -940,18 +1071,26 @@ fn run_zoi(args: &[String], reporter: &Reporter) -> Result<()> {
     }
 
     let status = child.wait().context("Failed to wait for 'zoi'")?;
+    let stdout_text = stdout_drain
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default();
 
     if !status.success() {
         // Classify the failure so a frontend can show something more useful
         // than "transaction failed". The text is matched because `zoi`
-        // reports the specifics on stderr and there is no
-        // machine-readable status to read.
-        let code = classify_failure(&captured);
-        return Err(PkError {
-            code,
-            message: captured.trim().to_string()
-        }
-        .into());
+        // reports the specifics as text and there is no machine-readable
+        // status to read. stderr is checked first, as that is where errors
+        // go.
+        let code = match classify_failure(&captured) {
+            error_code::TRANSACTION_ERROR => classify_failure(&stdout_text),
+            code => code
+        };
+        let message = if captured.trim().is_empty() {
+            stdout_text.trim().to_string()
+        } else {
+            captured.trim().to_string()
+        };
+        return Err(PkError { code, message }.into());
     }
 
     Ok(())
@@ -1012,7 +1151,7 @@ fn classify_failure(output: &str) -> u32 {
     {
         error_code::PACKAGE_FAILED_TO_REMOVE
     } else if lower.contains("no space") || lower.contains("disk full") {
-        error_code::INTERNAL_ERROR
+        error_code::NO_SPACE_ON_DEVICE
     } else {
         error_code::TRANSACTION_ERROR
     }
@@ -1023,6 +1162,7 @@ fn do_install(packages: &[String], reporter: &Reporter) -> Result<()> {
     if packages.is_empty() {
         return Ok(());
     }
+    validate_package_names(packages)?;
 
     reporter.set_status(status::DOWNLOAD);
     for pkg in packages {
@@ -1035,10 +1175,7 @@ fn do_install(packages: &[String], reporter: &Reporter) -> Result<()> {
     // prefix but neither is a kernel.
     let kernels_before = installed_kernel_versions();
 
-    let mut args = vec!["install".to_string()];
-    args.extend(packages.iter().cloned());
-
-    run_zoi(&args, reporter)?;
+    run_zoi(&zoi_argv("install", &[], packages), reporter)?;
 
     // A new kernel needs a reboot before it takes effect. The signal lets a
     // frontend offer the restart rather than rebooting on its own.
@@ -1067,16 +1204,14 @@ fn do_remove(packages: &[String], reporter: &Reporter) -> Result<()> {
     if packages.is_empty() {
         return Ok(());
     }
+    validate_package_names(packages)?;
 
     reporter.set_status(status::REMOVE);
     for pkg in packages {
         reporter.touch(pkg, info::REMOVING);
     }
 
-    let mut args = vec!["uninstall".to_string()];
-    args.extend(packages.iter().cloned());
-
-    run_zoi(&args, reporter)
+    run_zoi(&zoi_argv("uninstall", &[], packages), reporter)
 }
 
 /// Updates the given packages, or everything when none are named.
@@ -1085,31 +1220,32 @@ fn do_remove(packages: &[String], reporter: &Reporter) -> Result<()> {
 /// `zoi update --all` is what makes `update --all` the distribution upgrade
 /// path over `PackageKit` as well as from the CLI.
 fn do_update(packages: &[String], reporter: &Reporter) -> Result<()> {
-    let mut args = vec!["update".to_string()];
-
-    if packages.is_empty() {
-        args.push("--all".to_string());
+    let argv = if packages.is_empty() {
+        zoi_argv("update", &["--all"], &[])
     } else {
+        validate_package_names(packages)?;
         for pkg in packages {
             reporter.touch(pkg, info::UPDATING);
         }
-        args.extend(packages.iter().cloned());
-    }
+        zoi_argv("update", &[], packages)
+    };
 
     reporter.set_status(status::UPDATE);
-    run_zoi(&args, reporter)
+    run_zoi(&argv, reporter)
 }
 
 /// Refreshes registry metadata.
 fn do_refresh_cache(force: bool, reporter: &Reporter) -> Result<()> {
     reporter.set_status(status::REFRESH_CACHE);
 
-    let mut args = vec!["sync".to_string()];
-    if force {
-        args.push("--force".to_string());
-    }
+    let flags: &[&str] = if force { &["--force"] } else { &[] };
+    run_zoi(&zoi_argv("sync", flags, &[]), reporter)
+}
 
-    run_zoi(&args, reporter)
+/// Installs local package files.
+fn do_install_files(paths: &[String], reporter: &Reporter) -> Result<()> {
+    validate_file_paths(paths)?;
+    do_install(paths, reporter)
 }
 
 /// Emits the `RepoDetail` signal for every configured repository.
@@ -1605,6 +1741,130 @@ fn refreshed() {
 }
 
 // ---------------------------------------------------------------------------
+// Authorization
+//
+// Every mutating method is authorized against polkit for the *calling* bus
+// name, with the same action ids upstream PackageKit uses. The daemon runs as
+// root and the system bus lets any local user call it, so without this any
+// user could install or remove system packages.
+// ---------------------------------------------------------------------------
+
+/// Returns the Unix uid owning a bus connection, if the bus will tell.
+async fn caller_uid(conn: &Connection, sender: &str) -> Option<u32> {
+    let reply = conn
+        .call_method(
+            Some("org.freedesktop.DBus"),
+            "/org/freedesktop/DBus",
+            Some("org.freedesktop.DBus"),
+            "GetConnectionUnixUser",
+            &(sender,)
+        )
+        .await
+        .ok()?;
+    let body = reply.body();
+    body.deserialize::<u32>().ok()
+}
+
+/// Asks polkit whether `sender` may perform `action_id`.
+///
+/// Returns `(is_authorized, is_challenge)`. With `interactive` set polkit may
+/// prompt the user through their session's authentication agent, so this can
+/// take as long as the user takes to type a password.
+async fn polkit_check(
+    conn: &Connection,
+    sender: &str,
+    action_id: &str,
+    interactive: bool
+) -> Result<(bool, bool)> {
+    let mut subject_details: HashMap<&str, OwnedVariant> = HashMap::new();
+    subject_details.insert("name", owned_str(sender));
+    let subject = ("system-bus-name", subject_details);
+    let details: HashMap<&str, &str> = HashMap::new();
+    let flags = if interactive {
+        POLKIT_ALLOW_USER_INTERACTION
+    } else {
+        0
+    };
+
+    let reply = conn
+        .call_method(
+            Some(POLKIT_BUS_NAME),
+            POLKIT_AUTHORITY_PATH,
+            Some(POLKIT_AUTHORITY_IFACE),
+            "CheckAuthorization",
+            &(subject, action_id, details, flags, "")
+        )
+        .await
+        .context("polkit CheckAuthorization failed")?;
+
+    let body = reply.body();
+    let (authorized, challenge, _details): (
+        bool,
+        bool,
+        HashMap<String, String>
+    ) = body
+        .deserialize()
+        .context("Malformed polkit CheckAuthorization reply")?;
+    Ok((authorized, challenge))
+}
+
+/// Builds the `NOT_AUTHORIZED` error reported to a client.
+fn not_authorized(message: String) -> anyhow::Error {
+    PkError {
+        code: error_code::NOT_AUTHORIZED,
+        message
+    }
+    .into()
+}
+
+/// Authorizes `sender` for `action_id`, allowing interactive authentication.
+///
+/// Root callers are always allowed. Anything that cannot be positively
+/// authorized - no sender, polkit unreachable, a malformed reply, or a denial
+/// - is refused: failing closed is the only safe default for a root daemon.
+async fn authorize_sender(
+    conn: &Connection,
+    sender: Option<&str>,
+    action_id: &str
+) -> Result<()> {
+    let Some(sender) = sender else {
+        return Err(not_authorized(
+            "The request carried no sender to authorize".to_string()
+        ));
+    };
+
+    if caller_uid(conn, sender).await == Some(0) {
+        return Ok(());
+    }
+
+    match polkit_check(conn, sender, action_id, true).await {
+        Ok((true, _)) => Ok(()),
+        Ok((false, _)) => Err(not_authorized(format!(
+            "Not authorized to perform {action_id}"
+        ))),
+        Err(e) => Err(not_authorized(format!(
+            "Could not verify authorization for {action_id}: {e:#}"
+        )))
+    }
+}
+
+/// Maps a non-interactive polkit answer onto `PkAuthorizeEnum`.
+fn authorize_result(authorized: bool, challenge: bool) -> u32 {
+    if authorized {
+        authorize::YES
+    } else if challenge {
+        authorize::INTERACTIVE
+    } else {
+        authorize::NO
+    }
+}
+
+/// Returns the unique bus name a method call came from.
+fn header_sender(header: &zbus::message::Header<'_>) -> Option<String> {
+    header.sender().map(|s| s.as_str().to_string())
+}
+
+// ---------------------------------------------------------------------------
 // Root object: org.freedesktop.PackageKit at /org/freedesktop/PackageKit
 // ---------------------------------------------------------------------------
 
@@ -1831,19 +2091,52 @@ impl PackageKitRoot {
         DISTRO_ID.to_string()
     }
 
-    /// Reports whether a caller could authorize an action.
+    /// Reports whether the caller could be authorized for an action.
     ///
-    /// Always yes: authorization happens at the `zoid` boundary and the method
-    /// bodies do no authorization of their own. Reporting `interactive` would
-    /// make a frontend prompt for a password that is then never used.
+    /// Root is always authorized. For anyone else polkit is asked without
+    /// user interaction: an outright grant is `yes`, a grant that needs a
+    /// password is `interactive`, and anything else (including polkit being
+    /// unreachable) is `no`, matching what the mutating methods will enforce.
     #[zbus(name = "CanAuthorize")]
-    fn can_authorize(&self, _action_id: &str) -> u32 {
-        authorize::YES
+    async fn can_authorize(
+        &self,
+        action_id: &str,
+        #[zbus(header)] header: zbus::message::Header<'_>,
+        #[zbus(connection)] conn: &Connection
+    ) -> u32 {
+        let Some(sender) = header_sender(&header) else {
+            return authorize::NO;
+        };
+        if caller_uid(conn, &sender).await == Some(0) {
+            return authorize::YES;
+        }
+        match polkit_check(conn, &sender, action_id, false).await {
+            Ok((authorized, challenge)) => {
+                authorize_result(authorized, challenge)
+            }
+            Err(_) => authorize::NO
+        }
     }
 
     /// Creates a transaction and returns its object path.
+    ///
+    /// The caller's unique bus name and uid are recorded on the transaction
+    /// and reported through its `Sender` and `Uid` properties.
     #[zbus(name = "CreateTransaction")]
-    fn create_transaction(&self) -> zbus::fdo::Result<OwnedObjectPath> {
+    async fn create_transaction(
+        &self,
+        #[zbus(header)] header: zbus::message::Header<'_>,
+        #[zbus(connection)] conn: &Connection
+    ) -> zbus::fdo::Result<OwnedObjectPath> {
+        let sender = header_sender(&header).unwrap_or_default();
+        // `u32::MAX` is what PackageKit itself reports for an unknown uid;
+        // reporting 0 would claim the transaction belongs to root.
+        let uid = if sender.is_empty() {
+            u32::MAX
+        } else {
+            caller_uid(conn, &sender).await.unwrap_or(u32::MAX)
+        };
+
         let (path, state) = self
             .new_transaction_path()
             .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?;
@@ -1860,26 +2153,18 @@ impl PackageKitRoot {
         let interface = PackageKitTransaction {
             state,
             transaction_path: Arc::new(Mutex::new(path.clone())),
-            sender: String::new(),
-            uid: 0
+            sender,
+            uid
         };
 
-        // `at` is async in zbus 6, and this runs on a D-Bus dispatcher thread,
-        // so it is driven to completion here rather than left as a
-        // future nobody polls.
-        async_io::block_on(
-            dbus_connection()
-                .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?
-                .object_server()
-                .at(object_path.clone(), interface)
-        )
-        // `at` reports whether the interface was newly added. A `false`
-        // would mean the path was taken, which the monotonic counter above
-        // already rules out, so the flag is not interesting here.
-        .map(|_| ())
-        .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?;
-
-        let () = ();
+        conn.object_server()
+            .at(object_path.clone(), interface)
+            .await
+            // `at` reports whether the interface was newly added. A `false`
+            // would mean the path was taken, which the monotonic counter
+            // above already rules out, so the flag is not interesting here.
+            .map(|_| ())
+            .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?;
 
         Ok(OwnedObjectPath::from(object_path))
     }
@@ -2059,6 +2344,35 @@ impl PackageKitTransaction {
         }
 
         spawn(&self.reporter(), work);
+    }
+
+    /// Spawns mutating work that first has to be authorized.
+    ///
+    /// Authorization runs on the worker thread rather than in the D-Bus
+    /// method: an interactive polkit check lasts as long as the user takes to
+    /// type a password, and the method has to return immediately. Until it
+    /// succeeds nothing is touched; a denial finishes the transaction with
+    /// `NOT_AUTHORIZED`.
+    fn start_authorized<F>(
+        &self,
+        role: u32,
+        sender: Option<String>,
+        action_id: &'static str,
+        work: F
+    ) where
+        F: FnOnce(&Reporter) -> Result<()> + Send + 'static
+    {
+        self.start(role, move |r| {
+            r.set_status(status::WAITING_FOR_AUTH);
+            let conn = dbus_connection()?;
+            async_io::block_on(authorize_sender(
+                &conn,
+                sender.as_deref(),
+                action_id
+            ))?;
+            r.set_status(status::RUNNING);
+            work(r)
+        });
     }
 }
 
@@ -2370,15 +2684,25 @@ impl PackageKitTransaction {
 
     /// Re-downloads repository metadata.
     #[zbus(name = "RefreshCache")]
-    fn refresh_cache(&self, force: bool) {
-        self.start(role::REFRESH_CACHE, move |r| {
-            // The root signal is what makes a running frontend's update badge
-            // refresh. It is emitted either way, because "there are no updates"
-            // is itself information a frontend needs.
-            let outcome = do_refresh_cache(force, r);
-            refreshed();
-            outcome
-        });
+    fn refresh_cache(
+        &self,
+        force: bool,
+        #[zbus(header)] header: zbus::message::Header<'_>
+    ) {
+        let sender = header_sender(&header);
+        self.start_authorized(
+            role::REFRESH_CACHE,
+            sender,
+            action::SYSTEM_SOURCES_REFRESH,
+            move |r| {
+                // The root signal is what makes a running frontend's update
+                // badge refresh. It is emitted either way, because "there are
+                // no updates" is itself information a frontend needs.
+                let outcome = do_refresh_cache(force, r);
+                refreshed();
+                outcome
+            }
+        );
     }
 
     /// Installs packages.
@@ -2386,13 +2710,19 @@ impl PackageKitTransaction {
     fn install_packages(
         &self,
         _transaction_flags: u64,
-        package_ids: Vec<String>
+        package_ids: Vec<String>,
+        #[zbus(header)] header: zbus::message::Header<'_>
     ) {
         let packages: Vec<String> = package_ids
             .iter()
             .map(|p| package_name_from_id(p))
             .collect();
-        self.start(role::INSTALL_PACKAGES, move |r| do_install(&packages, r));
+        self.start_authorized(
+            role::INSTALL_PACKAGES,
+            header_sender(&header),
+            action::PACKAGE_INSTALL,
+            move |r| do_install(&packages, r)
+        );
     }
 
     /// Removes packages.
@@ -2402,13 +2732,19 @@ impl PackageKitTransaction {
         _transaction_flags: u64,
         package_ids: Vec<String>,
         _allow_deps: bool,
-        _autoremove: bool
+        _autoremove: bool,
+        #[zbus(header)] header: zbus::message::Header<'_>
     ) {
         let packages: Vec<String> = package_ids
             .iter()
             .map(|p| package_name_from_id(p))
             .collect();
-        self.start(role::REMOVE_PACKAGES, move |r| do_remove(&packages, r));
+        self.start_authorized(
+            role::REMOVE_PACKAGES,
+            header_sender(&header),
+            action::PACKAGE_REMOVE,
+            move |r| do_remove(&packages, r)
+        );
     }
 
     /// Updates packages, or all of them when the list is empty.
@@ -2416,13 +2752,19 @@ impl PackageKitTransaction {
     fn update_packages(
         &self,
         _transaction_flags: u64,
-        package_ids: Vec<String>
+        package_ids: Vec<String>,
+        #[zbus(header)] header: zbus::message::Header<'_>
     ) {
         let packages: Vec<String> = package_ids
             .iter()
             .map(|p| package_name_from_id(p))
             .collect();
-        self.start(role::UPDATE_PACKAGES, move |r| do_update(&packages, r));
+        self.start_authorized(
+            role::UPDATE_PACKAGES,
+            header_sender(&header),
+            action::SYSTEM_UPDATE,
+            move |r| do_update(&packages, r)
+        );
     }
 
     /// Downloads packages without installing them.
@@ -2454,8 +2796,20 @@ impl PackageKitTransaction {
     /// archive. A frontend's MIME filter will not offer `.zpa` files, so this
     /// exists mainly for direct API users.
     #[zbus(name = "InstallFiles")]
-    fn install_files(&self, _transaction_flags: u64, full_paths: Vec<String>) {
-        self.start(role::INSTALL_PACKAGES, move |r| do_install(&full_paths, r));
+    fn install_files(
+        &self,
+        _transaction_flags: u64,
+        full_paths: Vec<String>,
+        #[zbus(header)] header: zbus::message::Header<'_>
+    ) {
+        // Local files bypass repository signatures, so they need the
+        // stronger "untrusted" action, exactly as upstream PackageKit does.
+        self.start_authorized(
+            role::INSTALL_FILES,
+            header_sender(&header),
+            action::PACKAGE_INSTALL_UNTRUSTED,
+            move |r| do_install_files(&full_paths, r)
+        );
     }
 
     /// Performs a distribution upgrade.
@@ -2467,9 +2821,15 @@ impl PackageKitTransaction {
         &self,
         _transaction_flags: u64,
         _distro_id: &str,
-        _upgrade_kind: u32
+        _upgrade_kind: u32,
+        #[zbus(header)] header: zbus::message::Header<'_>
     ) {
-        self.start(role::UPDATE_PACKAGES, move |r| do_update(&[], r));
+        self.start_authorized(
+            role::UPGRADE_SYSTEM,
+            header_sender(&header),
+            action::SYSTEM_UPDATE,
+            move |r| do_update(&[], r)
+        );
     }
 
     /// Enables or disables a repository.
@@ -2735,6 +3095,116 @@ pub(crate) fn start_packagekit() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Recovers the `PkErrorEnum` code carried by an error.
+    fn pk_code(e: &anyhow::Error) -> Option<u32> {
+        e.downcast_ref::<PkError>().map(|p| p.code)
+    }
+
+    // The exact shapes below are mirrored by
+    // `crates/tests/tests/fix_cli_packagekit_argv.rs`, which parses each one
+    // with the real `zoi` CLI definition. Keep the two in sync.
+    #[test]
+    fn zoi_argv_shapes_put_client_values_after_double_dash() {
+        let pkgs = vec!["firefox".to_string(), "@core/vim".to_string()];
+
+        assert_eq!(
+            zoi_argv("install", &[], &pkgs),
+            [
+                "install",
+                "--yes",
+                "--scope",
+                "system",
+                "--",
+                "firefox",
+                "@core/vim"
+            ]
+        );
+        assert_eq!(
+            zoi_argv("uninstall", &[], &pkgs),
+            [
+                "uninstall",
+                "--yes",
+                "--scope",
+                "system",
+                "--",
+                "firefox",
+                "@core/vim"
+            ]
+        );
+        assert_eq!(
+            zoi_argv("update", &[], &pkgs),
+            [
+                "update",
+                "--yes",
+                "--scope",
+                "system",
+                "--",
+                "firefox",
+                "@core/vim"
+            ]
+        );
+        assert_eq!(
+            zoi_argv("update", &["--all"], &[]),
+            ["update", "--yes", "--scope", "system", "--all"]
+        );
+        assert_eq!(
+            zoi_argv("sync", &[], &[]),
+            ["sync", "--yes", "--scope", "system"]
+        );
+        assert_eq!(
+            zoi_argv("sync", &["--force"], &[]),
+            ["sync", "--yes", "--scope", "system", "--force"]
+        );
+    }
+
+    #[test]
+    fn option_like_package_names_are_rejected() {
+        for bad in ["-x", "--repo=evil", ""] {
+            let err = validate_package_names(&[bad.to_string()])
+                .expect_err("option-like or empty names must be rejected");
+            assert_eq!(pk_code(&err), Some(error_code::PACKAGE_ID_INVALID));
+        }
+        assert!(
+            validate_package_names(&[
+                "firefox".to_string(),
+                "@core/linux".to_string(),
+                "#zoidberg@core/vim".to_string()
+            ])
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn install_files_requires_absolute_paths() {
+        for bad in ["-rf", "relative/file.zpa", "firefox"] {
+            let err = validate_file_paths(&[bad.to_string()])
+                .expect_err("non-absolute paths must be rejected");
+            assert_eq!(pk_code(&err), Some(error_code::INVALID_PACKAGE_FILE));
+        }
+        assert!(validate_file_paths(&["/tmp/pkg.zpa".to_string()]).is_ok());
+    }
+
+    #[test]
+    fn can_authorize_maps_polkit_answers_honestly() {
+        assert_eq!(authorize_result(true, false), authorize::YES);
+        assert_eq!(authorize_result(false, true), authorize::INTERACTIVE);
+        assert_eq!(authorize_result(false, false), authorize::NO);
+    }
+
+    #[test]
+    fn error_codes_match_packagekit_1x() {
+        assert_eq!(error_code::NOT_SUPPORTED, 3);
+        assert_eq!(error_code::PACKAGE_ID_INVALID, 6);
+        assert_eq!(error_code::PACKAGE_NOT_FOUND, 8);
+        assert_eq!(error_code::TRANSACTION_ERROR, 16);
+        assert_eq!(error_code::NO_PACKAGES_TO_UPDATE, 27);
+        assert_eq!(error_code::INVALID_PACKAGE_FILE, 38);
+        assert_eq!(error_code::NO_SPACE_ON_DEVICE, 46);
+        assert_eq!(error_code::NOT_AUTHORIZED, 48);
+        assert_eq!(error_code::PACKAGE_FAILED_TO_INSTALL, 58);
+        assert_eq!(error_code::PACKAGE_FAILED_TO_REMOVE, 59);
+    }
 
     #[test]
     fn package_ids_use_the_specified_format() {

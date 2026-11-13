@@ -1951,6 +1951,15 @@ pub struct RepoConfig {
     /// Optional URL to a pre-compiled database.
     #[serde(default)]
     pub db: Option<String>,
+    /// Digest of the pre-compiled database at `db`, as `sha512-<hex>`,
+    /// `sha256-<hex>`, or bare SHA-512 hex.
+    ///
+    /// A downloaded database is only used when it matches. Registries with
+    /// signing authorities only use a pre-compiled database when this is set,
+    /// because the signature covers `repo.yaml` (and so this digest) but not
+    /// the database itself.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub db_hash: Option<String>,
     /// The list of PGP keys for verification.
     #[serde(default)]
     pub pgp: Vec<PgpKey>,

@@ -63,7 +63,9 @@ zoi rollback @core/linux:headers
 
 This is useful when you want to undo a single package upgrade without affecting other packages installed in the same transaction.
 
-Zoi keeps the previous version's directory in the store (if `rollback_enabled` is true in `config.yaml`). Rolling back swaps the `latest` symlink and re-links the binaries.
+Zoi keeps the previous version's directory in the store (if `rollback_enabled` is true in `config.yaml`). Rolling back selects the newest stored version that is **older** than the installed one, removes the current version through the normal uninstall path, and activates the stored version: its `latest` symlink, binaries, shell completions, database record and lockfile entry are all restored.
+
+Rollback only works for versions whose files live entirely in the store. If the previous version installed files elsewhere (for example under `/usr` for system packages), Zoi stops with an error before changing anything, because the store keeps no copy of those files; reinstall that version with `zoi install <package>@<version>` instead. Rolling back a system package requires root.
 
 ---
 

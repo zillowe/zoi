@@ -162,6 +162,66 @@ fn cleanup_service(
     Ok(())
 }
 
+/// Returns the package source of a Zoi dependency string, or `None` for
+/// dependencies handled by other package managers (or unparsable ones).
+///
+/// Install manifests record Zoi dependencies as
+/// `zoi:#handle@repo/name[:sub]@version`. The generic dependency parser is
+/// meant for `manager:package[@version][:description]` and would report
+/// `#handle` as the package (and `:sub@version` as a description), so the
+/// source is taken verbatim after the `zoi:` prefix instead.
+fn zoi_dependency_source(dep_str: &str) -> Option<&str> {
+    let dep = dependencies::parse_dependency_string(dep_str).ok()?;
+    if dep.manager != "zoi" {
+        return None;
+    }
+    let source = dep_str.strip_prefix("zoi:").unwrap_or(dep_str).trim();
+    (!source.is_empty()).then_some(source)
+}
+
+/// Finds the installed manifest for the package part of a `zoi:` dependency
+/// string (for example `#handle@repo/name:sub@1.2.0`).
+///
+/// Dependency strings record the version that was installed at the time. If
+/// the dependency has since been upgraded, the lookup falls back to matching
+/// the package identity without the version. Returns `None` when nothing or
+/// more than one package matches.
+fn find_dependency_manifest(
+    dep_package: &str,
+    scope: types::Scope
+) -> Option<types::InstallManifest> {
+    let mut request = resolve::parse_source_string(dep_package).ok()?;
+    if let Ok(mut matches) =
+        local::find_installed_manifests_matching(&request, scope)
+        && matches.len() == 1
+    {
+        return matches.pop();
+    }
+    request.version_spec = None;
+    let mut matches =
+        local::find_installed_manifests_matching(&request, scope).ok()?;
+    if matches.len() == 1 {
+        matches.pop()
+    } else {
+        None
+    }
+}
+
+/// Returns the source string of an installed manifest without its version
+/// pin (`#handle@repo/name[:sub]`).
+fn unversioned_manifest_source(manifest: &types::InstallManifest) -> String {
+    match &manifest.sub_package {
+        Some(sub) => format!(
+            "#{}@{}/{}:{}",
+            manifest.registry_handle, manifest.repo, manifest.name, sub
+        ),
+        None => format!(
+            "#{}@{}/{}",
+            manifest.registry_handle, manifest.repo, manifest.name
+        )
+    }
+}
+
 /// Uninstalls a collection and its associated dependencies.
 fn uninstall_collection(
     pkg: &types::Package,
@@ -190,65 +250,77 @@ fn uninstall_collection(
         if !quiet {
             println!("Uninstalling dependencies of the collection...");
         }
+        let collection_id = local::installed_manifest_source(manifest);
         for dep_str in dependencies_to_uninstall {
             let dep = dependencies::parse_dependency_string(dep_str)?;
 
-            if dep.manager == "zoi" {
+            if dep.manager != "zoi" {
+                // The install manifest does not record whether Zoi installed
+                // a native package or it was already present on the host, so
+                // removing it could take out a package the user (or another
+                // program) relies on. Leave native packages alone.
                 if !quiet {
                     println!(
-                        "\n{} Uninstalling zoi dependency: {}...",
-                        "::".bold().blue(),
-                        dep_str.bold()
+                        "{} Keeping native dependency {} ({}): Zoi does not \
+                         record whether it installed it, so it is not \
+                         removed. Remove it with your system package manager \
+                         if it is no longer needed.",
+                        "Note:".yellow(),
+                        dep.package.cyan(),
+                        dep.manager.yellow()
                     );
                 }
-            } else {
-                let prompt = format!(
-                    "Uninstall native dependency '{}' ({})?",
-                    dep.package.cyan(),
-                    dep.manager.yellow()
-                );
-                let warning = "Warning: Zoi cannot track if other non-Zoi \
-                               applications depend on this package.";
-
-                if yes {
-                    if !quiet {
-                        println!(
-                            "\n{} Uninstalling native dependency: {}...",
-                            "::".bold().blue(),
-                            dep_str.bold()
-                        );
-                        println!("{}: {}", "Note".yellow(), warning);
-                    }
-                } else if core_utils::ask_for_confirmation(
-                    &format!("{}\n   {}", prompt, warning.dimmed()),
-                    false
-                ) {
-                    if !quiet {
-                        println!(
-                            "\n{} Uninstalling dependency: {}...",
-                            "::".bold().blue(),
-                            dep_str.bold()
-                        );
-                    }
-                } else {
-                    if !quiet {
-                        println!(
-                            "Skipping uninstallation of native dependency: {}",
-                            dep.package.yellow()
-                        );
-                    }
-                    continue;
-                }
+                continue;
             }
 
-            if let Err(e) =
-                dependencies::uninstall_dependency(dep_str, &move |name| {
-                    run(name, Some(scope), yes, quiet, dry_run).map(|_| ())
+            if !quiet {
+                println!(
+                    "\n{} Uninstalling zoi dependency: {}...",
+                    "::".bold().blue(),
+                    dep_str.bold()
+                );
+            }
+
+            let dep_source = zoi_dependency_source(dep_str).unwrap_or(dep_str);
+            let dep_manifest = find_dependency_manifest(dep_source, scope);
+
+            // Drop the collection's own dependent link first, otherwise the
+            // dependency always looks "in use" (by this collection) and the
+            // uninstall below is refused. Links held by other packages stay,
+            // so shared dependencies are still protected.
+            if let Some(dep_manifest) = &dep_manifest
+                && let Err(e) = local::get_package_dir(
+                    dep_manifest.scope,
+                    &dep_manifest.registry_handle,
+                    &dep_manifest.repo,
+                    &dep_manifest.name
+                )
+                .and_then(|dep_dir| {
+                    local::remove_dependent(&dep_dir, &collection_id)
                 })
                 && !quiet
             {
                 eprintln!(
-                    "Warning: Could not uninstall dependency '{dep_str}': {e}"
+                    "{} failed to remove dependent link for {}: {}",
+                    "Warning:".yellow(),
+                    dep_source,
+                    e
+                );
+            }
+
+            // Uninstall by identity without the version pin: a pinned
+            // uninstall of the active version would re-activate an older
+            // stored version instead of removing the dependency.
+            let target = dep_manifest.as_ref().map_or_else(
+                || dep_source.to_string(),
+                unversioned_manifest_source
+            );
+            if let Err(e) = run(&target, Some(scope), yes, quiet, dry_run)
+                && !quiet
+            {
+                eprintln!(
+                    "{} Could not uninstall dependency '{dep_str}': {e}",
+                    "Warning:".yellow()
                 );
             }
         }
@@ -272,8 +344,14 @@ fn uninstall_collection(
     }
 
     if let Ok(conn) = db::open_connection("local") {
-        let _ =
-            db::delete_package(&conn, &pkg.name, None, &pkg.repo, Some(scope));
+        let _ = db::delete_package(
+            &conn,
+            &pkg.name,
+            manifest.sub_package.as_deref(),
+            &pkg.repo,
+            Some(scope),
+            Some(&manifest.registry_handle)
+        );
     }
 
     if let Ok(true) = telemetry::posthog_capture_event(
@@ -676,6 +754,42 @@ fn activate_stored_version(
     restore_version_shims(manifest, scope, quiet);
     restore_version_completions(manifest, &version_dir, scope, quiet);
 
+    // Re-register this version as a dependent of its Zoi dependencies; the
+    // links of the version that was just removed were dropped with it.
+    let parent_id = local::installed_manifest_source(manifest);
+    for dep_str in &manifest.installed_dependencies {
+        let Some(dep_source) = zoi_dependency_source(dep_str) else {
+            continue;
+        };
+        let Some(dep_manifest) = find_dependency_manifest(dep_source, scope)
+        else {
+            if !quiet {
+                eprintln!(
+                    "{} dependency {} of version '{version}' is not installed.",
+                    "Warning:".yellow(),
+                    dep_source.cyan()
+                );
+            }
+            continue;
+        };
+        if let Err(e) = local::get_package_dir(
+            dep_manifest.scope,
+            &dep_manifest.registry_handle,
+            &dep_manifest.repo,
+            &dep_manifest.name
+        )
+        .and_then(|dep_dir| local::add_dependent(&dep_dir, &parent_id))
+            && !quiet
+        {
+            eprintln!(
+                "{} failed to record dependent link for {}: {}",
+                "Warning:".yellow(),
+                dep_source,
+                e
+            );
+        }
+    }
+
     let pkg = load_stored_package(&version_dir, manifest);
     if let Ok(conn) = db::open_connection("local")
         && let Ok(pkg_id) = db::update_package(
@@ -718,6 +832,179 @@ fn activate_stored_version(
         );
     }
     Ok(())
+}
+
+/// Re-activates a version of a package that is still present in the store.
+///
+/// Points `latest` at the version, rewrites its manifest, restores shims,
+/// completions and dependent links, and updates the database row, file index
+/// and lockfile. Nothing is downloaded. Files the version installed outside
+/// the store (`${usrroot}`, `${usrhome}`, `${applications}`, absolute paths)
+/// are not kept in the store and are therefore not restored; check
+/// [`files_outside_store`] first.
+///
+/// # Errors
+///
+/// Returns an error if the package directory cannot be determined or the
+/// `latest` link cannot be re-pointed.
+pub fn activate_stored_manifest(
+    manifest: &types::InstallManifest,
+    quiet: bool
+) -> anyhow::Result<()> {
+    let package_dir = local::get_package_dir(
+        manifest.scope,
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name
+    )?;
+    activate_stored_version(
+        &package_dir,
+        manifest.scope,
+        &manifest.version,
+        manifest,
+        quiet
+    )
+}
+
+/// Returns the manifest entries that live outside the Zoi store.
+///
+/// `${pkgstore}/...` entries (and relative entries) are inside the store.
+/// `${usrroot}`, `${usrhome}` and `${applications}` entries, and absolute
+/// paths that are not under the scope's store directory, are outside it.
+/// The store keeps no copy of those files, so a version that installed any
+/// cannot be re-activated from the store alone.
+pub fn files_outside_store(manifest: &types::InstallManifest) -> Vec<String> {
+    let store_base = local::get_store_base_dir(manifest.scope).ok();
+    manifest
+        .installed_files
+        .iter()
+        .filter(|file| is_outside_store(file, store_base.as_deref()))
+        .cloned()
+        .collect()
+}
+
+/// Returns whether a single manifest file entry lives outside the store.
+fn is_outside_store(file: &str, store_base: Option<&std::path::Path>) -> bool {
+    if file.starts_with("${pkgstore}") {
+        return false;
+    }
+    if ["${usrroot}", "${usrhome}", "${applications}"]
+        .iter()
+        .any(|placeholder| file.starts_with(placeholder))
+    {
+        return true;
+    }
+    let path = std::path::Path::new(file);
+    if path.is_absolute() {
+        return store_base.is_none_or(|base| !path.starts_with(base));
+    }
+    false
+}
+
+/// Rolls the active version of a package back to an older version that is
+/// still kept in the store.
+///
+/// The active version is removed through the regular uninstall path (hooks,
+/// `uninstall()` script, files, shims, completions and its dependent links),
+/// except that the package's own dependents do not block the operation
+/// because the package stays installed. `target_version` is then activated
+/// (see [`activate_stored_manifest`]): `latest`, shims, completions,
+/// dependent links, database row, file index and lockfile all move to it.
+///
+/// Nothing is changed when the rollback cannot be completed from the store:
+/// the call fails up front if `target_version` has no manifest in the store,
+/// if it installed files outside the store (they cannot be restored and the
+/// paths may be shared with the active version), or if a system package is
+/// rolled back without root privileges.
+///
+/// # Errors
+///
+/// Returns an error if a pre-flight check fails or the uninstall/activation
+/// fails.
+pub fn rollback_to_stored_version(
+    current: &types::InstallManifest,
+    target_version: &str,
+    yes: bool,
+    quiet: bool
+) -> anyhow::Result<()> {
+    let scope = current.scope;
+    let package_dir = local::get_package_dir(
+        scope,
+        &current.registry_handle,
+        &current.repo,
+        &current.name
+    )?;
+    if target_version == current.version {
+        return Err(anyhow!(
+            "Version '{target_version}' of '{}' is already active.",
+            current.name
+        ));
+    }
+    let stored = list_stored_version_manifests(
+        &package_dir,
+        current.sub_package.as_deref()
+    );
+    let Some((_, target)) = stored.iter().find(|(v, _)| v == target_version)
+    else {
+        return Err(anyhow!(
+            "Version '{target_version}' of '{}' is not in the store.",
+            current.name
+        ));
+    };
+
+    let outside = files_outside_store(target);
+    if !outside.is_empty() {
+        let preview: Vec<&str> =
+            outside.iter().take(5).map(String::as_str).collect();
+        let more = outside.len().saturating_sub(preview.len());
+        return Err(anyhow!(
+            "Cannot roll back '{}' to {target_version} from the store: that \
+             version installed {} file(s) outside the Zoi store ({}{}), which \
+             the store does not keep a copy of. Nothing was changed. Install \
+             it explicitly instead, e.g. `zoi install {}`.",
+            current.name,
+            outside.len(),
+            preview.join(", "),
+            if more > 0 {
+                format!(", and {more} more")
+            } else {
+                String::new()
+            },
+            local::installed_manifest_source(target)
+        ));
+    }
+
+    if scope == types::Scope::System && !core_utils::is_admin() {
+        return Err(anyhow!(
+            "Rolling back the system package '{}' requires root privileges. \
+             Re-run the command with sudo or doas.",
+            current.name
+        ));
+    }
+
+    run_with_options(
+        &local::installed_manifest_source(current),
+        Some(scope),
+        yes,
+        quiet,
+        false,
+        &RunOptions {
+            keep_dependents: true,
+            activate_version: Some(target_version)
+        }
+    )?;
+    Ok(())
+}
+
+/// Internal knobs for [`run_with_options`].
+#[derive(Debug, Default)]
+struct RunOptions<'a> {
+    /// Do not refuse when other packages depend on this one. Used by
+    /// rollback, where the package stays installed.
+    keep_dependents: bool,
+    /// After removing the active version, activate exactly this stored
+    /// version instead of the newest remaining one. Fails if it is missing.
+    activate_version: Option<&'a str>
 }
 
 /// Finds an installed manifest matching the given package request.
@@ -765,12 +1052,29 @@ fn find_installed_manifest(
     }
 }
 
+/// Package definition loaded for an installed manifest.
+struct LoadedPackage {
+    /// The package definition.
+    pkg: types::Package,
+    /// Lua source of the definition, if one could be found.
+    lua_path: Option<PathBuf>,
+    /// Whether `lua_path` is the `package.pkg.lua` snapshot kept in the
+    /// version directory (as opposed to a registry fallback).
+    from_store: bool
+}
+
 /// Loads an installed package definition and its Lua source path from a
 /// manifest.
+///
+/// Prefers the `package.pkg.lua` snapshot in the store. If it is missing,
+/// the definition is resolved from the registry; if that fails too, the
+/// manifest itself is used so the package can still be removed (without
+/// running its `uninstall()` script).
 fn load_installed_package(
     manifest: &types::InstallManifest,
-    yes: bool
-) -> anyhow::Result<(types::Package, PathBuf)> {
+    yes: bool,
+    quiet: bool
+) -> anyhow::Result<LoadedPackage> {
     let installed_source_path = local::get_package_source_path(manifest)?;
     if installed_source_path.exists() {
         let path = installed_source_path.to_str().ok_or_else(|| {
@@ -786,20 +1090,140 @@ fn load_installed_package(
         pkg.scope = manifest.scope;
         pkg.registry_handle = Some(manifest.registry_handle.clone());
         pkg.sub_package.clone_from(&manifest.sub_package);
-        return Ok((pkg, installed_source_path));
+        return Ok(LoadedPackage {
+            pkg,
+            lua_path: Some(installed_source_path),
+            from_store: true
+        });
     }
 
     let source = local::installed_manifest_source(manifest);
-    let (mut pkg, _, _, pkg_lua_path, _, _, _) =
-        resolve::resolve_package_and_version(
-            &source,
-            Some(manifest.scope),
-            true,
-            yes
-        )?;
-    pkg.scope = manifest.scope;
-    pkg.sub_package.clone_from(&manifest.sub_package);
-    Ok((pkg, pkg_lua_path))
+    match resolve::resolve_package_and_version(
+        &source,
+        Some(manifest.scope),
+        true,
+        yes
+    ) {
+        Ok((mut pkg, _, _, pkg_lua_path, _, _, _)) => {
+            pkg.scope = manifest.scope;
+            pkg.sub_package.clone_from(&manifest.sub_package);
+            Ok(LoadedPackage {
+                pkg,
+                lua_path: Some(pkg_lua_path),
+                from_store: false
+            })
+        }
+        Err(e) => {
+            if !quiet {
+                eprintln!(
+                    "{} the package definition of '{}' is missing from the \
+                     store and could not be resolved from its registry ({}). \
+                     Removing it using its install manifest only; its \
+                     uninstall() script will not run.",
+                    "Warning:".yellow(),
+                    manifest.name,
+                    e
+                );
+            }
+            let mut pkg = manifest.clone().into_package();
+            pkg.description.clone_from(&manifest.description);
+            Ok(LoadedPackage {
+                pkg,
+                lua_path: None,
+                from_store: false
+            })
+        }
+    }
+}
+
+/// Runs a package's Lua `uninstall()` function and the `zrm` operations it
+/// queued.
+///
+/// `lua_from_store` tells whether `pkg_lua_path` is the snapshot kept in the
+/// version directory; only then is it required to stay inside that
+/// directory. A registry fallback lives in the synced registry tree and is
+/// read directly.
+fn run_lua_uninstall(
+    pkg_lua_path: &std::path::Path,
+    lua_from_store: bool,
+    manifest: &types::InstallManifest,
+    version_dir: &std::path::Path,
+    scope: types::Scope,
+    quiet: bool
+) -> anyhow::Result<()> {
+    let lua = Lua::new();
+    // `cmd` and other build-time APIs need a real working directory; the
+    // uninstall script gets a throwaway one that is removed afterwards.
+    let work_dir = tempfile::Builder::new()
+        .prefix("zoi-uninstall-")
+        .tempdir()?;
+    let work_dir_str = work_dir.path().to_string_lossy().to_string();
+    zoi_lua::functions::setup_lua_environment(
+        &lua,
+        &core_utils::get_platform()?,
+        Some(&manifest.version),
+        pkg_lua_path.to_str(),
+        None,
+        Some(&work_dir_str),
+        None,
+        manifest.sub_package.as_deref(),
+        Some(scope),
+        None,
+        true
+    )
+    .map_err(|e| anyhow!(e.to_string()))?;
+    let lua_code = if lua_from_store {
+        core_utils::read_file_within(version_dir, pkg_lua_path)?
+    } else {
+        fs::read_to_string(pkg_lua_path).map_err(|e| {
+            anyhow!(
+                "Failed to read package definition {}: {e}",
+                pkg_lua_path.display()
+            )
+        })?
+    };
+    lua.load(&lua_code)
+        .exec()
+        .map_err(|e| anyhow!(e.to_string()))?;
+
+    if let Ok(uninstall_fn) = lua.globals().get::<mlua::Function>("uninstall") {
+        if !quiet {
+            println!("Running uninstall() script...");
+        }
+        uninstall_fn
+            .call::<()>(())
+            .map_err(|e| anyhow!(e.to_string()))?;
+    }
+
+    if let Ok(uninstall_ops) =
+        lua.globals().get::<mlua::Table>("__ZoiUninstallOperations")
+    {
+        for op in uninstall_ops.sequence_values::<mlua::Table>() {
+            let op = op.map_err(|e| anyhow!(e.to_string()))?;
+            if let Ok(op_type) = op.get::<String>("op")
+                && op_type == "zrm"
+            {
+                let path_to_remove: String =
+                    op.get("path").map_err(|e| anyhow!(e.to_string()))?;
+                let path = PathBuf::from(core_utils::expand_placeholders(
+                    &path_to_remove,
+                    version_dir,
+                    scope
+                )?);
+                if path.exists() {
+                    if !quiet {
+                        println!("Removing {}...", path.display());
+                    }
+                    if path.is_dir() {
+                        fs::remove_dir_all(path)?;
+                    } else {
+                        fs::remove_file(path)?;
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Uninstalls one or more packages from the system.
@@ -835,6 +1259,25 @@ pub fn run(
     yes: bool,
     quiet: bool,
     dry_run: bool
+) -> anyhow::Result<types::InstallManifest> {
+    run_with_options(
+        package_name,
+        scope_override,
+        yes,
+        quiet,
+        dry_run,
+        &RunOptions::default()
+    )
+}
+
+/// Implementation of [`run`] with the internal [`RunOptions`] knobs.
+fn run_with_options(
+    package_name: &str,
+    scope_override: Option<types::Scope>,
+    yes: bool,
+    quiet: bool,
+    dry_run: bool,
+    opts: &RunOptions<'_>
 ) -> anyhow::Result<types::InstallManifest> {
     let request = resolve::parse_source_string(package_name)?;
     // Resolve the package identity through the active (`latest`) manifest,
@@ -929,7 +1372,11 @@ pub fn run(
     }
     let sub_package_to_uninstall = manifest.sub_package.clone();
     let registry_handle = Some(manifest.registry_handle.clone());
-    let (pkg, pkg_lua_path) = load_installed_package(&manifest, yes)?;
+    let LoadedPackage {
+        pkg,
+        lua_path: pkg_lua_path,
+        from_store: lua_from_store
+    } = load_installed_package(&manifest, yes, quiet)?;
 
     if pkg.package_type == types::PackageType::Collection {
         return uninstall_collection(
@@ -953,7 +1400,7 @@ pub fn run(
     let version_dir = package_dir.join(&manifest.version);
 
     let dependents = local::get_dependents(&package_dir)?;
-    if !dependents.is_empty() {
+    if !opts.keep_dependents && !dependents.is_empty() {
         return Err(anyhow::anyhow!(
             "Cannot uninstall '{}' because other packages depend on it:\n  \
              -{}\n\nPlease uninstall these packages first.",
@@ -1008,67 +1455,15 @@ pub fn run(
             return Err(anyhow::anyhow!("Pre-remove hook failed: {e}"));
         }
 
-        let lua = Lua::new();
-        zoi_lua::functions::setup_lua_environment(
-            &lua,
-            &core_utils::get_platform()?,
-            Some(&manifest.version),
-            pkg_lua_path.to_str(),
-            None,
-            None,
-            None,
-            sub_package_to_uninstall.as_deref(),
-            Some(scope),
-            None,
-            true
-        )
-        .map_err(|e| anyhow!(e.to_string()))?;
-        let lua_code =
-            core_utils::read_file_within(&version_dir, &pkg_lua_path)?;
-        lua.load(&lua_code)
-            .exec()
-            .map_err(|e| anyhow!(e.to_string()))?;
-
-        if let Ok(uninstall_fn) =
-            lua.globals().get::<mlua::Function>("uninstall")
-        {
-            if !quiet {
-                println!("Running uninstall() script...");
-            }
-            uninstall_fn
-                .call::<()>(())
-                .map_err(|e| anyhow!(e.to_string()))?;
-        }
-
-        if let Ok(uninstall_ops) =
-            lua.globals().get::<mlua::Table>("__ZoiUninstallOperations")
-        {
-            for op in uninstall_ops.sequence_values::<mlua::Table>() {
-                let op = op.map_err(|e| anyhow!(e.to_string()))?;
-                if let Ok(op_type) = op.get::<String>("op")
-                    && op_type == "zrm"
-                {
-                    let path_to_remove: String =
-                        op.get("path").map_err(|e| anyhow!(e.to_string()))?;
-                    let path = std::path::PathBuf::from(
-                        core_utils::expand_placeholders(
-                            &path_to_remove,
-                            &version_dir,
-                            scope
-                        )?
-                    );
-                    if path.exists() {
-                        if !quiet {
-                            println!("Removing {}...", path.display());
-                        }
-                        if path.is_dir() {
-                            fs::remove_dir_all(path)?;
-                        } else {
-                            fs::remove_file(path)?;
-                        }
-                    }
-                }
-            }
+        if let Some(pkg_lua_path) = &pkg_lua_path {
+            run_lua_uninstall(
+                pkg_lua_path,
+                lua_from_store,
+                &manifest,
+                &version_dir,
+                scope,
+                quiet
+            )?;
         }
 
         if let Some(backup_files) = &manifest.backup {
@@ -1146,17 +1541,47 @@ pub fn run(
             );
         }
 
+        // One connection for every ownership query below instead of one per
+        // shim/file.
+        let db_conn = match db::open_connection("local") {
+            Ok(conn) => Some(conn),
+            Err(e) => {
+                if !quiet {
+                    eprintln!(
+                        "{} could not open the package database ({e}); shims \
+                         and files are removed without checking for other \
+                         owners.",
+                        "Warning:".yellow()
+                    );
+                }
+                None
+            }
+        };
+        // Exact, scope-filtered check: is `bin` provided by an installed
+        // package other than the one being removed?
+        let bin_provided_by_others = |bin: &str| -> bool {
+            let Some(conn) = db_conn.as_ref() else {
+                return false;
+            };
+            db::find_exact_bin_providers(conn, bin, Some(scope)).is_ok_and(
+                |providers| {
+                    providers.iter().any(|p| {
+                        !(p.name == manifest.name
+                            && p.sub_package == manifest.sub_package
+                            && p.repo == manifest.repo
+                            && p.registry.as_deref()
+                                == Some(manifest.registry_handle.as_str()))
+                    })
+                }
+            )
+        };
+
         if let Some(bins) = &manifest.bins {
             let bin_root = get_bin_root(scope)?;
             for bin in bins {
                 let symlink_path = bin_root.join(bin);
                 if symlink_path.is_symlink() || symlink_path.exists() {
-                    let other_providers = db::find_provides("local", bin)?;
-                    let still_provided =
-                        other_providers.iter().any(|(p, _)| {
-                            p.name != pkg.name
-                                || (p.sub_package != manifest.sub_package)
-                        });
+                    let still_provided = bin_provided_by_others(bin);
 
                     if still_provided {
                         if !quiet {
@@ -1182,13 +1607,17 @@ pub fn run(
             let bin = &pkg.name;
             let symlink_path = get_bin_root(scope)?.join(bin);
             if symlink_path.is_symlink() || symlink_path.exists() {
-                let other_providers = db::find_provides("local", bin)?;
-                let still_provided = other_providers.iter().any(|(p, _)| {
-                    p.name != pkg.name
-                        || (p.sub_package != manifest.sub_package)
-                });
+                let still_provided = bin_provided_by_others(bin);
 
-                if !still_provided {
+                if still_provided {
+                    if !quiet {
+                        println!(
+                            "Keeping shim for {} as it is still provided by \
+                             other packages.",
+                            bin.cyan()
+                        );
+                    }
+                } else {
                     if !quiet {
                         println!(
                             "Removing shim for {} from {}...",
@@ -1202,19 +1631,36 @@ pub fn run(
         }
 
         if let Some(completions) = &manifest.completions {
+            // Completion links live under `<root>/<package name>/`, so only
+            // another installed package with the same name in this scope
+            // (different sub-package, repo or registry) that ships the same
+            // completion file can share a link.
+            let same_name_others: Vec<types::InstallManifest> =
+                local::get_installed_manifests_in_scope(scope)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|m| {
+                        m.name == manifest.name
+                            && !(m.sub_package == manifest.sub_package
+                                && m.repo == manifest.repo
+                                && m.registry_handle
+                                    == manifest.registry_handle)
+                    })
+                    .collect();
             for completion in completions {
                 let completions_root =
                     get_completions_root(scope, &completion.shell)?;
                 let pkg_dir = completions_root.join(&pkg.name);
                 let symlink_path = pkg_dir.join(&completion.filename);
                 if symlink_path.is_symlink() || symlink_path.exists() {
-                    let other_providers =
-                        db::find_provides("local", &completion.filename)?;
-                    let still_provided =
-                        other_providers.iter().any(|(p, _)| {
-                            p.name != pkg.name
-                                || (p.sub_package != manifest.sub_package)
-                        });
+                    let still_provided = same_name_others.iter().any(|m| {
+                        m.completions.as_ref().is_some_and(|cs| {
+                            cs.iter().any(|c| {
+                                c.shell == completion.shell
+                                    && c.filename == completion.filename
+                            })
+                        })
+                    });
 
                     if !still_provided {
                         if !quiet {
@@ -1251,18 +1697,17 @@ pub fn run(
             }
         }
 
-        let pkg_id_opt = if let Ok(conn) = db::open_connection("local") {
-            db::get_package_id(
-                &conn,
+        let pkg_id_opt = db_conn.as_ref().and_then(|conn| {
+            db::get_package_id_scoped(
+                conn,
                 &pkg.name,
                 manifest.sub_package.as_deref(),
                 &pkg.repo,
-                handle
+                handle,
+                Some(scope)
             )
             .ok()
-        } else {
-            None
-        };
+        });
 
         for file_path_str in &manifest.installed_files {
             let expanded = core_utils::expand_placeholders(
@@ -1272,30 +1717,15 @@ pub fn run(
             )?;
             let file_path = PathBuf::from(&expanded);
 
-            if let Some(pkg_id) = pkg_id_opt
-                && let Ok(conn) = db::open_connection("local")
-                && let Ok(true) =
-                    db::has_other_owners(&conn, file_path_str, pkg_id)
-            {
-                if !quiet {
-                    println!(
-                        "Keeping {} as it is still owned by other packages.",
-                        file_path_str.dimmed()
-                    );
-                }
-                continue;
-            }
-
             // Use symlink_metadata so links are removed even when they dangle
             // or point to a non-empty directory; only the link is deleted.
             let Ok(meta) = fs::symlink_metadata(&file_path) else {
                 continue;
             };
 
-            if let Some(pkg_id) = pkg_id_opt
-                && let Ok(conn) = db::open_connection("local")
+            if let (Some(conn), Some(pkg_id)) = (db_conn.as_ref(), pkg_id_opt)
                 && let Ok(true) =
-                    db::has_other_owners(&conn, file_path_str, pkg_id)
+                    db::has_other_owners(conn, file_path_str, pkg_id)
             {
                 if !quiet {
                     println!(
@@ -1389,50 +1819,38 @@ pub fn run(
             }
         }
 
-        let parent_id = format!(
-            "#{}@{}/{}@{}",
-            manifest.registry_handle,
-            manifest.repo,
-            manifest.name,
-            manifest.version
-        );
+        // `remove_dependent` also matches the install-graph shape
+        // (`#handle@repo/name@version`, without the sub-package), so links
+        // recorded in either format are cleaned up.
+        let parent_id = local::installed_manifest_source(&manifest);
         for dep_str in &manifest.installed_dependencies {
-            if let Ok(dep) = dependencies::parse_dependency_string(dep_str)
-                && dep.manager == "zoi"
+            if let Some(dep_source) = zoi_dependency_source(dep_str)
+                && let Some(dep_manifest) =
+                    find_dependency_manifest(dep_source, scope)
             {
-                let dep_req = resolve::parse_source_string(dep.package)?;
-                let dep_matches =
-                    local::find_installed_manifests_matching(&dep_req, scope)?;
-                if dep_matches.len() == 1 {
-                    let dep_manifest =
-                        dep_matches.first().expect("Already checked length");
-                    match local::get_package_dir(
-                        dep_manifest.scope,
-                        &dep_manifest.registry_handle,
-                        &dep_manifest.repo,
-                        &dep_manifest.name
-                    ) {
-                        Ok(dep_pkg_dir) => {
-                            if let Err(e) = local::remove_dependent(
-                                &dep_pkg_dir,
-                                &parent_id
-                            ) && !quiet
-                            {
-                                eprintln!(
-                                    "Warning: failed to remove dependent link \
-                                     for {}: {}",
-                                    dep.package, e
-                                );
-                            }
+                match local::get_package_dir(
+                    dep_manifest.scope,
+                    &dep_manifest.registry_handle,
+                    &dep_manifest.repo,
+                    &dep_manifest.name
+                ) {
+                    Ok(dep_pkg_dir) => {
+                        if let Err(e) =
+                            local::remove_dependent(&dep_pkg_dir, &parent_id)
+                            && !quiet
+                        {
+                            eprintln!(
+                                "Warning: failed to remove dependent link for \
+                                 {dep_source}: {e}"
+                            );
                         }
-                        Err(e) => {
-                            if !quiet {
-                                eprintln!(
-                                    "Warning: failed to get package dir for \
-                                     {}: {}",
-                                    dep.package, e
-                                );
-                            }
+                    }
+                    Err(e) => {
+                        if !quiet {
+                            eprintln!(
+                                "Warning: failed to get package dir for \
+                                 {dep_source}: {e}"
+                            );
                         }
                     }
                 }
@@ -1462,10 +1880,32 @@ pub fn run(
     } else {
         Vec::new()
     };
+    // Rollback asked for a specific stored version; it was validated before
+    // anything was removed, so its absence here means the store changed
+    // underneath us.
+    let requested_activation = match opts.activate_version {
+        Some(target) => {
+            let Some(found) =
+                remaining.iter().find(|(v, _)| v == target).cloned()
+            else {
+                return Err(anyhow!(
+                    "Version {target} of '{}' disappeared from the store \
+                     while rolling back; version {} was already removed. \
+                     Reinstall the package with `zoi install`.",
+                    pkg.name,
+                    manifest.version
+                ));
+            };
+            Some(found)
+        }
+        None => None
+    };
     if !remaining.is_empty() {
-        if request.version_spec.is_some() {
-            let (prev_version, prev_manifest) =
-                remaining.last().expect("remaining is not empty").clone();
+        if requested_activation.is_some() || request.version_spec.is_some() {
+            let (prev_version, prev_manifest) = requested_activation
+                .unwrap_or_else(|| {
+                    remaining.last().expect("remaining is not empty").clone()
+                });
             if !quiet {
                 println!(
                     "Version {} still available in the store. Rolling back \
@@ -1496,7 +1936,7 @@ pub fn run(
                     return Ok(manifest);
                 }
                 Err(e) => {
-                    if needs_escalation {
+                    if needs_escalation && opts.activate_version.is_none() {
                         eprintln!(
                             "{} rollback activation needs root and failed \
                              ({}); the old version stays in the store.",
@@ -1595,7 +2035,8 @@ pub fn run(
             &pkg.name,
             sub_package_to_uninstall.as_deref(),
             &pkg.repo,
-            Some(scope)
+            Some(scope),
+            Some(&manifest.registry_handle)
         );
     }
 

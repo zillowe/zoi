@@ -61,9 +61,7 @@ pub fn add_verify_hash(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             let p = Path::new(&file_path);
             let actual_path = if p.exists() {
                 p.to_path_buf()
-            } else if let Ok(build_dir) =
-                lua.globals().get::<String>("BUILD_DIR")
-            {
+            } else if let Some(build_dir) = super::opt_build_dir(lua) {
                 Path::new(&build_dir).join(p)
             } else {
                 p.to_path_buf()
@@ -155,9 +153,7 @@ pub fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 let p = Path::new(p_str);
                 if p.exists() {
                     p.to_path_buf()
-                } else if let Ok(build_dir) =
-                    lua.globals().get::<String>("BUILD_DIR")
-                {
+                } else if let Some(build_dir) = super::opt_build_dir(lua) {
                     Path::new(&build_dir).join(p)
                 } else {
                     p.to_path_buf()
@@ -189,6 +185,14 @@ pub fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                         }
                     }
                 } else {
+                    if let Err(e) =
+                        zoi_core::pgp::validate_key_name(&key_source)
+                    {
+                        return Err(mlua::Error::RuntimeError(format!(
+                            "verifySignature: key '{key_source}' is neither \
+                             an existing file nor a valid key name: {e}"
+                        )));
+                    }
                     let pgp_dir = match zoi_core::pgp::get_pgp_dir() {
                         Ok(dir) => dir,
                         Err(e) => {
@@ -304,6 +308,15 @@ pub fn add_add_pgp_key(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 }
             };
 
+            // The name becomes a file name in the keyring: it must be a single
+            // plain path component. (The keyring itself also refuses to
+            // replace an existing key that has a different fingerprint.)
+            if let Err(e) = zoi_core::pgp::validate_key_name(&name) {
+                return Err(mlua::Error::RuntimeError(format!(
+                    "addPgpKey: {e}"
+                )));
+            }
+
             let result = if source.starts_with("http") {
                 zoi_core::pgp::add_key_from_url(&source, &name, quiet)
             } else if is_key_fingerprint(&source) {
@@ -317,9 +330,7 @@ pub fn add_add_pgp_key(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 let p = Path::new(&source);
                 let actual_path = if p.exists() {
                     p.to_path_buf()
-                } else if let Ok(build_dir) =
-                    lua.globals().get::<String>("BUILD_DIR")
-                {
+                } else if let Some(build_dir) = super::opt_build_dir(lua) {
                     Path::new(&build_dir).join(p)
                 } else {
                     p.to_path_buf()

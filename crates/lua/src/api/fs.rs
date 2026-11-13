@@ -288,7 +288,7 @@ pub fn add_zshell(lua: &Lua) -> Result<(), mlua::Error> {
 pub fn add_zsed(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let zsed_fn = lua.create_function(
         move |lua, (pattern, replacement, file): (String, String, String)| {
-            let build_dir_str: String = lua.globals().get("BUILD_DIR")?;
+            let build_dir_str = super::build_dir(lua)?;
             let path = Path::new(&build_dir_str).join(&file);
 
             let content = std::fs::read_to_string(&path).map_err(|e| {
@@ -476,7 +476,7 @@ pub fn add_fs_util(lua: &Lua) -> Result<(), mlua::Error> {
         if p.exists() {
             return Ok(true);
         }
-        if let Ok(build_dir) = lua.globals().get::<String>("BUILD_DIR")
+        if let Some(build_dir) = super::opt_build_dir(lua)
             && Path::new(&build_dir).join(p).exists()
         {
             return Ok(true);
@@ -538,7 +538,7 @@ pub fn add_find_util(lua: &Lua) -> Result<(), mlua::Error> {
 
     let find_file_fn =
         lua.create_function(|lua, (dir, name): (String, String)| {
-            let build_dir_str: String = lua.globals().get("BUILD_DIR")?;
+            let build_dir_str = super::build_dir(lua)?;
             let search_dir = Path::new(&build_dir_str).join(dir);
             for entry in WalkDir::new(search_dir) {
                 let entry = entry

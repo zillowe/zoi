@@ -109,6 +109,20 @@ pub fn pool_files(
             #[cfg(not(unix))]
             let mode = None;
 
+            // Outside the package store, a staged directory that merely holds
+            // files (`usr`, `usr/bin`, `.config`, ...) is a shared system or
+            // home directory, not something the package owns. Recording it
+            // would make installation re-apply the builder's mode and owner
+            // to it. Only empty directories (created on purpose) and ones
+            // given a non-default mode are recorded; installation creates
+            // any other parents on demand.
+            if dest_prefix != "${pkgstore}"
+                && fs::read_dir(path)?.next().is_some()
+                && mode.is_none_or(|m| m == 0o755)
+            {
+                continue;
+            }
+
             scope_mapping.dirs.push(MappedDir {
                 path: dest,
                 mode,

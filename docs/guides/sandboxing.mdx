@@ -162,8 +162,8 @@ They are strictly confined to `~/.mozilla` and `~/Downloads`.
 | `system`  | `boolean`. If `true`, read-only mounts `/usr`, `/lib`, `/bin`, `/sbin`, `/etc/ssl`, and basic DNS configs, and mounts `/dev` and `/proc`. Required for dynamically linked apps. |
 | `cwd`     | `boolean`. If `true`, the current terminal working directory is mounted read-write.                                                                                             |
 | `read`    | `string[]`. A list of paths to mount read-only. Supports `~/` expansion.                                                                                                        |
-| `write`   | `string[]`. A list of paths to mount read-write. Zoi will attempt to create the parent directories on the host if they don't exist. Supports `~/` expansion.                    |
-| `env`     | `string[]`. A list of host environment variables to pass through to the sandbox. (Note: If `system = true`, common GUI/Display variables are passed automatically).             |
+| `write`   | `string[]`. A list of paths to mount read-write. Supports `~/` expansion. Paths must be inside your home directory (not the home directory itself), the Zoi data directory, or the package store; `..` is rejected and other paths are ignored with a warning. Missing paths are only created once they pass this check. |
+| `env`     | `string[]`. A list of host environment variables to pass through to the sandbox. (Note: If `system = true`, common GUI/Display variables are passed automatically). Secret-looking names (containing `TOKEN`, `SECRET`, `PASSWORD`, `CREDENTIAL`, `PRIVATE`, ending in `_KEY`, starting with `AWS_`, and similar) are never forwarded. |
 
 ## Testing Your Sandbox
 

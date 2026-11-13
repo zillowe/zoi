@@ -106,7 +106,17 @@ pub fn wrap_command(
     }
 
     for path_str in &config.write {
-        let path = expand_home(path_str)?;
+        // Write paths come from package metadata. Only paths inside the
+        // user's home (but not the home directory itself), Zoi's user data
+        // directory or the package's own store directory are honoured, and
+        // nothing is created on the host before that check passes.
+        let path = match resolve_sandbox_write_path(path_str, pkg_store_path) {
+            Ok(path) => path,
+            Err(e) => {
+                eprintln!("Warning: ignoring sandbox write path: {e}");
+                continue;
+            }
+        };
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
@@ -116,6 +126,9 @@ pub fn wrap_command(
             } else {
                 let _ = std::fs::File::create(&path);
             }
+        }
+        if !path.exists() {
+            continue;
         }
         bwrap.arg("--bind").arg(&path).arg(&path);
     }
@@ -155,6 +168,13 @@ pub fn wrap_command(
     }
 
     for var in &config.env {
+        if is_sensitive_env_var(var) {
+            eprintln!(
+                "Warning: not forwarding sensitive environment variable \
+                 '{var}' into the sandbox."
+            );
+            continue;
+        }
         if let Ok(val) = std::env::var(var) {
             bwrap.arg("--setenv").arg(var).arg(val);
         }
@@ -168,11 +188,25 @@ pub fn wrap_command(
     Ok(bwrap)
 }
 
+/// Selects how much of the host a sysroot sandbox may touch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RootProfile {
+    /// Root hooks, `exec` and `shell` inside a sysroot. Host devices are
+    /// bound (`--dev-bind /dev`) and `/sys` is writable, because tools such as
+    /// bootloader installers need real hardware access.
+    System,
+    /// Package builds (`--pure`). Only a minimal, synthetic `/dev` is provided
+    /// (`--dev /dev`) and `/sys` is mounted read-only. Networking is kept so
+    /// builds can fetch sources.
+    Build
+}
+
 /// Wraps a command in a sysroot (chroot-like) using Bubblewrap on Linux.
 ///
 /// This binds the host's sysroot directory to '/' in the sandbox,
 /// and provides access to essential system devices and kernels (/dev, /proc,
-/// /sys).
+/// /sys). It uses [`RootProfile::System`]; package builds should use
+/// [`wrap_command_in_root_with_profile`] with [`RootProfile::Build`].
 ///
 /// # Errors
 ///
@@ -187,6 +221,35 @@ pub fn wrap_command_in_root<S: std::hash::BuildHasher>(
     env: &std::collections::HashMap<String, String, S>,
     extra_binds: &[(PathBuf, PathBuf)],
     fakeroot: bool
+) -> Result<Command> {
+    wrap_command_in_root_with_profile(
+        sysroot,
+        exe_inside_root,
+        args,
+        env,
+        extra_binds,
+        fakeroot,
+        RootProfile::System
+    )
+}
+
+/// Wraps a command in a sysroot using Bubblewrap with an explicit
+/// [`RootProfile`].
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Bubblewrap (`bwrap`) is not found.
+/// - The sysroot path cannot be canonicalized.
+/// - Essential directories cannot be created in the sysroot.
+pub fn wrap_command_in_root_with_profile<S: std::hash::BuildHasher>(
+    sysroot: &Path,
+    exe_inside_root: &Path,
+    args: &[String],
+    env: &std::collections::HashMap<String, String, S>,
+    extra_binds: &[(PathBuf, PathBuf)],
+    fakeroot: bool,
+    profile: RootProfile
 ) -> Result<Command> {
     if !zoi_core::utils::command_exists("bwrap") {
         return Err(anyhow!(
@@ -264,11 +327,23 @@ pub fn wrap_command_in_root<S: std::hash::BuildHasher>(
         }
     }
 
-    // Essential system mounts for hardware interaction (grub, etc)
-    // Use --dev-bind to give full access to host devices
-    bwrap.arg("--dev-bind").arg("/dev").arg("/dev");
-    bwrap.arg("--proc").arg("/proc");
-    bwrap.arg("--bind").arg("/sys").arg("/sys");
+    match profile {
+        RootProfile::System => {
+            // Essential system mounts for hardware interaction (grub, etc)
+            // Use --dev-bind to give full access to host devices
+            bwrap.arg("--dev-bind").arg("/dev").arg("/dev");
+            bwrap.arg("--proc").arg("/proc");
+            bwrap.arg("--bind").arg("/sys").arg("/sys");
+        }
+        RootProfile::Build => {
+            // Builds get a minimal synthetic /dev (null, zero, random, tty,
+            // ...) and a read-only /sys: no host block devices, no writable
+            // kernel knobs.
+            bwrap.arg("--dev").arg("/dev");
+            bwrap.arg("--proc").arg("/proc");
+            bwrap.arg("--ro-bind").arg("/sys").arg("/sys");
+        }
+    }
     bwrap.arg("--tmpfs").arg("/run");
     bwrap.arg("--tmpfs").arg("/tmp");
     bwrap.arg("--tmpfs").arg("/var/run");
@@ -297,6 +372,135 @@ pub fn wrap_command_in_root<S: std::hash::BuildHasher>(
     bwrap.args(args);
 
     Ok(bwrap)
+}
+
+/// Reports whether an environment variable name looks like it carries a secret
+/// and must therefore never be forwarded into a sandbox, even when a package
+/// asks for it.
+///
+/// Matches (case-insensitively) names containing `TOKEN`, `SECRET`,
+/// `PASSWORD`, `PASSWD`, `PASSPHRASE`, `CREDENTIAL` or `PRIVATE`, names ending
+/// in `_KEY`, `_PASS` or `_AUTH`, cloud credential prefixes (`AWS_`, `AZURE_`,
+/// `GOOGLE_APPLICATION_CREDENTIALS`) and a few well-known agent variables
+/// (`GPG_PASSWORD`, `SSH_AUTH_SOCK`, `GPG_AGENT_INFO`).
+pub fn is_sensitive_env_var(name: &str) -> bool {
+    const EXACT: &[&str] = &[
+        "GPG_PASSWORD",
+        "SSH_AUTH_SOCK",
+        "GPG_AGENT_INFO",
+        "KEY",
+        "GOOGLE_APPLICATION_CREDENTIALS"
+    ];
+    const CONTAINS: &[&str] = &[
+        "TOKEN",
+        "SECRET",
+        "PASSWORD",
+        "PASSWD",
+        "PASSPHRASE",
+        "CREDENTIAL",
+        "PRIVATE"
+    ];
+    const PREFIXES: &[&str] = &["AWS_", "AZURE_"];
+    const SUFFIXES: &[&str] = &["_KEY", "_PASS", "_AUTH"];
+
+    let upper = name.to_ascii_uppercase();
+    EXACT.contains(&upper.as_str())
+        || CONTAINS.iter().any(|needle| upper.contains(needle))
+        || PREFIXES.iter().any(|prefix| upper.starts_with(prefix))
+        || SUFFIXES.iter().any(|suffix| upper.ends_with(suffix))
+}
+
+/// Resolves a sandbox `write` path from package metadata and checks that it is
+/// allowed.
+///
+/// The path (after `~/` expansion) must be absolute, must not contain `..`
+/// components, and must lie strictly inside the user's home directory, inside
+/// Zoi's user data directory, or inside `pkg_store_path`. The home directory
+/// itself is rejected because binding it writable would defeat the sandbox.
+/// Symlinks in the existing part of the path are resolved before the check.
+///
+/// # Errors
+///
+/// Returns an error describing why the path was rejected.
+pub fn resolve_sandbox_write_path(
+    path_str: &str,
+    pkg_store_path: &Path
+) -> Result<PathBuf> {
+    let path = expand_home(path_str)?;
+    if !path.is_absolute() {
+        return Err(anyhow!("'{path_str}' is not an absolute path"));
+    }
+    if path
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err(anyhow!("'{path_str}' contains '..'"));
+    }
+
+    let home = zoi_core::utils::get_user_home().map(|h| canonical_or_self(&h));
+    let store = canonical_or_self(pkg_store_path);
+    let mut roots: Vec<PathBuf> = Vec::new();
+    if let Some(home) = &home {
+        roots.push(home.clone());
+    }
+    if let Ok(data_dir) = zoi_core::utils::get_user_data_dir() {
+        roots.push(canonical_or_self(&data_dir));
+    }
+
+    let resolved = resolve_existing_prefix(&path);
+
+    if home.as_deref() == Some(resolved.as_path()) {
+        return Err(anyhow!(
+            "'{path_str}' is the home directory itself; request specific \
+             subdirectories instead"
+        ));
+    }
+
+    // Strictly below the home or data directory, or the package's own store
+    // directory (or anything below it).
+    let allowed = resolved.starts_with(&store)
+        || roots
+            .iter()
+            .any(|root| resolved.starts_with(root) && resolved != *root);
+    if !allowed {
+        return Err(anyhow!(
+            "'{path_str}' is outside the user's home directory and the \
+             package's data directories"
+        ));
+    }
+
+    Ok(path)
+}
+
+/// Canonicalizes a path, falling back to the path itself when it does not
+/// exist.
+fn canonical_or_self(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// Resolves symlinks in the longest existing prefix of `path` and re-appends
+/// the not-yet-existing remainder.
+fn resolve_existing_prefix(path: &Path) -> PathBuf {
+    let mut existing = path.to_path_buf();
+    let mut remainder = Vec::new();
+    loop {
+        if let Ok(canonical) = std::fs::canonicalize(&existing) {
+            let mut result = canonical;
+            for part in remainder.iter().rev() {
+                result.push(part);
+            }
+            return result;
+        }
+        let Some(name) =
+            existing.file_name().map(std::ffi::OsStr::to_os_string)
+        else {
+            return path.to_path_buf();
+        };
+        remainder.push(name);
+        if !existing.pop() {
+            return path.to_path_buf();
+        }
+    }
 }
 
 /// Expands the `~/` prefix in a path string to the user's home directory.

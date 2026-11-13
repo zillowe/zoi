@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
 use anyhow::{Result, anyhow};
 use pubgrub::{DependencyProvider, Ranges, resolve as pubgrub_resolve};
@@ -293,19 +293,31 @@ pub fn build_graph_from_locked_packages(
 
     let direct_id_set: HashSet<String> = direct_ids.iter().cloned().collect();
 
+    // The reason records a single parent for display, in the same
+    // dependent-ID format (`#handle@repo/name[:sub]@version`) the normal
+    // resolution path, uninstall and rollback use; every
+    // parent gets its own dependent link at install time
+    // (`installer::link_dependents`). The smallest ID is picked so the
+    // choice does not depend on hash-map iteration order.
     let mut parent_map = HashMap::new();
     for (pkg_id, parents) in &reverse_deps {
-        if !direct_id_set.contains(pkg_id)
-            && let Some(parent_id) = parents.first()
-            && let Some(parent_node) = graph.nodes.get(parent_id)
-        {
-            let parent_source = zoi_resolver::local::package_source_string(
-                &parent_node.registry_handle,
-                &parent_node.pkg.repo,
-                &parent_node.pkg.name,
-                parent_node.sub_package.as_deref(),
-                &parent_node.version
-            );
+        if direct_id_set.contains(pkg_id) {
+            continue;
+        }
+        let parent_source = parents
+            .iter()
+            .filter_map(|parent_id| graph.nodes.get(parent_id))
+            .map(|parent_node| {
+                crate::installer::dependent_id(
+                    &parent_node.registry_handle,
+                    &parent_node.pkg.repo,
+                    &parent_node.pkg.name,
+                    parent_node.sub_package.as_deref(),
+                    &parent_node.version
+                )
+            })
+            .min();
+        if let Some(parent_source) = parent_source {
             parent_map.insert(pkg_id.clone(), parent_source);
         }
     }
@@ -593,22 +605,28 @@ pub fn resolve_dependency_graph(
                 direct_ids.clone_from(root_children);
             }
 
-            let mut parent_map = HashMap::new();
+            // Every parent of a node is tracked, not just the first one seen.
+            // The reason stores one of them (the smallest, so the choice is
+            // deterministic) for display; each parent records its own
+            // dependent link at install time (`installer::link_dependents`).
+            let mut parent_map: HashMap<String, BTreeSet<String>> =
+                HashMap::new();
             for (from, to_set) in &final_adj {
                 if from != "$root"
                     && let Some(parent_node) = final_nodes.get(from)
                 {
-                    let parent_id = format!(
-                        "#{}@{}/{}@{}",
-                        parent_node.registry_handle,
-                        parent_node.pkg.repo,
-                        parent_node.pkg.name,
-                        parent_node.version
+                    let parent_id = crate::installer::dependent_id(
+                        &parent_node.registry_handle,
+                        &parent_node.pkg.repo,
+                        &parent_node.pkg.name,
+                        parent_node.sub_package.as_deref(),
+                        &parent_node.version
                     );
                     for to in to_set {
                         parent_map
                             .entry(to.clone())
-                            .or_insert(parent_id.clone());
+                            .or_default()
+                            .insert(parent_id.clone());
                     }
                 }
             }
@@ -649,7 +667,7 @@ pub fn resolve_dependency_graph(
                 } else {
                     let parent_id = parent_map
                         .get(pkg_id)
-                        .cloned()
+                        .and_then(|parents| parents.iter().next().cloned())
                         .unwrap_or_else(|| "unknown".to_string());
                     node.reason =
                         InstallReason::Dependency { parent: parent_id };

@@ -49,13 +49,27 @@ fn clone_repository(
     if let Some(parent) = destination.parent() {
         std::fs::create_dir_all(parent)?;
     }
+    let url = repository_url(repository)?;
+    // An option-like URL (e.g. `--upload-pack=...`) would be interpreted by
+    // git as an option and can run arbitrary commands. Reject it before any
+    // filesystem change, and end option parsing with `--`.
+    if url.starts_with('-') {
+        return Err(anyhow!(
+            "Refusing to clone import '{repository}': a git URL must not \
+             start with '-'."
+        ));
+    }
+    if let Some(revision) = revision {
+        validate_revision(revision)?;
+    }
     if destination.exists() {
         std::fs::remove_dir_all(destination)?;
     }
     let output = Command::new("git")
         .arg("clone")
         .arg("--no-tags")
-        .arg(repository_url(repository)?)
+        .arg("--")
+        .arg(url)
         .arg(destination)
         .output()
         .map_err(|error| {
@@ -73,12 +87,32 @@ fn clone_repository(
     Ok(())
 }
 
+/// Rejects revisions git would parse as an option.
+///
+/// `git checkout --detach <rev>` has no way to end option parsing before the
+/// revision (a `--` there starts a pathspec list), so a value such as
+/// `--orphan=x` must be refused up front.
+///
+/// # Errors
+///
+/// Returns an error if the revision is empty or starts with `-`.
+fn validate_revision(revision: &str) -> Result<()> {
+    if revision.is_empty() || revision.starts_with('-') {
+        return Err(anyhow!(
+            "Invalid import revision '{revision}': a git revision must not be \
+             empty or start with '-'."
+        ));
+    }
+    Ok(())
+}
+
 /// Checks out a detached repository revision.
 ///
 /// # Errors
 ///
 /// Returns an error if Git cannot check out the requested revision.
 fn checkout_revision(repository: &Path, revision: &str) -> Result<()> {
+    validate_revision(revision)?;
     let output = Command::new("git")
         .arg("-C")
         .arg(repository)

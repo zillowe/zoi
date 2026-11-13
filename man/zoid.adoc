@@ -9,11 +9,13 @@ zoid - the ZoiOS privileged system daemon
 
 == Synopsis
 
-*zoid* *start* [--foreground] [--no-packagekit]
+*zoid* *start* [-f|--foreground] [--no-packagekit]
 
 *zoid* *stop*
 
 *zoid* *--help*
+
+*zoid* *--version*
 
 == Description
 
@@ -35,6 +37,17 @@ It provides two interfaces:
   returns an object path; every query and mutation is then a method on
   `org.freedesktop.PackageKit.Transaction` at that path, and results arrive
   asynchronously as signals.
++
+Every method that changes the system (InstallPackages, InstallFiles,
+RemovePackages, UpdatePackages, UpgradeSystem, RefreshCache) is authorized
+with polkit for the calling bus client, using the upstream PackageKit action
+ids (`org.freedesktop.packagekit.package-install`,
+`package-install-untrusted`, `package-remove`, `system-update`,
+`system-sources-refresh`). Callers running as root are allowed without a
+polkit check. The PackageKit polkit policy file must be installed, otherwise
+polkit does not know these actions and every non-root request is denied.
+`CanAuthorize` reports the real answer (yes, interactive or no) instead of
+always yes.
 
 *zoid* is normally started by systemd at boot through
 `/usr/lib/systemd/system/zoid.service`.
@@ -43,9 +56,12 @@ It provides two interfaces:
 
 *start*::
   Start the daemon. With no further options the process forks into the
-  background and the parent exits.
+  background and the parent exits. The runtime directory `/run/zoid` is
+  created if it does not exist, and a pid file left by a process that is not
+  *zoid* is treated as stale. *start* exits with a non-zero status if the
+  daemon is already running or cannot be started.
 
-*--foreground*::
+*-f*, *--foreground*::
   Do not fork. This is what the systemd unit uses, because a double-forking
   daemon defeats process supervision: systemd could not observe an exec failure
   or keep track of the process it started.
@@ -58,10 +74,15 @@ It provides two interfaces:
 
 *stop*::
   Ask a running daemon to shut down. Falls back to sending `SIGTERM` to the pid
-  in `/run/zoid/zoid.pid` if the socket cannot be reached.
+  in `/run/zoid/zoid.pid` if the socket cannot be reached. Exits with a
+  non-zero status if the daemon is not running, reports an error, or cannot be
+  signalled.
 
-*--help*::
+*-h*, *--help*::
   Show usage and exit.
+
+*-V*, *--version*::
+  Print the daemon version and exit.
 
 == Kernel and boot handling
 
@@ -87,10 +108,13 @@ three.
 
 == Declarative system state
 
-*zoid system apply* asks *zoid* to reconcile the machine with a `system.lua`.
-The daemon installs and removes packages so that the installed set matches the
-configuration exactly, applies the declared users and groups, enables the
-declared services, regenerates `/etc/fstab` from the declared filesystems,
+*zoi system apply* asks *zoid* to reconcile the machine with a `system.lua`.
+While holding the store lock, the daemon first installs the configured
+packages; only if that succeeds does it remove system packages that you
+installed directly and that the configuration no longer lists (packages
+installed as dependencies are left alone). If installing fails, nothing is
+removed. It then applies the declared users and groups, enables the declared
+services, regenerates `/etc/fstab` from the declared filesystems,
 creates a new numbered generation linked to the package transaction, writes
 boot entries, and prunes old generations.
 

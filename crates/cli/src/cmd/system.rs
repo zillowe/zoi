@@ -123,6 +123,48 @@ pub enum SecretSubcommands {
     }
 }
 
+/// Returns whether a subcommand is carried out by the `zoid` daemon.
+///
+/// These operate on the daemon's host system, never on an alternate root.
+pub fn is_daemon_command(command: &SystemSubcommands) -> bool {
+    matches!(
+        command,
+        SystemSubcommands::Apply { .. }
+            | SystemSubcommands::List
+            | SystemSubcommands::Status
+            | SystemSubcommands::Rollback { .. }
+            | SystemSubcommands::Pin { .. }
+            | SystemSubcommands::Unpin { .. }
+    )
+}
+
+/// Refuses `--root` for subcommands that go through `zoid`.
+///
+/// The daemon has no notion of an alternate root: it always applies to, and
+/// reports on, the machine it runs on. Silently ignoring `--root` would make
+/// `zoi --root /mnt system apply` reconfigure the host instead of `/mnt`.
+///
+/// # Errors
+///
+/// Returns an error if `sysroot` is set and `command` is daemon-backed.
+pub fn check_root_supported(
+    command: &SystemSubcommands,
+    sysroot: Option<&std::path::Path>
+) -> Result<()> {
+    if let Some(root) = sysroot
+        && is_daemon_command(command)
+    {
+        return Err(anyhow!(
+            "'--root {}' is not supported for this command: it is carried out \
+             by the zoid daemon, which always operates on the running system. \
+             Use 'zoi system distro build' or 'zoi system distro chroot' to \
+             work with another root.",
+            root.display()
+        ));
+    }
+    Ok(())
+}
+
 /// Run the system management command.
 ///
 /// # Errors
@@ -137,6 +179,11 @@ pub enum SecretSubcommands {
 ///
 /// Returns an error if the system operation fails.
 pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
+    check_root_supported(
+        &args.command,
+        zoi_core::sysroot::get_sysroot().as_deref()
+    )?;
+
     let is_secret = matches!(args.command, SystemSubcommands::Secret { .. });
     let is_distro = matches!(args.command, SystemSubcommands::Distro { .. });
 

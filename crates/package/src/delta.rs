@@ -16,7 +16,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Component, Path};
 
 use anyhow::{Result, anyhow};
 use colored::Colorize;
@@ -31,6 +31,11 @@ use zstd::stream::read::Decoder as ZstdDecoder;
 struct ZpaContents {
     /// The pooled manifest describing content hashes and file mappings.
     manifest: PooledZpaManifest,
+    /// The exact `manifest.json` bytes from the archive. These are what an
+    /// embedded `manifest.sig` signs (and they may carry keys the struct does
+    /// not model, such as the `.pkg.lua` digest), so they must travel
+    /// verbatim rather than be re-serialized.
+    manifest_raw: Vec<u8>,
     /// Pool hash (without prefix) to raw bytes.
     pool: BTreeMap<String, Vec<u8>>,
     /// Non-pool, non-manifest entries (e.g. `.pkg.lua`), by entry name.
@@ -46,30 +51,63 @@ fn read_zpa(path: &Path) -> Result<ZpaContents> {
     let decoder = ZstdDecoder::new(file)?;
     let mut archive = Archive::new(decoder);
 
-    let mut manifest_json: Option<String> = None;
+    let mut manifest_json: Option<Vec<u8>> = None;
     let mut pool = BTreeMap::new();
     let mut extras = BTreeMap::new();
     let mut embedded_sig: Option<Vec<u8>> = None;
 
     for entry in archive.entries()? {
         let mut entry = entry?;
-        let name = entry.path()?.to_string_lossy().to_string();
-        let name = name.trim_start_matches("./").to_string();
+        let entry_path = entry.path()?.into_owned();
+        let name = normalized_entry_name(&entry_path).ok_or_else(|| {
+            anyhow!(
+                "Archive '{}' contains an entry escaping its root: {}",
+                path.display(),
+                entry_path.display()
+            )
+        })?;
 
-        if name.ends_with("manifest.sig") {
+        // The manifest and its signature are only meaningful at the archive
+        // root, exactly once. Accepting nested or repeated copies would let
+        // the copy carried forward differ from the one the installer reads.
+        let file_name = Path::new(&name)
+            .file_name()
+            .map(|f| f.to_string_lossy().to_string());
+        if matches!(
+            file_name.as_deref(),
+            Some("manifest.json" | "manifest.sig")
+        ) {
+            if name != "manifest.json" && name != "manifest.sig" {
+                return Err(anyhow!(
+                    "Archive '{}' contains a nested '{name}' entry",
+                    path.display()
+                ));
+            }
+            if !entry.header().entry_type().is_file() {
+                return Err(anyhow!(
+                    "Archive '{}' entry '{name}' is not a regular file",
+                    path.display()
+                ));
+            }
             let mut data = Vec::new();
             entry.read_to_end(&mut data)?;
-            embedded_sig = Some(data);
+            let slot = if name == "manifest.json" {
+                &mut manifest_json
+            } else {
+                &mut embedded_sig
+            };
+            if slot.is_some() {
+                return Err(anyhow!(
+                    "Archive '{}' contains more than one '{name}' entry",
+                    path.display()
+                ));
+            }
+            *slot = Some(data);
             continue;
         }
 
         let mut data = Vec::new();
         entry.read_to_end(&mut data)?;
-
-        if name.ends_with("manifest.json") && manifest_json.is_none() {
-            manifest_json = Some(String::from_utf8(data)?);
-            continue;
-        }
 
         if let Some(rest) = name.strip_prefix("pool/") {
             let file_name = Path::new(rest)
@@ -87,17 +125,35 @@ fn read_zpa(path: &Path) -> Result<ZpaContents> {
         }
     }
 
-    let manifest_json = manifest_json.ok_or_else(|| {
+    let manifest_raw = manifest_json.ok_or_else(|| {
         anyhow!("No manifest.json found in '{}'", path.display())
     })?;
-    let manifest = serde_json::from_str(&manifest_json)?;
+    let manifest = serde_json::from_slice(&manifest_raw)?;
 
     Ok(ZpaContents {
         manifest,
+        manifest_raw,
         pool,
         extras,
         embedded_sig
     })
+}
+
+/// Returns an archive entry's path the way extraction places it: root,
+/// prefix and `.` components dropped, `/`-joined. `None` when the path holds
+/// a `..` component.
+fn normalized_entry_name(path: &Path) -> Option<String> {
+    let mut parts = Vec::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(_) | Component::RootDir | Component::CurDir => {}
+            Component::ParentDir => return None,
+            Component::Normal(part) => {
+                parts.push(part.to_string_lossy().to_string());
+            }
+        }
+    }
+    Some(parts.join("/"))
 }
 
 /// Collects every distinct destination path mapped to each pool hash.
@@ -197,8 +253,11 @@ pub fn create_zpa_delta(
         }
     }
 
-    // The new manifest travels verbatim - it defines the target state.
-    files.push(("manifest.json".into(), serde_json::to_vec(&new.manifest)?));
+    // The new manifest travels verbatim - it defines the target state. The
+    // original bytes are used rather than a re-serialization, which would
+    // change formatting (invalidating an embedded signature) and drop keys
+    // the struct does not model (such as the `.pkg.lua` digest).
+    files.push(("manifest.json".into(), new.manifest_raw.clone()));
     // Carry the new archive's embedded signature forward. Because the delta
     // container stores the new manifest verbatim, the signature remains
     // valid against it.
@@ -417,6 +476,22 @@ pub fn apply_zpa_delta(
             // by the explicit pool file writes below.
             if entry_name == "pool" {
                 continue;
+            }
+            // The manifest, its signature and pool objects are written
+            // explicitly above and below; a root entry shadowing any of them
+            // would produce an archive whose duplicates the installer rejects
+            // (or worse, whose later copy wins on extraction).
+            let file_name = Path::new(entry_name)
+                .file_name()
+                .map(|f| f.to_string_lossy().to_string());
+            if matches!(
+                file_name.as_deref(),
+                Some("manifest.json" | "manifest.sig")
+            ) || entry_name.starts_with("pool/")
+            {
+                return Err(anyhow!(
+                    "Delta carries a forbidden root entry: {entry_name}"
+                ));
             }
             append_entry(&mut builder, entry_name, data)?;
         }

@@ -20,7 +20,7 @@ Each entry follows the format `manager:package[@version][:description]`. If the 
 - **Format:** `manager:package[@version][:description]`
   - Note: For `deno` dependencies, use a `-` separator instead of `:` (e.g. `deno:npm-chalk` or `deno:jsr-@std/bytes`).
 - **Virtual Packages:** You can depend on a virtual package name that is satisfied by any package that includes it in its `provides` list.
-- **Split packages:** Use the dependency group's `sub_packages` map to add dependencies that only apply to a specific sub-package. Sub-packages can depend on other sub-packages of the same package (or external packages) using `zoi:package:subpackage` (e.g. `zoi:linux:main`).
+- **Split packages:** Use the dependency group's `sub_packages` map to add dependencies that only apply to a specific sub-package. Any package can depend on a specific sub-package with `zoi:package:subpackage` (e.g. `zoi:linux:main` or `zoi:@core/gcc:libgcc`); only that sub-package is installed. The full Zoi form is `zoi:@repo/name[:subpackage][@version][:description]`. A sub-package is a single word without spaces, so a description that follows the package directly must contain a space (e.g. `zoi:@core/bubblewrap:for isolated builds`).
 - **Version:** Zoi dependencies support standard SemVer requirements such as `=1.2.3`, `>=2.0.0`, `^1.2`, and `~1.2.3`. External dependencies support exact versions and safe version forms beginning with `=`, `^`, or `~`; their package manager ultimately decides whether a version can be enforced. An optional `v` prefix is supported (e.g. `@v1.2.3`).
   - Examples: `npm:typescript@5.3.2`, `cargo:bat@v0.24.0`, `apt:curl=7.68.0-1ubuntu2.18`.
   - For `zoi` packages, you can use a channel name like `zoi:my-pkg@stable`.

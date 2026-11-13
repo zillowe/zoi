@@ -5,10 +5,20 @@ use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::hooks::global::{
     GlobalHook, HookTrigger, HookWhen, get_system_hooks_dir,
-    get_user_hooks_dir, load_all_hooks, trigger_matches_modified_files
+    get_user_hooks_dir, load_hooks_for_privilege,
+    trigger_matches_modified_files
 };
 
 mod common;
+
+/// Loads hooks the way an unprivileged run does.
+///
+/// These tests cover user-hook precedence and ordering. When Zoi runs as root
+/// (as in CI), user hook directories are intentionally ignored; that
+/// behavior is covered in `fix_security_hooks.rs`.
+fn load_unprivileged_hooks() -> Vec<GlobalHook> {
+    load_hooks_for_privilege(false).expect("hooks should load")
+}
 
 #[test]
 fn test_hook_deserialization() {
@@ -259,7 +269,7 @@ fn test_hook_loading_is_deterministic_by_name() {
     )
     .expect("user hook should write");
 
-    let hooks = load_all_hooks().expect("hooks should load");
+    let hooks = load_unprivileged_hooks();
     let names: Vec<String> = hooks
         .into_iter()
         .filter(|h| h.name.starts_with("order-test-"))
@@ -295,7 +305,7 @@ fn test_hook_loading_precedence_and_builtin_flag() {
     fs::create_dir_all(&system_hooks_dir)
         .expect("system hooks dir should be created");
 
-    let hooks = load_all_hooks().expect("hooks should load");
+    let hooks = load_unprivileged_hooks();
     let font_cache_hook = hooks.iter().find(|h| h.name == "update-font-cache");
     assert!(
         font_cache_hook.is_some(),
@@ -314,7 +324,7 @@ fn test_hook_loading_precedence_and_builtin_flag() {
     )
     .expect("system hook override should write");
 
-    let hooks = load_all_hooks().expect("hooks should load");
+    let hooks = load_unprivileged_hooks();
     let font_cache_hook = hooks
         .iter()
         .find(|h| h.name == "update-font-cache")
@@ -332,7 +342,7 @@ fn test_hook_loading_precedence_and_builtin_flag() {
     )
     .expect("user hook override should write");
 
-    let hooks = load_all_hooks().expect("hooks should load");
+    let hooks = load_unprivileged_hooks();
     let font_cache_hook = hooks
         .iter()
         .find(|h| h.name == "update-font-cache")

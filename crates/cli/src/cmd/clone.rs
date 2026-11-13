@@ -65,8 +65,21 @@ pub fn run(
         }
     );
 
+    // A URL starting with `-` would be parsed by git as an option (e.g.
+    // `--upload-pack=...`), which runs arbitrary commands. Package metadata
+    // is not trusted input, so it is rejected and `--` ends option parsing.
+    if git_url.starts_with('-') {
+        return Err(anyhow!(
+            "Refusing to clone '{git_url}': a git URL must not start with '-'."
+        ));
+    }
+
     let mut git_cmd = Command::new("git");
-    git_cmd.arg("clone").arg(git_url).arg(&target_location);
+    git_cmd
+        .arg("clone")
+        .arg("--")
+        .arg(git_url)
+        .arg(&target_location);
 
     let status = git_cmd
         .status()

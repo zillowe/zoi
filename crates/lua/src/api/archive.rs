@@ -45,12 +45,20 @@ use zstd::stream::read::Decoder as ZstdDecoder;
 pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let extract_fn = lua.create_function(
         move |lua, (source, out_name): (String, Option<String>)| {
-            let build_dir_str: String = lua.globals().get("BUILD_DIR")?;
+            let build_dir_str = super::build_dir(lua)?;
             let build_dir = Path::new(&build_dir_str);
 
             let archive_file = if source.starts_with("http") {
-                let file_name =
-                    source.split('/').next_back().unwrap_or("download.tmp");
+                let file_name = source
+                    .split(['?', '#'])
+                    .next()
+                    .unwrap_or_default()
+                    .split('/')
+                    .next_back()
+                    .filter(|name| {
+                        zoi_core::utils::validate_path_component(name).is_ok()
+                    })
+                    .unwrap_or("download.tmp");
                 let temp_path = build_dir.join(file_name);
                 super::download::download_with_progress(
                     &source, &temp_path, quiet
@@ -75,14 +83,23 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 
             let out_dir_name =
                 out_name.unwrap_or_else(|| "extracted".to_string());
-            let out_dir = build_dir.join(&out_dir_name);
-
-            if !out_dir.starts_with(build_dir) || out_dir == build_dir {
-                return Err(mlua::Error::RuntimeError(format!(
-                    "Invalid output directory: {out_dir_name}. Extraction \
-                     must be into a subdirectory of the build directory."
-                )));
-            }
+            // `safe_join` rejects absolute paths and `..` components (which a
+            // plain `join` + `starts_with` check does not), and resolves
+            // symlinks that would lead outside the build directory.
+            let out_dir =
+                zoi_core::utils::safe_join(build_dir, Path::new(&out_dir_name))
+                    .ok()
+                    .filter(|dir| {
+                        dir.components().count()
+                            > build_dir.components().count()
+                    })
+                    .ok_or_else(|| {
+                        mlua::Error::RuntimeError(format!(
+                            "Invalid output directory: {out_dir_name}. \
+                             Extraction must be into a subdirectory of the \
+                             build directory."
+                        ))
+                    })?;
 
             fs::create_dir_all(&out_dir)
                 .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
@@ -401,7 +418,7 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
         let p = Path::new(&path);
         let actual_path = if p.exists() {
             p.to_path_buf()
-        } else if let Ok(build_dir) = lua.globals().get::<String>("BUILD_DIR") {
+        } else if let Some(build_dir) = super::opt_build_dir(lua) {
             Path::new(&build_dir).join(p)
         } else {
             p.to_path_buf()
@@ -560,7 +577,7 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
             let algo = algorithm
                 .unwrap_or_else(|| "zst".to_string())
                 .to_lowercase();
-            let build_dir_str: String = lua.globals().get("BUILD_DIR")?;
+            let build_dir_str = super::build_dir(lua)?;
             let build_dir = Path::new(&build_dir_str);
 
             let output_path = if Path::new(&output).is_absolute() {

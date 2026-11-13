@@ -157,7 +157,8 @@ fn test_db_delete_package_is_scope_specific() {
         "scoped-pkg",
         None,
         "core",
-        Some(types::Scope::System)
+        Some(types::Scope::System),
+        Some("local")
     )
     .expect("Should delete system row");
 
