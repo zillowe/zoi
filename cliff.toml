@@ -15,17 +15,33 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 """
 body = """
+{%- macro remote_url() -%}
+  https://gitlab.com/{{ remote.gitlab.owner }}/{{ remote.gitlab.repo }}
+{%- endmacro -%}
+
 {% if version %}\
-    ## [{{ version | replace_regex(from="^([A-Za-z]+)-", to="${1}. ") | replace_regex(from="-([0-9.]+)$", to=" ${1}") | trim_start_matches(pat="v") }}](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/tags/{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
+    ## [{{ version | replace_regex(from="^([A-Za-z]+)-", to="${1}. ") | replace_regex(from="-([0-9.]+)$", to=" ${1}") | trim_start_matches(pat="v") }}]({{ self::remote_url() }}/-/tags/{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
 {% else %}\
     ## [unreleased]
 {% endif %}\
-{% for group, commits in commits | group_by(attribute="group") %}
+{% for group, commits in commits | filter(attribute="merge_commit", value=false) | group_by(attribute="group") %}
     ### {{ group | striptags | trim | upper_first }}
     {% for commit in commits | unique(attribute="message") %}
-        - [`{{ commit.id | truncate(length=8, end='') }}`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/{{ commit.id }}) {% if commit.scope %}*({{ commit.scope }})* {% endif %}{% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message | upper_first }}\
+        - [`{{ commit.id | truncate(length=8, end='') }}`]({{ self::remote_url() }}/-/commit/{{ commit.id }}) {% if commit.scope %}*({{ commit.scope }})* {% endif %}{% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message | upper_first }}\
+          {% for link in commit.links %} [{{ link.text }}]({{ link.href }}){% endfor %}\
     {% endfor %}
 {% endfor %}
+{%- set merges = commits | filter(attribute="merge_commit", value=true) %}
+{%- if merges | length > 0 %}
+    ### 🔀 Merge Requests
+    {% for commit in merges -%}
+        {%- set title = commit.remote.pr_title | default(value=commit.body | default(value=commit.message) | split(pat="\n") | first) %}
+        - {{ title | trim | upper_first }}\
+          {% if commit.remote.pr_number %} [!{{ commit.remote.pr_number }}]({{ self::remote_url() }}/-/merge_requests/{{ commit.remote.pr_number }})\
+          {% else %}{% for link in commit.links %} [{{ link.text }}]({{ link.href }}){% endfor %}{% endif %}\
+          {% if commit.remote.pr_author and commit.remote.pr_author is not containing("_bot_") %} by @{{ commit.remote.pr_author }}{% endif %}
+    {%- endfor %}
+{% endif %}
 
 """
 footer = """
@@ -183,7 +199,7 @@ commit_parsers = [
     { message = "(?i)^Release", skip = true },
     { message = "(?i)^Git", skip = true },
     { message = "(?i)^Ignore", skip = true },
-    { message = "(?i)^Merge", skip = true },
+    { message = "(?i)^Merge", group = "🔀 Merge Requests" },
 
     { message = "^Build", group = "🛠️ Build" },
     { message = "^Feat", group = "✨ Features" },
