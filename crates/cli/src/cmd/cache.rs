@@ -76,54 +76,76 @@ pub fn clear(dry_run: bool) -> Result<()> {
 
 /// Lists files in the local archive cache.
 ///
+/// As root this also lists the system-wide archive cache that
+/// `zoi system distro build` and other sysroot installs use.
+///
 /// # Errors
 ///
 /// Returns an error if the archive cache root cannot be determined or if
 /// reading the directory fails.
-///
-/// # Panics
-///
-/// This function does not explicitly panic.
 pub fn list() -> Result<()> {
-    let archive_cache_root = cache::get_archive_cache_root()?;
-    if !archive_cache_root.exists() {
+    let dirs = cache::archive_cache_dirs()?;
+    let mut total = 0;
+    for (i, dir) in dirs.iter().enumerate() {
+        if i > 0 {
+            println!();
+        }
+        total += list_dir(dir, dirs.len() > 1)?;
+    }
+    if dirs.len() > 1 && total > 0 {
+        println!("\nTotal: {total} archives");
+    }
+    Ok(())
+}
+
+/// Lists the archives in one cache directory and returns how many there are.
+fn list_dir(dir: &std::path::Path, show_path: bool) -> Result<usize> {
+    if show_path {
+        println!(
+            "{} Archives in {}:",
+            "::".bold().blue(),
+            dir.display().to_string().cyan()
+        );
+    } else {
+        println!("{} Archives in local cache:", "::".bold().blue());
+    }
+    if !dir.exists() {
         println!("Cache is empty.");
-        return Ok(());
+        return Ok(0);
     }
 
-    println!("{} Archives in local cache:", "::".bold().blue());
     let mut count = 0;
-    for entry in fs::read_dir(archive_cache_root)? {
-        let entry = entry?;
+    let mut entries: Vec<_> =
+        fs::read_dir(dir)?.filter_map(Result::ok).collect();
+    entries.sort_by_key(std::fs::DirEntry::file_name);
+    for entry in entries {
         let path = entry.path();
-        if path.is_file() {
-            let filename = path
-                .file_name()
-                .ok_or_else(|| {
-                    let p = path.display();
-                    anyhow!("Path from read_dir has no file name: {p}")
-                })?
-                .to_string_lossy();
-            let size = fs::metadata(&path)?.len();
-            println!(
-                "  - {:<40} ({})",
-                filename.cyan(),
-                crate::pkg::utils::format_bytes(size)
-            );
-            count += 1;
+        if !path.is_file() {
+            continue;
         }
+        let filename = entry.file_name().to_string_lossy().to_string();
+        let size = fs::metadata(&path)?.len();
+        let note = if filename.ends_with(".part") {
+            " (incomplete download)".dimmed().to_string()
+        } else {
+            String::new()
+        };
+        println!(
+            "  - {:<40} ({}){note}",
+            filename.cyan(),
+            crate::pkg::utils::format_bytes(size)
+        );
+        count += 1;
     }
 
     if count == 0 {
         println!("No archives found in cache.");
+    } else if !show_path {
+        println!("\nTotal: {count} archives");
     } else {
-        println!(
-            "
-Total: {count} archives"
-        );
+        println!("{count} archives");
     }
-
-    Ok(())
+    Ok(count)
 }
 
 /// Adds a new cache mirror URL.

@@ -243,6 +243,8 @@ Manage Zoi's local package archive cache.
 - `mirror ls`: List configured binary/cache mirrors.
 - `clear`: Clear the entire Zoi cache, including downloaded archives and cached package definitions.
 
+When run as root, `ls` and `clear` also cover the system-wide archive cache (`/var/cache/zoi/archives`) that `zoi system distro build` and other installs into a `--root` target use, so a failed build can be retried without downloading everything again.
+
 ---
 
 ### `zoi clone <package> [location]`

@@ -353,6 +353,10 @@ ones. *--registry*=_HANDLE_, *--repo*=_REPO_:: Scope the audit.
 [*--dry-run*]:: Clear the entire cache. *list*, *ls*:: List cached
 archives. *mirror add* _URL_, *mirror remove* _URL_, *mirror list*
 (*ls*):: Manage fallback cache-mirror base URLs.
++
+Run as root, *list* and *clear* also cover the system-wide archive cache,
+_/var/cache/zoi/archives_, where archives downloaded while installing into
+a target root (such as by *system distro build*) are kept.
 
 *repo*, *repositories* _SUBCOMMAND_::
   Manage package repositories.
