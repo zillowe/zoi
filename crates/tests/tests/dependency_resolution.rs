@@ -96,3 +96,26 @@ fn test_get_versions_does_not_leak_across_distinct_explicit_sources() {
         &pubgrub::SemVersion::parse("1.0.0").expect("unwrap failed")
     );
 }
+
+#[test]
+fn git_snapshot_versions_parse_and_order() {
+    // Zoidberg's VCS snapshots carry several `+` sections (glibc, gcc). They
+    // used to fail to parse, making every package that depends on them
+    // unsolvable.
+    for v in [
+        "2.44+r50+g1848099f063e",
+        "16.2.1+r23+gd564253eb6c8",
+        "7.1.4.arch1",
+        "1:2.44+r50+g1848099f063e"
+    ] {
+        assert!(pubgrub::SemVersion::parse(v).is_ok(), "failed to parse {v}");
+    }
+    let parse =
+        |v: &str| pubgrub::SemVersion::parse(v).expect("version parses");
+    assert!(parse("2.44+r50+g1848099f063e") < parse("2.45"));
+    assert!(parse("16.2.1+r23+gd564253eb6c8") > parse("16.2.0"));
+    assert_eq!(
+        parse("2.44+r50+g1848099f063e").to_string(),
+        "2.44+r50+g1848099f063e"
+    );
+}

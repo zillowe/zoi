@@ -194,40 +194,43 @@ impl Display for SemVersion {
 /// Sanitizes non-standard version strings into valid `SemVer` format.
 ///
 /// Logic:
-/// - Padds missing parts (e.g. "2.41" -> "2.41.0").
+/// - Pads missing parts (e.g. "2.41" -> "2.41.0").
 /// - Converts extra parts into build metadata (e.g. "7.1.4.arch1" ->
 ///   "7.1.4+arch1").
-/// - Cleans up prefixes and suffixes.
+/// - Joins several `+` sections, as in git snapshot versions such as
+///   "2.44+r50+g1848099f063e", into one build metadata
+///   ("2.44.0+r50.g1848099f063e"); `SemVer` allows a single `+`.
+/// - Drops characters build metadata cannot hold.
 fn sanitize_version_string(v: &str) -> String {
     let v = v.trim_start_matches('v').replace('-', "+");
-    let parts: Vec<&str> = v.split('.').collect();
+    let (core, build) = v.split_once('+').unwrap_or((v.as_str(), ""));
 
-    match parts.len() {
-        1 => {
-            if let Some(p0) = parts.first() {
-                format!("{p0}.0.0")
-            } else {
-                "0.0.0".to_string()
-            }
-        }
-        2 => {
-            if let (Some(p0), Some(p1)) = (parts.first(), parts.get(1)) {
-                format!("{p0}.{p1}.0")
-            } else {
-                "0.0.0".to_string()
-            }
-        }
-        len if len > 3 => {
-            if let (Some(p0), Some(p1), Some(p2)) =
-                (parts.first(), parts.get(1), parts.get(2))
-            {
-                let rest = parts.get(3..).unwrap_or(&[]).join(".");
-                format!("{p0}.{p1}.{p2}+{rest}")
-            } else {
-                v.clone()
-            }
-        }
-        _ => v.clone()
+    let mut parts: Vec<&str> = core.split('.').collect();
+    let extra: Vec<&str> = if parts.len() > 3 {
+        parts.split_off(3)
+    } else {
+        Vec::new()
+    };
+    while parts.len() < 3 {
+        parts.push("0");
+    }
+
+    let metadata: Vec<String> = extra
+        .into_iter()
+        .chain(build.split(['+', '.']))
+        .map(|id| {
+            id.chars()
+                .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
+                .collect::<String>()
+        })
+        .filter(|id| !id.is_empty())
+        .collect();
+
+    let core = parts.join(".");
+    if metadata.is_empty() {
+        core
+    } else {
+        format!("{core}+{}", metadata.join("."))
     }
 }
 
@@ -478,6 +481,79 @@ impl ZoiDependencyProvider {
         semver_to_range(req_str)
     }
 
+    /// Resolves a package's declared dependencies for the sub-packages the
+    /// request stands for.
+    ///
+    /// A request naming a sub-package (`pkg:sub`) gets that sub-package's
+    /// dependencies. A request without one, for a split package, installs
+    /// its `main_subs` (or `main`), so it gets theirs, merged: otherwise
+    /// `@core/base` would resolve only the shared top-level list, which is
+    /// empty when every dependency is declared per sub-package.
+    fn resolve_for_package(
+        &self,
+        deps: &types::Dependencies,
+        package: &PkgName,
+        version: &str,
+        chosen_opts: &[String],
+        chosen_opts_opt: &[String]
+    ) -> types::DependenciesV2 {
+        let resolve_sub = |sub: Option<&str>| {
+            deps.resolve(
+                chosen_opts,
+                chosen_opts_opt,
+                sub,
+                self.all_optional,
+                self.build_type.as_deref()
+            )
+        };
+
+        let has_sub_deps = |group: Option<&types::DependencyGroup>| {
+            matches!(
+                group,
+                Some(types::DependencyGroup::Complex(c))
+                    if c.sub_packages.as_ref().is_some_and(|m| !m.is_empty())
+            )
+        };
+        if package.sub_package.is_some() || !has_sub_deps(deps.runtime.as_ref())
+        {
+            return resolve_sub(package.sub_package.as_deref());
+        }
+
+        let subs = self.default_subs(package, version);
+        let mut merged = resolve_sub(subs.first().map(String::as_str));
+        for sub in subs.iter().skip(1) {
+            let more = resolve_sub(Some(sub));
+            for dep in more.runtime {
+                if !merged.runtime.contains(&dep) {
+                    merged.runtime.push(dep);
+                }
+            }
+            merged.build.extend(more.build);
+            for dep in more.test {
+                if !merged.test.contains(&dep) {
+                    merged.test.push(dep);
+                }
+            }
+        }
+        merged
+    }
+
+    /// The sub-packages installed when a split package is requested without
+    /// one: its `main_subs`, or `main` when it declares none.
+    fn default_subs(&self, package: &PkgName, version: &str) -> Vec<String> {
+        let source = package.explicit_source.clone().unwrap_or_else(|| {
+            format!(
+                "#{}@{}/{}@{version}",
+                package.registry, package.repo, package.name
+            )
+        });
+        resolve::resolve_package_and_version(&source, self.scope, true, true)
+            .ok()
+            .and_then(|(pkg, ..)| pkg.main_subs)
+            .filter(|subs| !subs.is_empty())
+            .unwrap_or_else(|| vec!["main".to_string()])
+    }
+
     /// Determines if a raw source string matches a resolved `PkgName`.
     fn source_matches_package(&self, package: &PkgName, source: &str) -> bool {
         if let Some(explicit_source) = &package.explicit_source {
@@ -697,12 +773,12 @@ impl DependencyProvider for ZoiDependencyProvider {
                 })
                 && let Some(v1_deps) = &spec.dependencies
             {
-                package_deps = Some(v1_deps.resolve(
+                package_deps = Some(self.resolve_for_package(
+                    v1_deps,
+                    package,
+                    &version_str,
                     &chosen_opts,
-                    &chosen_opts_opt,
-                    package.sub_package.as_deref(),
-                    self.all_optional,
-                    self.build_type.as_deref()
+                    &chosen_opts_opt
                 ));
             }
         }
@@ -763,12 +839,12 @@ impl DependencyProvider for ZoiDependencyProvider {
             };
 
             package_deps = v1_deps.map(|d| {
-                d.resolve(
+                self.resolve_for_package(
+                    &d,
+                    package,
+                    &version_str,
                     &chosen_opts,
-                    &chosen_opts_opt,
-                    package.sub_package.as_deref(),
-                    self.all_optional,
-                    self.build_type.as_deref()
+                    &chosen_opts_opt
                 )
             });
         }
