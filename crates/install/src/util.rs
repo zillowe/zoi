@@ -101,13 +101,15 @@ pub fn get_filename_from_url(url: &str) -> Option<&str> {
         .next()
         .unwrap_or_default();
 
-    // Letters, digits, dot, dash and underscore cover every archive name Zoi
-    // actually deals in (`zoi-1.0.0.zpa`, `node_20.11.1_linux-x64.tar.gz`).
-    // Everything else is refused.
+    // Letters, digits, dot, dash, underscore and plus cover every archive
+    // name Zoi actually deals in (`zoi-1.0.0.zpa`,
+    // `node_20.11.1_linux-x64.tar.gz`, and snapshot versions such as
+    // `glibc-2.44+r50+g1848099f063e-linux-amd64.main.zpa`). `+` is not a
+    // separator anywhere. Everything else is refused.
     let is_allowlisted = !name.is_empty()
-        && name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'));
+        && name.chars().all(|c| {
+            c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '+')
+        });
 
     // A whole `.` or `..` is a directory reference, not a file name. With the
     // allowlist in place `..` is otherwise spellable, so it needs its own

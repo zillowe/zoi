@@ -155,7 +155,13 @@ fn get_filename_from_url_accepts_ordinary_names() {
         ("https://example.test/a.b.c", "a.b.c"),
         // A Windows reserved stem is only rejected as the whole stem.
         ("https://example.test/CONSOLE.zpa", "CONSOLE.zpa"),
-        ("https://example.test/NULLFILE.zpa", "NULLFILE.zpa")
+        ("https://example.test/NULLFILE.zpa", "NULLFILE.zpa"),
+        // Snapshot versions; these used to fall back to one shared name.
+        (
+            "https://example.test/glibc-2.44+r50+g1848099f063e-linux-amd64.\
+             main.zpa",
+            "glibc-2.44+r50+g1848099f063e-linux-amd64.main.zpa"
+        )
     ] {
         assert_eq!(
             zoi::pkg::install::util::get_filename_from_url(url),

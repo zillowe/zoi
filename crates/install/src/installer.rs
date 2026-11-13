@@ -56,8 +56,21 @@ pub fn download_and_cache_archive(
     // helper only returns a value that is a single inert path component;
     // anything else (empty, or carrying separators/dot segments) falls back to
     // a fixed name rather than being joined onto the cache root.
+    //
+    // The fallback is unique per URL. A fixed name made every package whose
+    // URL was refused share one cached file: the first download was then
+    // reused for all of them and failed their hash checks.
+    let fallback_filename = format!(
+        "archive-{}.zpa",
+        zoi_core::hash::calculate_string_hash(
+            &details.info.final_url,
+            zoi_core::hash::HashAlgorithm::Sha256
+        )
+        .get(..16)
+        .unwrap_or_default()
+    );
     let archive_filename = util::get_filename_from_url(&details.info.final_url)
-        .unwrap_or("archive.zpa");
+        .unwrap_or(&fallback_filename);
 
     // Defence in depth: assert the invariant the helper promises, so a future
     // change to that helper cannot silently reintroduce a writable path.
