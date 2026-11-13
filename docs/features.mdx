@@ -887,11 +887,13 @@ When using `--all`, Zoi also prints explicit pinned/skipped summaries and adviso
 
 (alias: `ug`)
 
-Upgrades the Zoi binary to the latest version.
+Upgrades the Zoi binary to the latest version. This is for standalone installs (such as the install script).
+
+If the running binary belongs to an installed Zoi package, such as `@core/zoi` on ZoiOS, `zoi upgrade` stops and prints the command to use instead, for example `sudo zoi update @core/zoi @core/zoid`. Only `zoi update` keeps Zoi's records of the package (manifest, file list, database entry) in step with its files. Binaries owned by Homebrew, Scoop, Cargo or a system package manager are refused the same way, with that manager's upgrade command.
 
 **Options:**
 
-- `--force`: Force a full download.
+- `--force`: Upgrade anyway: overrides the package-manager check, upgrades even when already on the latest version, and downloads the full binary instead of a delta patch.
 - `--tag <TAG>`: Upgrade to a specific git tag.
 - `--branch <BRANCH>`: Upgrade to the latest release of a specific branch.
 

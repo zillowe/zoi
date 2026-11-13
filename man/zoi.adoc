@@ -322,9 +322,17 @@ registry URL (accepts `default`, `github`, `gitlab`, `codeberg`, or a URL).
 
 *upgrade*, *ug* [_OPTIONS_]::
   Upgrade the Zoi binary itself to the latest release, using a delta
-  patch when possible.
+  patch when possible. This is for standalone installs (such as the
+  install script). When the running binary belongs to an installed Zoi
+  package, such as *@core/zoi* on ZoiOS, *upgrade* stops and prints the
+  *zoi update* command to use instead (including *@core/zoid* when it is
+  installed), because only *update* keeps Zoi's records of the package in
+  step with its files. Installs owned by Homebrew, Scoop, Cargo or a system
+  package manager are refused the same way.
 +
-*--force*:: Skip the delta patch and download the full binary.
+*--force*:: Upgrade anyway: override the package-manager check, upgrade
+even when already on the latest version, and download the full binary
+instead of a delta patch.
 *--tag*=_TAG_:: Upgrade to a specific release tag.
 *--branch*=_BRANCH_:: Upgrade from a release branch such as Prod or Pub.
 
