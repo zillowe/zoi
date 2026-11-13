@@ -31,21 +31,18 @@ pub enum HookType {
 }
 
 /// Executes a list of shell commands within a specific scope.
+///
+/// While installing into a sysroot (`zoi system distro build`, `--root`), the
+/// commands run inside that root, as global hooks already do. Run on the host
+/// they would act on the host instead: bash's hook appended to the host's
+/// `/etc/shells` and systemd's ran the host's `systemd-sysusers`.
 fn execute_commands(commands: &[String], scope: types::Scope) -> Result<()> {
     let scope_str = format!("{scope:?}").to_lowercase();
     for cmd_str in commands {
         println!("> {}", cmd_str.cyan());
-        let mut command = if cfg!(target_os = "windows") {
-            let mut c = Command::new("pwsh");
-            c.arg("-Command").arg(cmd_str);
-            c
-        } else {
-            let mut c = Command::new("bash");
-            c.arg("-c").arg(cmd_str);
-            c
+        let Some(mut command) = hook_command(cmd_str, &scope_str)? else {
+            continue;
         };
-
-        command.env("ZOI_SCOPE", &scope_str);
 
         let status = command.status()?;
 
@@ -54,6 +51,51 @@ fn execute_commands(commands: &[String], scope: types::Scope) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Builds the command that runs one hook, or `None` if it cannot run (a
+/// sysroot without a shell yet).
+fn hook_command(cmd_str: &str, scope_str: &str) -> Result<Option<Command>> {
+    #[cfg(target_os = "linux")]
+    if let Some(root) = zoi_core::sysroot::get_sysroot() {
+        let has_bash = root.join("bin/bash").exists()
+            || root.join("usr/bin/bash").exists();
+        if !has_bash {
+            eprintln!(
+                "{}: skipping hook in {}: the target has no /bin/bash yet.",
+                "Warning".yellow().bold(),
+                root.display()
+            );
+            return Ok(None);
+        }
+        let mut envs = std::collections::HashMap::new();
+        envs.insert("ZOI_SCOPE".to_string(), scope_str.to_string());
+        envs.insert(
+            "PATH".to_string(),
+            "/usr/bin:/bin:/usr/sbin:/sbin".to_string()
+        );
+        return zoi_sandbox::wrap_command_in_root(
+            &root,
+            std::path::Path::new("/bin/bash"),
+            &["-c".to_string(), cmd_str.to_string()],
+            &envs,
+            &[],
+            false
+        )
+        .map(Some);
+    }
+
+    let mut command = if cfg!(target_os = "windows") {
+        let mut c = Command::new("pwsh");
+        c.arg("-Command").arg(cmd_str);
+        c
+    } else {
+        let mut c = Command::new("bash");
+        c.arg("-c").arg(cmd_str);
+        c
+    };
+    command.env("ZOI_SCOPE", scope_str);
+    Ok(Some(command))
 }
 
 /// Runs the specified type of hooks for a package.
