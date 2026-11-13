@@ -637,10 +637,13 @@ fn parse_elf(file: &mut File, path: &Path) -> Result<Option<FileInfo>> {
         ET_DYN => {
             let name = path
                 .file_name()
-                .map(|n| n.to_string_lossy().to_string())
+                .map(|n| n.to_string_lossy().to_ascii_lowercase())
                 .unwrap_or_default();
-            let looks_like_library =
-                name.ends_with(".so") || name.contains(".so.");
+            // `libfoo.so`, or a versioned `libfoo.so.1.2`.
+            let looks_like_library = Path::new(&name)
+                .extension()
+                .is_some_and(|ext| ext == "so")
+                || name.contains(".so.");
             if has_interp && !looks_like_library {
                 StripKind::Executable
             } else {

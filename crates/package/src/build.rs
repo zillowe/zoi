@@ -515,7 +515,6 @@ fn process_build_operations(
     Ok(())
 }
 
-/// Core implementation of the build process for a single platform.
 /// The sub-packages built when none are requested: every declared
 /// sub-package plus the main one, or just the main package when the package
 /// is not split.
@@ -533,6 +532,7 @@ fn default_subs_to_build(pkg: &types::Package) -> Vec<String> {
     }
 }
 
+/// Core implementation of the build process for a single platform.
 fn build_for_platform(
     package_file: &Path,
     build_type: Option<&str>,
