@@ -141,6 +141,14 @@ In this single step, Zoi:
 5. **Generates fstab**: Writes `/etc/fstab` from the declared `filesystems`.
 6. **Builds the First Generation**: Creates a record of the installation and links it to the package transaction.
 
+<Callout title="Downloads are kept on the host">
+  Package archives are cached on the host, not in the target:
+  `/var/cache/zoi/archives` when run with `sudo`. If a build fails, or you
+  rebuild a fresh target, the archives already downloaded are reused. Each one
+  is still verified against its hash and signature. Remove them with `sudo rm
+  -rf /var/cache/zoi/archives`.
+</Callout>
+
 <Callout title="What is not done yet">
   The bootloader and initramfs are still installed by hand in Step 4, because
   the target has no bootloader on it yet. Once the machine is running, `zoi

@@ -220,11 +220,21 @@ pub fn get_host_user_data_dir() -> Result<PathBuf> {
 ///
 /// Returns an error if no suitable user cache directory can be found.
 pub fn get_user_cache_dir() -> Result<PathBuf> {
+    Ok(crate::sysroot::apply_sysroot(get_host_user_cache_dir()?))
+}
+
+/// Returns the invoking user's Zoi cache directory on the host, ignoring any
+/// sysroot.
+///
+/// # Errors
+///
+/// Returns an error if no suitable user cache directory can be found.
+pub fn get_host_user_cache_dir() -> Result<PathBuf> {
     let root =
         xdg_or_platform_dir("XDG_CACHE_HOME", dirs::cache_dir, |home| {
             home.join(".cache")
         })?;
-    Ok(crate::sysroot::apply_sysroot(root.join("zoi")))
+    Ok(root.join("zoi"))
 }
 
 /// Returns Zoi's user state directory, honoring `XDG_STATE_HOME` first.

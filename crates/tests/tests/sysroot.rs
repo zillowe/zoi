@@ -63,3 +63,20 @@ fn host_db_root_ignores_the_sysroot() {
     let host = zoi::pkg::resolve::get_host_db_root().expect("host db root");
     assert_eq!(host, home.path().join(".local/share/zoi/pkgs/db"));
 }
+
+#[test]
+fn archive_cache_stays_on_the_host_while_building_into_a_sysroot() {
+    // Downloads are kept outside the target, so a failed or repeated
+    // `zoi system distro build` reuses them instead of downloading again.
+    let mut ctx = common::TestContextGuard::acquire();
+    let home = tempfile::tempdir().expect("tempdir");
+    ctx.set_env_var("HOME", home.path());
+    ctx.set_env_var("XDG_CACHE_HOME", home.path().join(".cache"));
+    common::TestContextGuard::set_sysroot(PathBuf::from("/mnt/new-disk"));
+
+    let cache = zoi::pkg::cache::get_archive_cache_root().expect("cache");
+    assert!(!cache.starts_with("/mnt/new-disk"), "{}", cache.display());
+    if !zoi_core::utils::is_effective_root() {
+        assert_eq!(cache, home.path().join(".cache/zoi/archives"));
+    }
+}

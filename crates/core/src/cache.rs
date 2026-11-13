@@ -14,12 +14,39 @@ pub fn get_cache_root() -> Result<PathBuf> {
 
 /// Returns the root directory for Zoi's archive cache.
 ///
+/// While installing into a sysroot (`zoi system distro build`, `--root`,
+/// `--pure` builds), archives are kept on the host instead of in the target:
+/// they are downloads, not state of the system being built, and keeping them
+/// lets a failed or repeated build reuse them instead of downloading
+/// everything again. Every archive is still verified (hash and signature)
+/// each time it is used. As root that is `/var/cache/zoi/archives`, so no
+/// root-owned files land in the invoking user's home; otherwise it is the
+/// user's own archive cache.
+///
 /// # Errors
 ///
 /// Returns an error if the cache root directory cannot be determined.
 pub fn get_archive_cache_root() -> Result<PathBuf> {
+    if crate::sysroot::get_sysroot().is_some() {
+        return host_archive_cache_root();
+    }
     let cache_root = get_cache_root()?;
     Ok(cache_root.join("archives"))
+}
+
+/// The archive cache on the host, used while a sysroot is active.
+fn host_archive_cache_root() -> Result<PathBuf> {
+    if crate::utils::is_effective_root() {
+        let base = if cfg!(target_os = "macos") {
+            PathBuf::from("/Library/Caches/zoi")
+        } else if cfg!(target_os = "windows") {
+            PathBuf::from("C:\\ProgramData\\zoi\\cache")
+        } else {
+            PathBuf::from("/var/cache/zoi")
+        };
+        return Ok(base.join("archives"));
+    }
+    Ok(crate::utils::get_host_user_cache_dir()?.join("archives"))
 }
 
 /// Returns the root directory for Zoi's package definition cache.
