@@ -15,7 +15,7 @@ mod common;
 ///
 /// These tests cover user-hook precedence and ordering. When Zoi runs as root
 /// (as in CI), user hook directories are intentionally ignored; that
-/// behavior is covered in `fix_security_hooks.rs`.
+/// behavior is covered in `hooks_privilege.rs`.
 fn load_unprivileged_hooks() -> Vec<GlobalHook> {
     load_hooks_for_privilege(false).expect("hooks should load")
 }

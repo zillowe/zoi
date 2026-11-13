@@ -129,7 +129,7 @@ fn test_sandbox_env_passthrough() -> Result<()> {
     }
 
     // A neutral name: secret-looking names (TOKEN, SECRET, ...) are never
-    // forwarded, which `fix_security_sandbox.rs` covers.
+    // forwarded, which `sandbox_hardening.rs` covers.
     let config = SandboxConfig {
         enabled: true,
         system: true,

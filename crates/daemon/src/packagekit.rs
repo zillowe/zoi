@@ -3102,7 +3102,7 @@ mod tests {
     }
 
     // The exact shapes below are mirrored by
-    // `crates/tests/tests/fix_cli_packagekit_argv.rs`, which parses each one
+    // `crates/tests/tests/packagekit_argv.rs`, which parses each one
     // with the real `zoi` CLI definition. Keep the two in sync.
     #[test]
     fn zoi_argv_shapes_put_client_values_after_double_dash() {
