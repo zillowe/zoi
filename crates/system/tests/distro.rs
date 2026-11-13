@@ -19,10 +19,7 @@ fn marker_is_a_valid_os_release_and_hostname_goes_to_etc_hostname() {
 
     let content = fs::read_to_string(dir.path().join(BOOTSTRAP_OS_RELEASE))
         .expect("read marker");
-    assert_eq!(
-        content,
-        "ID=zoios\nNAME=ZoiOS\nPRETTY_NAME=\"ZoiOS\"\n"
-    );
+    assert_eq!(content, "ID=zoios\nNAME=ZoiOS\nPRETTY_NAME=\"ZoiOS\"\n");
     for line in content.lines() {
         let (key, _) = line.split_once('=').expect("KEY=value line");
         assert!(
@@ -60,7 +57,7 @@ fn marker_becomes_os_release_when_no_package_provides_one() {
     finalize_zoios_marker(dir.path(), false).expect("finalize");
 
     assert!(!dir.path().join(BOOTSTRAP_OS_RELEASE).exists());
-    let content = fs::read_to_string(dir.path().join("etc/os-release"))
-        .expect("read");
+    let content =
+        fs::read_to_string(dir.path().join("etc/os-release")).expect("read");
     assert!(content.starts_with("ID=zoios\n"));
 }

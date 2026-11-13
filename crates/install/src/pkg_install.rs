@@ -314,14 +314,11 @@ fn check_and_handle_file_conflicts(
 
         if !owned_by_others.is_empty() {
             println!();
+            println!("{}", "File Conflict With Another Package:".red().bold());
             println!(
-                "{}",
-                "File Conflict With Another Package:".red().bold()
-            );
-            println!(
-                "The following files are owned by other installed \
-                 packages. Installing this package would replace them, \
-                 leaving the other package broken:"
+                "The following files are owned by other installed packages. \
+                 Installing this package would replace them, leaving the \
+                 other package broken:"
             );
             for conflict in &owned_by_others {
                 println!(

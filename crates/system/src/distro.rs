@@ -44,9 +44,7 @@ pub fn initialize_zoios_marker(
     sysroot::set_sysroot(target.to_path_buf());
     fs::create_dir_all(target.join("etc/zoi"))?;
 
-    let marker = "ID=zoios\n\
-                  NAME=ZoiOS\n\
-                  PRETTY_NAME=\"ZoiOS\"\n";
+    let marker = "ID=zoios\nNAME=ZoiOS\nPRETTY_NAME=\"ZoiOS\"\n";
     fs::write(target.join(BOOTSTRAP_OS_RELEASE), marker)?;
 
     let hostname = hostname.unwrap_or("zoios");
