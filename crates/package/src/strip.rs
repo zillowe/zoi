@@ -234,13 +234,8 @@ pub fn strip_staging(
         .par_iter()
         .map(|(path, rel, info, target)| {
             let before = fs::metadata(path).map_or(0, |m| m.len());
-            let outcome = strip_one(
-                &tools,
-                path,
-                info,
-                config.strip,
-                target.as_deref()
-            );
+            let outcome =
+                strip_one(&tools, path, info, config.strip, target.as_deref());
             let after = fs::metadata(path).map_or(before, |m| m.len());
             (rel, outcome, before, after)
         })
@@ -306,8 +301,7 @@ fn strip_one(
             wrote_debug = true;
         }
 
-        if let Err(e) = run(Command::new(&tools.strip).args(flags).arg(path))
-        {
+        if let Err(e) = run(Command::new(&tools.strip).args(flags).arg(path)) {
             // The file stays unstripped, so its debug information must not
             // ship separately as well.
             if let Some(target) = debug_target.filter(|_| wrote_debug) {
@@ -609,11 +603,8 @@ fn parse_elf(file: &mut File, path: &Path) -> Result<Option<FileInfo>> {
     let section_names_index = usize::from(header.u16(base + 8)?);
 
     let has_interp = if segment_offset != 0 && segment_count > 0 {
-        let table = read_at(
-            file,
-            segment_offset,
-            segment_entry_size * segment_count
-        )?;
+        let table =
+            read_at(file, segment_offset, segment_entry_size * segment_count)?;
         let table = Bytes {
             data: &table,
             big_endian
@@ -640,10 +631,9 @@ fn parse_elf(file: &mut File, path: &Path) -> Result<Option<FileInfo>> {
                 .map(|n| n.to_string_lossy().to_ascii_lowercase())
                 .unwrap_or_default();
             // `libfoo.so`, or a versioned `libfoo.so.1.2`.
-            let looks_like_library = Path::new(&name)
-                .extension()
-                .is_some_and(|ext| ext == "so")
-                || name.contains(".so.");
+            let looks_like_library =
+                Path::new(&name).extension().is_some_and(|ext| ext == "so")
+                    || name.contains(".so.");
             if has_interp && !looks_like_library {
                 StripKind::Executable
             } else {
@@ -655,11 +645,8 @@ fn parse_elf(file: &mut File, path: &Path) -> Result<Option<FileInfo>> {
 
     let mut sections = Vec::new();
     if section_offset != 0 && section_count > 0 {
-        let table = read_at(
-            file,
-            section_offset,
-            section_entry_size * section_count
-        )?;
+        let table =
+            read_at(file, section_offset, section_entry_size * section_count)?;
         let table = Bytes {
             data: &table,
             big_endian

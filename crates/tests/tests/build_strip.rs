@@ -91,7 +91,10 @@ fn strip_flags_depend_on_file_kind_and_level() {
     use strip::StripKind::{Executable, Object, SharedLibrary, StaticLibrary};
 
     let flags = |kind, mode| strip::strip_flags(kind, mode);
-    assert_eq!(flags(Executable, StripMode::Full), Some(&["--strip-all"][..]));
+    assert_eq!(
+        flags(Executable, StripMode::Full),
+        Some(&["--strip-all"][..])
+    );
     assert_eq!(
         flags(SharedLibrary, StripMode::Full),
         Some(&["--strip-unneeded"][..])
@@ -222,7 +225,9 @@ fn non_elf_files_and_non_library_archives_are_ignored() {
 
     let archive = tmp.path().join("libfoo.a");
     fs::write(&archive, b"!<arch>\nmembers").expect("write");
-    let info = strip::inspect_file(&archive).expect("read").expect("archive");
+    let info = strip::inspect_file(&archive)
+        .expect("read")
+        .expect("archive");
     assert_eq!(info.kind, strip::StripKind::StaticLibrary);
 
     // `ar` is also the container of .deb files; only `.a` is a library.
@@ -325,9 +330,8 @@ fn staging_strip_splits_debug_info_and_honors_excludes() {
         sub_package: true,
         exclude: vec!["usr/lib/firmware/**".to_string()]
     };
-    let report =
-        strip::strip_staging(&staging, &config, Some(&debug), true)
-            .expect("strip");
+    let report = strip::strip_staging(&staging, &config, Some(&debug), true)
+        .expect("strip");
 
     assert!(!report.skipped);
     assert_eq!(report.stripped, 1);
@@ -401,7 +405,10 @@ fn strip_none_leaves_files_untouched() {
     let report =
         strip::strip_staging(tmp.path(), &config, None, true).expect("strip");
     assert_eq!(report.stripped, 0);
-    assert_eq!(fs::read(&tool).expect("read"), fs::read(&exe).expect("read"));
+    assert_eq!(
+        fs::read(&tool).expect("read"),
+        fs::read(&exe).expect("read")
+    );
 }
 
 fn read_manifest(archive_path: &Path) -> PooledZpaManifest {
@@ -475,9 +482,8 @@ end
     )
     .expect("build");
 
-    let main = read_manifest(
-        &output.join(format!("striptest-1.0.0-{platform}.zpa"))
-    );
+    let main =
+        read_manifest(&output.join(format!("striptest-1.0.0-{platform}.zpa")));
     let debug = read_manifest(
         &output.join(format!("striptest-1.0.0-{platform}.debug.zpa"))
     );
@@ -500,10 +506,7 @@ end
 
     // The debug archive holds only the `debug` mapping with the split-off
     // debug file, laid out where debuggers look for it.
-    assert_eq!(
-        debug.mappings.keys().collect::<Vec<_>>(),
-        vec!["debug"]
-    );
+    assert_eq!(debug.mappings.keys().collect::<Vec<_>>(), vec!["debug"]);
     let debug_files: Vec<_> = debug
         .mappings
         .get("debug")
