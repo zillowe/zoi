@@ -33,9 +33,9 @@ pub fn run(
             "{}{}",
             "Warning: ".yellow().bold(),
             format!(
-                "Forcing a self-upgrade of a binary managed by the {} package; \
-                 Zoi's records for it will no longer match the binary until \
-                 it is updated with 'zoi update'.",
+                "Forcing a self-upgrade of a binary managed by the {} \
+                 package; Zoi's records for it will no longer match the \
+                 binary until it is updated with 'zoi update'.",
                 managed.source
             )
             .yellow()
