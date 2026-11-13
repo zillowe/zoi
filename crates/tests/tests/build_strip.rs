@@ -565,8 +565,15 @@ function package() end
         false,
         false
     );
-    let error = result.expect_err("duplicate debug sub-package").to_string();
-    assert!(error.contains("sub_packages already declares"), "{error}");
+    // `build::run` reports per-platform failures (here: the reserved
+    // `debug` name) as one aggregate error, and nothing is archived.
+    assert!(result.is_err(), "duplicate debug sub-package was accepted");
+    let archives: Vec<_> = fs::read_dir(&root)
+        .expect("read output dir")
+        .filter_map(Result::ok)
+        .filter(|e| e.path().extension().is_some_and(|x| x == "zpa"))
+        .collect();
+    assert!(archives.is_empty(), "{archives:?}");
 }
 
 fn archive_pkg(sub_packages: Option<Vec<&str>>) -> zoi::pkg::types::Package {

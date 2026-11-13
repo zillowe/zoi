@@ -457,6 +457,8 @@ const ET_DYN: u16 = 3;
 const PT_INTERP: u32 = 3;
 /// Section type of the static symbol table.
 const SHT_SYMTAB: u32 = 2;
+/// Section flag of sections loaded into memory at run time.
+const SHF_ALLOC: u64 = 0x2;
 /// Note type of the GNU build-id.
 const NT_GNU_BUILD_ID: u32 = 3;
 /// Upper bound for header tables and string tables read from a file, so a
@@ -565,6 +567,8 @@ struct Section {
     name: u32,
     /// Section type (`sh_type`).
     kind: u32,
+    /// Section flags (`sh_flags`).
+    flags: u64,
     /// File offset of the section contents.
     offset: u64,
     /// Size of the section contents in bytes.
@@ -661,6 +665,7 @@ fn parse_elf(file: &mut File, path: &Path) -> Result<Option<FileInfo>> {
             sections.push(Section {
                 name: table.u32(at)?,
                 kind: table.u32(at + 4)?,
+                flags: table.word(at + 8, is_64)?,
                 offset,
                 size
             });
@@ -687,7 +692,12 @@ fn parse_elf(file: &mut File, path: &Path) -> Result<Option<FileInfo>> {
     let mut build_id_section = None;
     for section in &sections {
         let name = name_of(section);
-        if name.starts_with(b".debug_") || name.starts_with(b".zdebug_") {
+        // DWARF lives in sections that are never loaded. Allocated sections
+        // with a debug-like name, such as Rust's `.debug_gdb_scripts`, are
+        // part of the program and survive stripping.
+        if (name.starts_with(b".debug_") || name.starts_with(b".zdebug_"))
+            && section.flags & SHF_ALLOC == 0
+        {
             info.has_debug_info = true;
         }
         if section.kind == SHT_SYMTAB {
