@@ -44,8 +44,42 @@ enum UpdateOutcome {
 ///
 /// # Errors
 ///
-/// Returns an error if the package names cannot be expanded.
+/// Returns an error if the package names cannot be expanded, or if any of the
+/// requested packages failed to update.
 pub fn run(
+    all: bool,
+    package_names: &[String],
+    yes: bool,
+    dry_run: bool,
+    explain: bool,
+    plan_json: bool,
+    verbose: bool,
+    interactive: bool
+) -> Result<()> {
+    run_scoped(
+        None,
+        all,
+        package_names,
+        yes,
+        dry_run,
+        explain,
+        plan_json,
+        verbose,
+        interactive
+    )
+}
+
+/// Same as [`run`], restricted to packages installed in `scope`.
+///
+/// `None` keeps the historical behaviour: targeted updates look in the user
+/// and system scopes, and `--all` considers every installed package.
+///
+/// # Errors
+///
+/// Returns an error if the package names cannot be expanded, or if any of the
+/// requested packages failed to update.
+pub fn run_scoped(
+    scope: Option<types::Scope>,
     all: bool,
     package_names: &[String],
     yes: bool,
@@ -57,6 +91,7 @@ pub fn run(
 ) -> Result<()> {
     if all {
         return run_update_all_logic(
+            scope,
             yes,
             dry_run,
             explain,
@@ -83,6 +118,7 @@ pub fn run(
         }
         match run_update_single_logic(
             package_name,
+            scope,
             yes,
             dry_run,
             explain,
@@ -111,6 +147,13 @@ pub fn run(
             skipped
         });
     }
+
+    if failed > 0 {
+        return Err(anyhow!(
+            "{failed} of {} package(s) failed to update.",
+            expanded_package_names.len()
+        ));
+    }
     Ok(())
 }
 
@@ -120,6 +163,7 @@ pub fn run(
 /// pinned, dry run, or aborted by the user).
 fn run_update_single_logic(
     package_name: &str,
+    scope: Option<types::Scope>,
     yes: bool,
     dry_run: bool,
     explain: bool,
@@ -164,15 +208,19 @@ fn run_update_single_logic(
         )
     };
     let installed_request = resolve::parse_source_string(&installed_source)?;
+    let search_scopes: &[types::Scope] = match scope {
+        Some(types::Scope::User) => &[types::Scope::User],
+        Some(types::Scope::System) => &[types::Scope::System],
+        Some(types::Scope::Project) => &[types::Scope::Project],
+        None => &[types::Scope::User, types::Scope::System]
+    };
     let mut candidates = Vec::new();
-    candidates.extend(local::find_installed_manifests_matching(
-        &installed_request,
-        types::Scope::User
-    )?);
-    candidates.extend(local::find_installed_manifests_matching(
-        &installed_request,
-        types::Scope::System
-    )?);
+    for search_scope in search_scopes {
+        candidates.extend(local::find_installed_manifests_matching(
+            &installed_request,
+            *search_scope
+        )?);
+    }
 
     let old_manifest = crate::cmd::installed_select::choose_installed_manifest(
         package_name,
@@ -670,6 +718,7 @@ fn perform_transaction(
 
 /// Logic for updating all installed packages.
 fn run_update_all_logic(
+    scope: Option<types::Scope>,
     yes: bool,
     dry_run: bool,
     explain: bool,
@@ -689,7 +738,11 @@ fn run_update_all_logic(
         new_installed_size: u64
     }
 
-    let installed_packages = local::get_installed_packages()?;
+    let installed_packages: Vec<types::InstallManifest> =
+        local::get_installed_packages()?
+            .into_iter()
+            .filter(|m| scope.is_none_or(|s| m.scope == s))
+            .collect();
     let mut pinned_sources = Vec::new();
     let mut skipped_sources = Vec::new();
     let mut up_to_date_sources = Vec::new();

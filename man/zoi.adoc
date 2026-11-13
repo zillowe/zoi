@@ -132,23 +132,32 @@ needed.
 impact and safety blocks. *--plan-json*:: Machine-readable plan (requires
 *--dry-run*).
 
-*update*, *up* [_PACKAGES_... | *--all*] [_OPTIONS_]::
-  Update one or more packages to their latest versions. With no packages
-  and no *--all*, behavior follows the command defaults; use *--all* to
-  update everything.
+*update*, *up* (_PACKAGES_... | *--all*) [_OPTIONS_]::
+  Update one or more packages to their latest versions. Either one or more
+  packages or *--all* is required; running *update* with neither prints the
+  help and exits. The command exits with a non-zero status if any package
+  fails to update.
 +
 *--all*:: Update all installed packages (conflicts with package list).
+*--scope*=_SCOPE_:: Only update packages installed in _SCOPE_ (*user*,
+*system* or *project*).
 *--dry-run*:: Show what would be done. *--explain*:: Explain decisions.
 *--plan-json*:: Machine-readable plan (requires *--dry-run*).
 *-v*, *--verbose*:: Verbose output. *--interactive*:: Interactively pick
 updates (requires *--all*).
 
 *downgrade*, *dg* _PACKAGE_::
-  Install an older version of a package from the local store or archive
-  cache. With no version given, offers an interactive selection.
+  Interactively choose and install an older version of a package from the
+  local store or archive cache. The command takes no version argument; the
+  available versions are offered in a selection prompt.
 
 *rollback* _PACKAGE_::
-  Roll a package back to the previously installed version.
+  Roll a package back to the newest stored version that is older than the
+  installed one, restoring its shims, completions, database record and
+  lockfile entry. Rollback refuses, without changing anything, when that
+  version installed files outside the store (such as system files), since
+  the store keeps no copy of them; reinstall that version instead. System
+  packages require root.
 
 *pin* _PACKAGE_ _VERSION_::
   Pin a package to a specific version so updates skip it, and record that
@@ -158,10 +167,10 @@ updates (requires *--all*).
   Remove a version pin so the package can be updated again. Clears both the
   upgrade guard and the shim version preference.
 
-*mark*, *m* _PACKAGES_... (*--as-dependency* | *--asexplicit*)::
+*mark*, *m* _PACKAGES_... (*--as-dependency* | *--as-explicit*)::
   Change the installation reason of a package. *--as-dependency*
-  (*--asdeps*) marks packages as dependencies; *--asexplicit*
-  (*--asexpl*) marks them as explicitly installed.
+  (alias *--asdeps*) marks packages as dependencies; *--as-explicit*
+  (alias *--asexpl*) marks them as explicitly installed.
 
 *autoremove* [*--dry-run*]::
   Remove packages that were installed as dependencies and are no longer
@@ -299,8 +308,8 @@ Registry content is fetched from a `.zrepo` snapshot when the registry publishes
 one in its `repo.yaml`, transferred incrementally through its `.zsync` control
 file when available, and from a Git clone otherwise.
 +
-*-v*, *--verbose*:: Show underlying git output. *--fallback*:: Use
-fallback behavior. *--no-pm*:: Skip the native package-manager check.
+*-v*, *--verbose*:: Show underlying git output. *--fallback*:: Fall
+back to other mirrors if the default one fails. *--no-pm*:: Skip the native package-manager check.
 *--force*:: Force a fresh clone. *--local*:: Sync into ./.zoi/pkgs/db
 from zoi.lua. *--frozen*:: With *--local*, use zoi.lock.
 *--scope*=_user|system_:: Sync scope (conflicts with *--local*).
@@ -532,7 +541,9 @@ List packages that define a service and their status.
   Manage the underlying ZoiOS system.
 
 *apply* [_FILE_]::
-  Apply a system configuration (default: /etc/zoi/system.lua).
+  Apply a system configuration (default: /etc/zoi/system.lua). These
+  subcommands act on the running system through *zoid* and reject the
+  global *--root* option.
 *list*:: List system generations. *status*:: Show the active generation.
 *rollback* _ID_:: Roll back to generation _ID_. *pin* _ID_:: Protect a
 generation from pruning. *unpin* _ID_:: Allow pruning again.

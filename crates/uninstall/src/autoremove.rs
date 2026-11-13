@@ -15,7 +15,13 @@ use zoi_resolver::local;
 pub fn run(yes: bool, dry_run: bool) -> Result<()> {
     println!("Checking for unused dependencies...");
     let all_installed = local::get_installed_packages()?;
-    let mut packages_to_remove: Vec<String> = Vec::new();
+    // Each entry keeps the scope it was found in, so removal targets exactly
+    // that install instead of searching every scope (project first) for a
+    // same-named package. The removal source carries no version pin: a pinned
+    // uninstall of the active version would re-activate an older stored
+    // version instead of removing the unused dependency.
+    let mut packages_to_remove: Vec<(String, String, zoi_core::types::Scope)> =
+        Vec::new();
 
     for package in &all_installed {
         if !matches!(package.reason, InstallReason::Dependency { .. }) {
@@ -31,7 +37,11 @@ pub fn run(yes: bool, dry_run: bool) -> Result<()> {
         let dependents = local::get_dependents(&package_dir)?;
 
         if dependents.is_empty() {
-            packages_to_remove.push(local::installed_manifest_source(package));
+            packages_to_remove.push((
+                local::installed_manifest_source(package),
+                crate::unversioned_manifest_source(package),
+                package.scope
+            ));
         }
     }
 
@@ -42,15 +52,15 @@ pub fn run(yes: bool, dry_run: bool) -> Result<()> {
 
     if dry_run {
         println!("\nThe following packages WOULD BE REMOVED (Dry-run):");
-        for pkg_name in &packages_to_remove {
-            println!("    - {}", pkg_name.yellow());
+        for (pkg_name, _, scope) in &packages_to_remove {
+            println!("    - {} ({scope:?})", pkg_name.yellow());
         }
         return Ok(());
     }
 
     println!("\nThe following packages will be REMOVED:");
-    for pkg_name in &packages_to_remove {
-        println!("    - {}", pkg_name.yellow());
+    for (pkg_name, _, scope) in &packages_to_remove {
+        println!("    - {} ({scope:?})", pkg_name.yellow());
     }
 
     if !core_utils::ask_for_confirmation("\nDo you want to continue?", yes) {
@@ -58,9 +68,9 @@ pub fn run(yes: bool, dry_run: bool) -> Result<()> {
         return Ok(());
     }
 
-    for pkg_name in &packages_to_remove {
+    for (pkg_name, source, scope) in &packages_to_remove {
         println!("\n{} Removing {}...", "::".bold().blue(), pkg_name.bold());
-        if let Err(e) = crate::run(pkg_name, None, yes, false, false) {
+        if let Err(e) = crate::run(source, Some(*scope), yes, false, false) {
             eprintln!(
                 "{} Failed to remove {}: {}",
                 "Error:".red(),

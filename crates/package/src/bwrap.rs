@@ -102,12 +102,14 @@ pub fn run(
             .ok_or_else(|| anyhow!("Invalid package file name"))?
             .to_string_lossy()
             .into_owned();
+        // Signing never happens inside the sandbox: the build runs untrusted
+        // package code, so the key and GPG_PASSWORD stay on the host and the
+        // produced archives are signed after the sandbox exits.
+        let archives_before = super::docker::snapshot_archives(&abs_output_dir);
         let build_args = build_command_args(
             package_filename,
             build_type,
             platforms,
-            sign_key,
-            sign_mode,
             container_output_dir,
             version_override,
             sub_packages,
@@ -140,20 +142,23 @@ pub fn run(
                 (zoi_exe_dir.to_path_buf(), PathBuf::from("/zoi_bin")),
             ];
 
-            let mut cmd = zoi_sandbox::wrap_command_in_root(
+            let mut cmd = zoi_sandbox::wrap_command_in_root_with_profile(
                 root,
                 &PathBuf::from("/zoi_bin/zoi"),
                 &build_args,
                 &envs,
                 &extra_binds,
-                fakeroot
+                fakeroot,
+                zoi_sandbox::RootProfile::Build
             )?;
-            cmd.status()?
+            cmd.env_remove("GPG_PASSWORD").status()?
         } else {
             // Base bwrap arguments for non-sysroot build
             let mut bwrap_args = vec![
                 "--unshare-all".to_string(),
                 "--share-net".to_string(),
+                "--new-session".to_string(),
+                "--die-with-parent".to_string(),
                 "--hostname".to_string(),
                 "zoi-build".to_string(),
                 "--dev".to_string(),
@@ -203,15 +208,20 @@ pub fn run(
                 "1".to_string(),
             ];
 
+            // Zoi's data directories are exposed read-only: the inner
+            // `zoi package build --method native` only reads registry
+            // metadata and keys from them, and package build scripts must not
+            // be able to tamper with the store, databases, trust stores or
+            // keyrings on the host.
             if zoi_data_dir.exists() {
-                bwrap_args.push("--bind".to_string());
+                bwrap_args.push("--ro-bind".to_string());
                 bwrap_args.push(zoi_data_dir.display().to_string());
                 bwrap_args.push(zoi_data_dir.display().to_string());
             }
 
             let system_zoi = Path::new("/var/lib/zoi");
             if system_zoi.exists() {
-                bwrap_args.push("--bind".to_string());
+                bwrap_args.push("--ro-bind".to_string());
                 bwrap_args.push(system_zoi.display().to_string());
                 bwrap_args.push(system_zoi.display().to_string());
             }
@@ -237,7 +247,10 @@ pub fn run(
             bwrap_args.push("/zoi_bin/zoi".to_string());
             bwrap_args.extend(build_args);
 
-            Command::new("bwrap").args(&bwrap_args).status()?
+            Command::new("bwrap")
+                .args(&bwrap_args)
+                .env_remove("GPG_PASSWORD")
+                .status()?
         };
 
         if !status.success() {
@@ -249,6 +262,15 @@ pub fn run(
 
         println!("{}", "Bubblewrap build successful!".green());
 
+        if let Some(key_id) = sign_key {
+            super::docker::sign_new_archives(
+                &abs_output_dir,
+                &archives_before,
+                &key_id,
+                sign_mode
+            )?;
+        }
+
         Ok(())
     }
 }
@@ -256,12 +278,13 @@ pub fn run(
 #[cfg(any(target_os = "linux", test))]
 #[allow(clippy::too_many_arguments)]
 /// Builds the argument vector passed directly to `zoi` inside Bubblewrap.
+///
+/// Signing options are intentionally not forwarded: archives are signed on the
+/// host after the sandbox exits.
 fn build_command_args(
     package_filename: String,
     build_type: Option<&str>,
     platforms: &[String],
-    sign_key: Option<String>,
-    sign_mode: zoi_core::types::SignMode,
     output_dir: &str,
     version_override: Option<&str>,
     sub_packages: Option<Vec<String>>,
@@ -284,13 +307,6 @@ fn build_command_args(
     }
     for platform in platforms {
         args.extend(["--platform".to_string(), platform.clone()]);
-    }
-    if let Some(sign_key) = sign_key {
-        args.extend(["--sign".to_string(), sign_key]);
-        if sign_mode == zoi_core::types::SignMode::Embed {
-            args.push("--sign-mode".to_string());
-            args.push("embed".to_string());
-        }
     }
     if let Some(version_override) = version_override {
         args.extend([
@@ -326,8 +342,6 @@ mod tests {
             "package; touch /tmp/pwned.pkg.lua".to_string(),
             Some("source; id"),
             &["linux-amd64; id".to_string()],
-            Some("key; id".to_string()),
-            zoi_core::types::SignMode::Embed,
             "/output",
             Some("1.0.0; id"),
             Some(vec!["sub; id".to_string()]),
@@ -341,8 +355,8 @@ mod tests {
         );
         assert!(args.contains(&"source; id".to_string()));
         assert!(args.contains(&"linux-amd64; id".to_string()));
-        assert!(args.contains(&"key; id".to_string()));
         assert!(args.contains(&"1.0.0; id".to_string()));
         assert!(args.contains(&"sub; id".to_string()));
+        assert!(!args.iter().any(|a| a == "--sign" || a == "--sign-mode"));
     }
 }

@@ -91,7 +91,8 @@ pub struct BuildOptions<'a> {
     pub install_deps: bool,
     /// Whether to run tests before building.
     pub test: bool,
-    /// Build backend to use. Supported values are `native` and `docker`.
+    /// Build backend to use. Supported values are `native`, `bwrap`, and
+    /// `docker`.
     pub method: &'a str,
     /// Docker image to use when `method` is `docker`.
     pub image: Option<&'a str>,
@@ -380,7 +381,8 @@ pub fn install_sources(
 ///
 /// # Errors
 ///
-/// Returns an error if the update fails.
+/// Returns an error if the update fails. When specific packages are named,
+/// every package is attempted and an error is returned if any of them failed.
 pub fn update_packages(
     all: bool,
     package_names: &[String],

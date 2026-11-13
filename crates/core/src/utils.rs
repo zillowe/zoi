@@ -1140,6 +1140,87 @@ pub fn is_admin() -> bool {
     }
 }
 
+/// Checks whether the current process runs with an effective UID of 0.
+///
+/// Unlike [`is_admin`], which inspects the real UID, this reflects the
+/// privileges the process actually acts with (e.g. under `sudo`, `doas`, or a
+/// setuid wrapper). Always `false` on non-Unix platforms.
+pub fn is_effective_root() -> bool {
+    #[cfg(unix)]
+    {
+        nix::unistd::geteuid().is_root()
+    }
+    #[cfg(not(unix))]
+    {
+        false
+    }
+}
+
+/// Checks that a path is safe to trust when running as root.
+///
+/// The path (following symlinks) must be owned by UID 0 and must not be
+/// writable by its group or by other users. Missing paths and paths whose
+/// metadata cannot be read are treated as untrusted. On non-Unix platforms
+/// this always returns `true` because the Unix ownership model does not apply.
+pub fn is_root_owned_and_protected(path: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        match fs::metadata(path) {
+            Ok(meta) => meta.uid() == 0 && meta.mode() & 0o022 == 0,
+            Err(_) => false
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        true
+    }
+}
+
+/// The maximum accepted length of a registry handle.
+pub const MAX_REGISTRY_HANDLE_LEN: usize = 128;
+
+/// Validates a registry handle before it is used as a filesystem path
+/// component.
+///
+/// Registry handles come from remote `repo.yaml` documents and project files,
+/// and are joined onto database directories, so they must be a single, plain
+/// path component: only ASCII letters, digits, `.`, `_` and `-`, not `.` or
+/// `..`, and at most [`MAX_REGISTRY_HANDLE_LEN`] characters.
+///
+/// # Errors
+///
+/// Returns an error describing why the handle was rejected.
+pub fn validate_registry_handle(handle: &str) -> Result<()> {
+    if handle.is_empty() {
+        return Err(anyhow!("Invalid registry handle: the handle is empty."));
+    }
+    if handle.len() > MAX_REGISTRY_HANDLE_LEN {
+        return Err(anyhow!(
+            "Invalid registry handle '{}…': longer than {} characters.",
+            handle.chars().take(32).collect::<String>(),
+            MAX_REGISTRY_HANDLE_LEN
+        ));
+    }
+    if handle == "." || handle == ".." {
+        return Err(anyhow!(
+            "Invalid registry handle '{handle}': '.' and '..' are not allowed."
+        ));
+    }
+    if !handle
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+    {
+        return Err(anyhow!(
+            "Invalid registry handle '{}': only ASCII letters, digits, '.', \
+             '_' and '-' are allowed.",
+            handle.escape_debug()
+        ));
+    }
+    Ok(())
+}
+
 /// Executes a shell command and returns an error if it fails.
 ///
 /// # Errors

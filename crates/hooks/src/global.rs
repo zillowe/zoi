@@ -104,11 +104,34 @@ pub fn get_system_hooks_dir() -> Result<PathBuf> {
 /// Loads all available global hooks from builtin, system, user, and package
 /// store locations.
 ///
+/// When the process runs with an effective UID of 0 (e.g. under `sudo`), only
+/// root-controlled locations are considered: see [`load_hooks_for_privilege`].
+///
 /// # Errors
 ///
 /// Returns an error if loading hooks from system, user, or package store
 /// directories fails.
 pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
+    load_hooks_for_privilege(utils::is_effective_root())
+}
+
+/// Loads global hooks, restricting the search to root-controlled locations when
+/// `as_root` is `true`.
+///
+/// - `as_root == false`: builtin hooks, the system hooks directory, the user
+///   hooks directory and hooks bundled with packages in the System, User and
+///   Project stores (the historical behavior).
+/// - `as_root == true`: builtin hooks, the system hooks directory and hooks
+///   bundled with packages in the System store only. User and project locations
+///   are writable by unprivileged users and are never loaded. Every hook file
+///   (and the directory containing it) must additionally be owned by root and
+///   must not be group- or world-writable; other files are skipped with a
+///   warning.
+///
+/// # Errors
+///
+/// Returns an error if a hooks directory cannot be determined or created.
+pub fn load_hooks_for_privilege(as_root: bool) -> Result<Vec<GlobalHook>> {
     let mut hook_map = HashMap::new();
 
     for (name, content) in BUILTIN_HOOKS {
@@ -124,14 +147,23 @@ pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
         }
     }
 
-    let mut dirs = vec![get_system_hooks_dir()?, get_user_hooks_dir()?];
+    let mut dirs = vec![get_system_hooks_dir()?];
+    if !as_root {
+        dirs.push(get_user_hooks_dir()?);
+    }
+
+    let store_scopes: &[types::Scope] = if as_root {
+        &[types::Scope::System]
+    } else {
+        &[
+            types::Scope::System,
+            types::Scope::User,
+            types::Scope::Project
+        ]
+    };
 
     // Scan the package store for bundled hooks
-    for scope in [
-        types::Scope::System,
-        types::Scope::User,
-        types::Scope::Project
-    ] {
+    for &scope in store_scopes {
         if let Ok(store_root) = utils::get_store_base_dir(scope) {
             if !store_root.exists() {
                 continue;
@@ -174,8 +206,17 @@ pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
         if !dir.exists() {
             continue;
         }
+        if as_root && !utils::is_root_owned_and_protected(&dir) {
+            eprintln!(
+                "{}: Ignoring hooks directory {} because it is not owned by \
+                 root or is writable by other users.",
+                "Warning".yellow().bold(),
+                dir.display()
+            );
+            continue;
+        }
         let mut hook_paths = Vec::new();
-        if let Ok(entries) = fs::read_dir(dir) {
+        if let Ok(entries) = fs::read_dir(&dir) {
             for entry in entries.flatten() {
                 hook_paths.push(entry.path());
             }
@@ -186,6 +227,19 @@ pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
                 let is_hook = path.to_string_lossy().ends_with(".hook.yaml")
                     || path.extension().and_then(|s| s.to_str())
                         == Some("yaml");
+
+                if is_hook
+                    && as_root
+                    && !utils::is_root_owned_and_protected(&path)
+                {
+                    eprintln!(
+                        "{}: Ignoring hook {} because it is not owned by root \
+                         or is writable by other users.",
+                        "Warning".yellow().bold(),
+                        path.display()
+                    );
+                    continue;
+                }
 
                 if is_hook
                     && let Ok(content) = fs::read_to_string(&path)
@@ -355,14 +409,74 @@ pub fn trigger_matches_modified_files(
     false
 }
 
+/// Returns the location of the hook trust database.
+///
+/// Unprivileged runs use the user hooks directory. Runs with an effective UID
+/// of 0 use `<system data dir>/hooks/trusted_hashes.json` (e.g.
+/// `/var/lib/zoi/hooks/trusted_hashes.json`), so an unprivileged user cannot
+/// pre-approve hooks that root will execute.
+///
+/// # Errors
+///
+/// Returns an error if the user hooks directory cannot be determined.
+pub fn get_trusted_hashes_path(as_root: bool) -> Result<PathBuf> {
+    if as_root {
+        Ok(utils::get_system_data_dir()
+            .join("hooks")
+            .join("trusted_hashes.json"))
+    } else {
+        Ok(get_user_hooks_dir()?.join("trusted_hashes.json"))
+    }
+}
+
+/// Writes the trust database, creating its directory and restricting its
+/// permissions when running as root.
+fn write_trusted_hashes(
+    path: &Path,
+    trusted: &HashMap<String, String>,
+    as_root: bool
+) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let content = serde_json::to_string_pretty(trusted)?;
+    fs::write(path, content)?;
+    #[cfg(unix)]
+    {
+        if as_root {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(path, fs::Permissions::from_mode(0o644))?;
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = as_root;
+    }
+    Ok(())
+}
+
 /// Checks if a hook is trusted by comparing its hash against the trusted
 /// database.
-fn is_hook_trusted(hook: &GlobalHook) -> Result<bool> {
+fn is_hook_trusted(hook: &GlobalHook, as_root: bool) -> Result<bool> {
     let mut hasher = Sha256::new();
     hasher.update(hook.action.exec.as_bytes());
     let hash = hex::encode(hasher.finalize());
 
-    let trusted_path = get_user_hooks_dir()?.join("trusted_hashes.json");
+    let trusted_path = get_trusted_hashes_path(as_root)?;
+    if as_root
+        && trusted_path.exists()
+        && !utils::is_root_owned_and_protected(&trusted_path)
+    {
+        eprintln!(
+            "{}: Refusing to use hook trust database {} because it is not \
+             owned by root or is writable by other users. Hook '{}' will not \
+             run.",
+            "SECURITY WARNING".yellow().bold(),
+            trusted_path.display(),
+            hook.name
+        );
+        return Ok(false);
+    }
     let mut trusted: HashMap<String, String> = if trusted_path.exists() {
         let content = fs::read_to_string(&trusted_path)?;
         serde_json::from_str(&content).unwrap_or_default()
@@ -392,8 +506,7 @@ fn is_hook_trusted(hook: &GlobalHook) -> Result<bool> {
         false
     ) {
         trusted.insert(hook.name.clone(), hash);
-        let content = serde_json::to_string_pretty(&trusted)?;
-        fs::write(trusted_path, content)?;
+        write_trusted_hashes(&trusted_path, &trusted, as_root)?;
         Ok(true)
     } else {
         Ok(false)
@@ -421,7 +534,8 @@ pub fn run_global_hooks(
     operation: &str,
     scope: types::Scope
 ) -> Result<()> {
-    let all_hooks = load_all_hooks()?;
+    let as_root = utils::is_effective_root();
+    let all_hooks = load_hooks_for_privilege(as_root)?;
     let mut triggered_hooks = HashSet::new();
     let current_platform = utils::get_platform()?;
 
@@ -450,7 +564,7 @@ pub fn run_global_hooks(
             modified_packages
         ) && triggered_hooks.insert(hook.name.clone())
         {
-            if !hook.is_builtin && !is_hook_trusted(&hook)? {
+            if !hook.is_builtin && !is_hook_trusted(&hook, as_root)? {
                 println!("Skipping untrusted hook: {}", hook.name);
                 continue;
             }

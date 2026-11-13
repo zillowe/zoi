@@ -113,12 +113,12 @@ pub fn resolve_to_installed_bin(
 ) -> Result<PathBuf> {
     let desired_version = get_desired_version(bin_name, plugin_manager)?;
 
-    let providers = db::find_provides("local", bin_name)?;
+    let providers = exact_bin_providers(bin_name)?;
 
     if let Some(version) = &desired_version {
-        for (pkg, _) in &providers {
+        for provider in &providers {
             if let Some(path) =
-                search_store_for_version(&pkg.name, version, bin_name)?
+                search_store_for_version(&provider.name, version, bin_name)?
             {
                 return Ok(path);
             }
@@ -134,10 +134,10 @@ pub fn resolve_to_installed_bin(
             )
         {
             install(bin_name, version)?;
-            let providers = db::find_provides("local", bin_name)?;
-            for (pkg, _) in &providers {
+            let providers = exact_bin_providers(bin_name)?;
+            for provider in &providers {
                 if let Some(path) =
-                    search_store_for_version(&pkg.name, version, bin_name)?
+                    search_store_for_version(&provider.name, version, bin_name)?
                 {
                     return Ok(path);
                 }
@@ -153,31 +153,44 @@ pub fn resolve_to_installed_bin(
     }
 
     if let Some(version) = &desired_version {
-        for (pkg, _) in &providers {
+        for provider in &providers {
             if let Some(path) =
-                search_store_for_version(&pkg.name, version, bin_name)?
+                search_store_for_version(&provider.name, version, bin_name)?
             {
                 return Ok(path);
             }
         }
     }
 
-    let Some((pkg, _)) = providers.first() else {
+    let Some(provider) = providers.first() else {
         return Err(anyhow!(
             "No installed package provides binary '{bin_name}'."
         ));
     };
+    let pkg_name = provider.name.as_str();
 
-    if let Some(path) = search_store_for_version(&pkg.name, "latest", bin_name)?
+    if let Some(path) = search_store_for_version(pkg_name, "latest", bin_name)?
     {
         return Ok(path);
     }
 
-    let version = pkg.version.as_deref().ok_or_else(|| {
-        anyhow!("Package '{}' has no version info in DB", pkg.name)
-    })?;
+    let version = [Scope::Project, Scope::User, Scope::System]
+        .into_iter()
+        .find_map(|scope| {
+            local::is_package_installed(
+                pkg_name,
+                provider.sub_package.as_deref(),
+                scope
+            )
+            .ok()
+            .flatten()
+        })
+        .map(|manifest| manifest.version)
+        .ok_or_else(|| {
+            anyhow!("Package '{pkg_name}' has no installed manifest")
+        })?;
 
-    if let Some(path) = search_store_for_version(&pkg.name, version, bin_name)?
+    if let Some(path) = search_store_for_version(pkg_name, &version, bin_name)?
     {
         return Ok(path);
     }
@@ -196,7 +209,7 @@ pub fn resolve_to_installed_bin(
             }
 
             if let Some(dir_name) = path.file_name().and_then(|s| s.to_str())
-                && dir_name.ends_with(&format!("-{}", pkg.name))
+                && dir_name.ends_with(&format!("-{pkg_name}"))
             {
                 let latest_dir = path.join("latest");
                 if latest_dir.exists()
@@ -284,9 +297,8 @@ fn get_desired_version(
         for pkg_spec in project_cfg.pkgs {
             if let Ok(req) = resolve::parse_source_string(&pkg_spec) {
                 let is_match = req.name == bin_name || {
-                    if let Ok(providers) = db::find_provides("local", bin_name)
-                    {
-                        providers.iter().any(|(p, _)| p.name == req.name)
+                    if let Ok(providers) = exact_bin_providers(bin_name) {
+                        providers.iter().any(|p| p.name == req.name)
                     } else {
                         false
                     }
@@ -309,6 +321,28 @@ fn get_desired_version(
     }
 
     Ok(None)
+}
+
+/// Returns the installed packages that provide exactly the binary
+/// `bin_name`, across every scope (project first, matching the store search
+/// order), plus rows recorded without a scope.
+///
+/// `db::find_provides` is the fuzzy search behind `zoi provides` (substring
+/// matches on binary names, path-suffix matches on files), so a shim for
+/// `go` could resolve to a package that merely ships `gofmt`. Shims need the
+/// exact provider.
+fn exact_bin_providers(bin_name: &str) -> Result<Vec<db::BinProvider>> {
+    let conn = db::open_connection("local")?;
+    let mut providers = Vec::new();
+    for scope in [
+        Some(Scope::Project),
+        Some(Scope::User),
+        Some(Scope::System),
+        None
+    ] {
+        providers.extend(db::find_exact_bin_providers(&conn, bin_name, scope)?);
+    }
+    Ok(providers)
 }
 
 /// Searches the Zoi store for a specific version of a package that provides a

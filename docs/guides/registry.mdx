@@ -86,29 +86,17 @@ Builds a zstd-compressed `.zrepo` snapshot of the registry - a single file that 
 
 - **Reproducible:** The same registry always produces byte-identical output, which is what makes incremental updates possible.
 - **Sidecars:** Writes a `.hash` and a `.size` file next to the snapshot, plus a `.sig` when `--sign` is given.
+- **zsync control file:** Also writes `<output>.zsync` beside the snapshot. Clients use it to transfer only the frames that changed since the snapshot they already hold, so there is no separate patch to build or publish.
 - **Exclusions:** Git plumbing and previously built snapshots are left out.
+
+If `-o` is omitted, the snapshot is written to `<handle>.zrepo` inside the registry directory, using the handle declared in `repo.yaml`.
 
 ```sh
 zoi registry zrepo . -o main.zrepo
 zoi registry zrepo . -o main.zrepo --sign your-key-id
 ```
 
-### `zoi registry zdelta <old.zrepo> [path]`
-
-(alias: `snapshot-delta`)
-
-Builds a `.zdelta` update patch that takes a client from an older `.zrepo` snapshot up to the current state of the registry. Only the differences are transferred, so a client that synced recently fetches a few hundred bytes instead of the whole snapshot.
-
-- **Verified:** The patch records the hash of both the base and the resulting snapshot, so a client can prove the patch applies to exactly the snapshot it holds.
-- **Reported:** Prints the patch size, the full download size, and the difference, warning if the patch would not be worth publishing.
-
-```sh
-# Build the snapshot, then the patch that updates the previous release
-zoi registry zrepo . -o main.zrepo
-zoi registry zdelta ../previous/main.zrepo . -o main.zrepo.zdelta
-```
-
-Add the resulting URLs to the `zrepo` section of `repo.yaml` so clients can find them. See [Snapshot Registries](/docs/zds/zoi/repositories#snapshot-registries-zrepo) for the full configuration reference.
+Publish the snapshot and its `.zsync` control file together, then add their URLs to the `zrepo` section of `repo.yaml` so clients can find them. See [Snapshot Registries](/docs/zds/zoi/repositories#snapshot-registries-zrepo) for the full configuration reference.
 
 ---
 

@@ -125,9 +125,27 @@ fn clone_repository(
     destination: &Path,
     revision: Option<&str>
 ) -> Result<()> {
+    // Values starting with `-` would be parsed by git as options (for
+    // example `--upload-pack=...`), so they are rejected outright and `--`
+    // ends option parsing before the positional arguments.
+    if url.starts_with('-') {
+        return Err(anyhow!(
+            "Refusing to clone '{url}': a git URL must not start with '-'."
+        ));
+    }
+    if let Some(revision) = revision
+        && revision.starts_with('-')
+    {
+        return Err(anyhow!(
+            "Refusing to check out revision '{revision}': a git revision must \
+             not start with '-'."
+        ));
+    }
+
     let output = Command::new("git")
         .arg("clone")
         .arg("--no-tags")
+        .arg("--")
         .arg(url)
         .arg(destination)
         .output()

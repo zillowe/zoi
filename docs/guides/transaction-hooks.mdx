@@ -21,7 +21,7 @@ Hooks are defined using simple YAML files. They can be placed in:
 
 - **Packages (Bundled):** Installed directly inside the package store via `${pkgstore}/hooks/` in `.pkg.lua`. These hooks are versioned with the package, automatically discovered by Zoi across scopes, and cleanly garbage-collected when the package version is removed or pruned.
 - **System:** `/etc/zoi/hooks/`
-- **User:** the user data directory under `zoi/hooks/`
+- **User:** the user data directory under `zoi/hooks/` (ignored when Zoi runs as root, see below)
 - **Extensions:** Distributed via Zoi [Extensions](/docs/zds/zoi/extensions).
 
 ### Example: update-icon-cache.hook.yaml
@@ -92,3 +92,11 @@ Zoi ships with several essential builtin hooks for Linux systems:
 ## Overriding Hooks
 
 Zoi follows a hierarchical loading order. If a hook in your user data directory under `zoi/hooks/` has the same **name** as a builtin or system hook, your user hook will take precedence and override the others. This allows you to easily customize or disable standard system behaviors.
+
+### Running as root
+
+Hooks run with Zoi's privileges, so when Zoi runs as root (including through `sudo`), it only loads hooks that an unprivileged user cannot plant:
+
+- Only builtin hooks, `/etc/zoi/hooks/`, and hooks bundled with system-scope packages are loaded. User hooks and project-store hooks are ignored.
+- Hook files and their directories must be owned by root and not writable by group or others; anything else is skipped with a warning.
+- Hook trust is recorded in `/var/lib/zoi/hooks/trusted_hashes.json` instead of the user data directory, and that file must pass the same ownership check.

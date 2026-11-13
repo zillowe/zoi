@@ -665,6 +665,13 @@ pub fn get_all_repos() -> Result<Vec<String>> {
 /// - The `git clone` command fails.
 /// - The user configuration cannot be updated.
 pub fn clone_git_repo(url: &str) -> Result<()> {
+    // A URL starting with `-` would be parsed by git as an option (e.g.
+    // `--upload-pack=...`), so it is rejected and `--` ends option parsing.
+    if url.starts_with('-') {
+        return Err(anyhow!(
+            "Refusing to clone '{url}': a git URL must not start with '-'."
+        ));
+    }
     let git_root = get_git_root()?;
     fs::create_dir_all(&git_root)?;
     let repo_name = url
@@ -684,6 +691,7 @@ pub fn clone_git_repo(url: &str) -> Result<()> {
     let status = std::process::Command::new("git")
         .arg("clone")
         .arg("--depth=1")
+        .arg("--")
         .arg(url)
         .arg(&target)
         .status()?;
@@ -956,12 +964,19 @@ pub fn add_resolved_registry(registry: Registry) -> Result<()> {
 ///
 /// # Errors
 ///
-/// Returns an error if the registry is already present.
+/// Returns an error if the registry handle is not a safe path component or
+/// the registry is already present.
 fn push_added_registry(
     config: &mut Config,
     registry: Registry,
     identity: &str
 ) -> Result<()> {
+    // Handles become directory names under the database root, so reject
+    // anything that could escape it. An empty handle is filled in on sync.
+    if !registry.handle.is_empty() {
+        crate::utils::validate_registry_handle(&registry.handle)?;
+    }
+
     if config
         .added_registries
         .iter()

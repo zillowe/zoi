@@ -227,7 +227,7 @@ function package()
 end
 
 function test()
-  local _, _, code = cmd(STAGING_DIR .. "/data/pkgstore/bin/my-cli --version")
+  local _, _, code = cmd(STAGING_DIR .. "/pkgstore/bin/my-cli --version")
   return code == 0
 end
 ```

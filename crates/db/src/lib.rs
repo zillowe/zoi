@@ -530,7 +530,14 @@ pub fn update_package(
     Ok(conn.last_insert_rowid())
 }
 
-/// Retrieves the internal database ID for a package.
+/// Retrieves the internal database ID for a package, ignoring its scope.
+///
+/// Scope is part of the package identity (`UNIQUE(name, sub_package, repo,
+/// scope, registry)`), so the same package installed in several scopes has
+/// several rows. This function returns the newest matching row and is only
+/// suitable for registry databases (which carry no scope) or callers that
+/// genuinely do not know the scope. Prefer [`get_package_id_scoped`] for
+/// installed packages.
 ///
 /// # Errors
 ///
@@ -544,8 +551,35 @@ pub fn get_package_id(
 ) -> Result<i64> {
     let id = conn.query_row(
         "SELECT id FROM packages WHERE name = ?1 AND sub_package IS ?2 AND \
-         repo = ?3 AND registry IS ?4",
+         repo = ?3 AND registry IS ?4 ORDER BY id DESC LIMIT 1",
         params![name, sub_package, repo, registry],
+        |row| row.get(0)
+    )?;
+    Ok(id)
+}
+
+/// Retrieves the internal database ID for a package in a specific scope.
+///
+/// Matches the full identity used by the `packages` UNIQUE key (`name`,
+/// `sub_package`, `repo`, `scope`, `registry`). `None` scope matches rows
+/// recorded without a scope.
+///
+/// # Errors
+///
+/// Returns an error if the query fails or if the package is not found.
+pub fn get_package_id_scoped(
+    conn: &Connection,
+    name: &str,
+    sub_package: Option<&str>,
+    repo: &str,
+    registry: &str,
+    scope: Option<types::Scope>
+) -> Result<i64> {
+    let scope_str = scope.map(|s| format!("{s:?}").to_lowercase());
+    let id = conn.query_row(
+        "SELECT id FROM packages WHERE name = ?1 AND sub_package IS ?2 AND \
+         repo = ?3 AND registry IS ?4 AND scope IS ?5",
+        params![name, sub_package, repo, registry, scope_str],
         |row| row.get(0)
     )?;
     Ok(id)
@@ -992,6 +1026,12 @@ pub fn get_other_owners(
 
 /// Deletes a package from the database.
 ///
+/// `registry` is the registry handle the package was installed from. When
+/// `Some`, only the row from that registry is removed, so uninstalling
+/// `#reg-a@core/foo` does not also drop `#reg-b@core/foo`. `None` removes the
+/// package from every registry (legacy behavior, for callers that do not
+/// know the handle).
+///
 /// # Errors
 ///
 /// Returns an error if the database execution fails.
@@ -1000,16 +1040,25 @@ pub fn delete_package(
     name: &str,
     sub_package: Option<&str>,
     repo: &str,
-    scope: Option<types::Scope>
+    scope: Option<types::Scope>,
+    registry: Option<&str>
 ) -> Result<()> {
     let scope_str = scope.map(|s| format!("{s:?}").to_lowercase());
     // `IS` already matches NULLs as equal; the old `OR scope IS NULL`
     // deleted NULL-scope rows on every scoped uninstall.
-    conn.execute(
-        "DELETE FROM packages WHERE name = ?1 AND sub_package IS ?2 AND repo \
-         = ?3 AND scope IS ?4",
-        params![name, sub_package, repo, scope_str]
-    )?;
+    if let Some(registry) = registry {
+        conn.execute(
+            "DELETE FROM packages WHERE name = ?1 AND sub_package IS ?2 AND \
+             repo = ?3 AND scope IS ?4 AND registry IS ?5",
+            params![name, sub_package, repo, scope_str, registry]
+        )?;
+    } else {
+        conn.execute(
+            "DELETE FROM packages WHERE name = ?1 AND sub_package IS ?2 AND \
+             repo = ?3 AND scope IS ?4",
+            params![name, sub_package, repo, scope_str]
+        )?;
+    }
     Ok(())
 }
 
@@ -1251,6 +1300,75 @@ pub fn find_provides(
     });
 
     Ok(results)
+}
+
+/// Identity of an installed package row that provides a binary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BinProvider {
+    /// Package name.
+    pub name: String,
+    /// Sub-package name, if any.
+    pub sub_package: Option<String>,
+    /// Repository the package was installed from.
+    pub repo: String,
+    /// Registry handle the package was installed from.
+    pub registry: Option<String>
+}
+
+/// Finds installed packages in `scope` that provide exactly the binary `bin`.
+///
+/// Unlike [`find_provides`], which is a fuzzy search for `zoi provides`
+/// (substring matches on binary names, path suffix matches on files, no
+/// scope filter), this only reports packages whose recorded binary list
+/// contains `bin` verbatim, or whose implicit binary (a non-split package
+/// with no explicit `bins`) is named `bin`. It is meant for ref-counting
+/// shims during uninstall.
+///
+/// # Errors
+///
+/// Returns an error if the query fails.
+pub fn find_exact_bin_providers(
+    conn: &Connection,
+    bin: &str,
+    scope: Option<types::Scope>
+) -> Result<Vec<BinProvider>> {
+    let scope_str = scope.map(|s| format!("{s:?}").to_lowercase());
+    let mut stmt = conn.prepare(
+        "SELECT name, sub_package, repo, registry, bins FROM packages WHERE \
+         scope IS ?1"
+    )?;
+    let rows = stmt.query_map(params![scope_str], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, Option<String>>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, Option<String>>(3)?,
+            row.get::<_, Option<String>>(4)?
+        ))
+    })?;
+
+    let mut providers = Vec::new();
+    for row in rows {
+        let (name, sub_package, repo, registry, bins_raw) = row?;
+        let bins: Vec<String> = bins_raw
+            .as_deref()
+            .and_then(|raw| serde_json::from_str(raw).ok())
+            .unwrap_or_default();
+        let ships_bin = if bins.is_empty() {
+            sub_package.is_none() && name == bin
+        } else {
+            bins.iter().any(|b| b == bin)
+        };
+        if ships_bin {
+            providers.push(BinProvider {
+                name,
+                sub_package,
+                repo,
+                registry
+            });
+        }
+    }
+    Ok(providers)
 }
 
 /// Searches for packages matching a search term.
@@ -1618,11 +1736,16 @@ pub fn get_dependents(
             return Err(rusqlite::Error::QueryReturnedNoRows);
         }
 
-        let tags_raw: String = row.get(5)?;
-        let tags: Vec<String> =
-            serde_json::from_str(&tags_raw).unwrap_or_default();
-        let type_raw: String = row.get(4)?;
-        let package_type = match type_raw.as_str() {
+        // Nullable columns are read as `Option` so a legacy row with missing
+        // metadata does not turn into a hard error now that row errors are
+        // propagated.
+        let tags_raw: Option<String> = row.get(5)?;
+        let tags: Vec<String> = tags_raw
+            .as_deref()
+            .and_then(|raw| serde_json::from_str(raw).ok())
+            .unwrap_or_default();
+        let type_raw: Option<String> = row.get(4)?;
+        let package_type = match type_raw.as_deref().unwrap_or_default() {
             "collection" => types::PackageType::Collection,
             "app" => types::PackageType::App,
             "extension" => types::PackageType::Extension,
@@ -1640,10 +1763,10 @@ pub fn get_dependents(
             name,
             repo: row.get(1)?,
             version: row.get(2)?,
-            description: row.get(3)?,
+            description: row.get::<_, Option<String>>(3)?.unwrap_or_default(),
             package_type,
             tags,
-            license: row.get(6)?,
+            license: row.get::<_, Option<String>>(6)?.unwrap_or_default(),
             sub_package: row.get(7)?,
             scope,
             registry_handle: row.get(9)?,
@@ -1654,8 +1777,14 @@ pub fn get_dependents(
     })?;
 
     let mut pkgs = Vec::new();
-    for pkg in rows.flatten() {
-        pkgs.push(pkg);
+    for row in rows {
+        match row {
+            Ok(pkg) => pkgs.push(pkg),
+            // The row mapper uses `QueryReturnedNoRows` as its "does not
+            // depend on the target" marker; every other error is real.
+            Err(rusqlite::Error::QueryReturnedNoRows) => {}
+            Err(e) => return Err(e.into())
+        }
     }
     Ok(pkgs)
 }

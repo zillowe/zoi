@@ -3,6 +3,8 @@
 //! This crate contains the logic for installing packages, managing lockfiles,
 //! and resolving dependencies.
 
+/// Shared rules for the trust-relevant entries of package archives.
+pub mod archive_trust;
 /// Module for creating package installations.
 pub mod create;
 /// Module for installing dependencies.

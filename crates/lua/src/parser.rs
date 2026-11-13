@@ -130,8 +130,13 @@ fn parse_lua_package_from_file_for_platform(
     let lua_code = fs::read_to_string(file_path)?;
     let lua = Lua::new();
 
-    functions::setup_lua_environment(
+    // Parsing only reads metadata. Package scripts are evaluated without any
+    // API that runs commands or writes to the host; lifecycle functions are
+    // merely defined here and only executed later in a full build
+    // environment.
+    functions::setup_lua_environment_with_mode(
         &lua,
+        functions::LuaEnvMode::Metadata,
         platform,
         version_override,
         Some(file_path),

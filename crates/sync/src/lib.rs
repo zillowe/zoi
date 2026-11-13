@@ -341,6 +341,26 @@ fn refresh_registry_db(
     Ok(())
 }
 
+/// Checks a downloaded pre-indexed database against the `db_hash` digest from
+/// `repo.yaml` (`sha512-<hex>`, `sha256-<hex>`, or bare SHA-512 hex).
+fn verify_db_digest(path: &Path, expected: &str) -> Result<()> {
+    let expected = expected.trim();
+    let (algo_name, hex) = match expected.split_once('-') {
+        Some((algo, hex)) => (algo, hex),
+        None => ("sha512", expected)
+    };
+    let algo = zoi_core::hash::HashAlgorithm::from_name(algo_name).ok_or_else(
+        || anyhow!("unsupported db_hash algorithm '{algo_name}'")
+    )?;
+    let actual = zoi_core::hash::calculate_file_hash(path, algo)?;
+    if hex.is_empty() || !actual.eq_ignore_ascii_case(hex) {
+        return Err(anyhow!(
+            "expected {algo_name}-{hex}, got {algo_name}-{actual}"
+        ));
+    }
+    Ok(())
+}
+
 /// Verifies the PGP signature of the latest commit in a registry repository.
 ///
 /// This ensures that the registry state hasn't been tampered with on the
@@ -510,6 +530,7 @@ fn run_verbose_at_path(db_url: &str, db_path: &Path) -> Result<()> {
             .arg("clone")
             .arg("--depth=1")
             .arg("--progress")
+            .arg("--")
             .arg(db_url)
             .arg(db_path)
             .stdout(Stdio::inherit())
@@ -542,6 +563,7 @@ fn run_quiet_git_at_path(db_url: &str, db_path: &Path) -> Result<()> {
             .arg("clone")
             .arg("--depth=1")
             .arg("--quiet")
+            .arg("--")
             .arg(db_url)
             .arg(db_path)
             .output()?;
@@ -889,6 +911,7 @@ fn fetch_handle_by_cloning(url: &str, verbose: bool) -> Result<String> {
     let status = std::process::Command::new("git")
         .arg("clone")
         .arg("--depth=1")
+        .arg("--")
         .arg(url)
         .arg(temp_dir.path())
         .stdout(if verbose {
@@ -1033,7 +1056,24 @@ pub fn fetch_repo_config_over_http(url: &str) -> Result<types::RepoConfig> {
 
 /// Resolves the registry handle for a given URL, using direct fetch or cloning
 /// as needed.
+///
+/// The handle comes from the registry's (untrusted) `repo.yaml` and is used as
+/// a path component, so it is validated with
+/// [`core_utils::validate_registry_handle`].
 fn fetch_handle_for_url(url: &str, verbose: bool) -> Result<String> {
+    let handle = fetch_unvalidated_handle_for_url(url, verbose)?;
+    core_utils::validate_registry_handle(&handle).map_err(|e| {
+        anyhow!("Registry at '{url}' declares an unusable name: {e}")
+    })?;
+    Ok(handle)
+}
+
+/// Reads the `name` field of the `repo.yaml` behind `url` without validating
+/// it. Use [`fetch_handle_for_url`] instead.
+fn fetch_unvalidated_handle_for_url(
+    url: &str,
+    verbose: bool
+) -> Result<String> {
     if verbose {
         println!(
             "Attempting to fetch handle for '{}' directly...",
@@ -1084,6 +1124,9 @@ fn fetch_handle_for_url(url: &str, verbose: bool) -> Result<String> {
 /// Returns an error if the document cannot be fetched or parsed.
 pub fn resolve_registry_from_url(url: &str) -> Result<types::Registry> {
     let repo_config = fetch_repo_config_over_http(url)?;
+    core_utils::validate_registry_handle(&repo_config.name).map_err(|e| {
+        anyhow!("Registry at '{url}' declares an unusable name: {e}")
+    })?;
 
     Ok(types::Registry {
         handle: repo_config.name.clone(),
@@ -1356,6 +1399,15 @@ fn sync_registry(
         reg_changed = true;
     }
 
+    // Handles stored in the config may predate validation (or have been
+    // edited by hand); never join an unvalidated handle onto the db root.
+    if let Err(e) = core_utils::validate_registry_handle(&reg.handle) {
+        if let Some(p) = &pb {
+            p.abandon_with_message("Sync failed.".red().to_string());
+        }
+        return Err(anyhow!("Cannot sync registry '{}': {e}", reg.url));
+    }
+
     let target_dir = db_root.join(&reg.handle);
     let pb_ref = pb.as_ref();
 
@@ -1468,8 +1520,30 @@ fn sync_registry(
         }
     } else {
         let mut db_downloaded = false;
+        // A pre-indexed database is a binary blob that the registry's
+        // signature only covers through the `db_hash` digest in repo.yaml.
+        // For a registry with configured authorities, a database without that
+        // digest would bypass the signature check entirely, so the index is
+        // rebuilt locally from the verified content instead.
+        let registry_is_signed =
+            reg.authorities.as_ref().is_some_and(|a| !a.is_empty());
+        let repo_config = config::read_repo_config(&target_dir).ok();
+        let db_hash = repo_config.as_ref().and_then(|c| c.db_hash.clone());
+        if registry_is_signed
+            && db_hash.is_none()
+            && repo_config.as_ref().is_some_and(|c| c.db.is_some())
+            && verbose
+        {
+            println!(
+                "Registry '{}' is signed but publishes no db_hash; building \
+                 the index locally instead of downloading an unverifiable \
+                 pre-indexed database.",
+                reg.handle
+            );
+        }
         if !is_local
-            && let Ok(repo_config) = config::read_repo_config(&target_dir)
+            && (!registry_is_signed || db_hash.is_some())
+            && let Some(repo_config) = &repo_config
             && let Some(db_url_template) = &repo_config.db
         {
             let platform = core_utils::get_platform().unwrap_or_default();
@@ -1500,7 +1574,18 @@ fn sync_registry(
                 )
                 .is_ok()
                 {
-                    if fs::rename(&temp_db_path, &db_path).is_ok() {
+                    if let Some(expected) = &db_hash
+                        && let Err(e) =
+                            verify_db_digest(&temp_db_path, expected)
+                    {
+                        eprintln!(
+                            "{}: Pre-indexed database for '{}' failed \
+                             verification ({e}); building the index locally.",
+                            "Warning".yellow(),
+                            reg.handle
+                        );
+                        let _ = fs::remove_file(&temp_db_path);
+                    } else if fs::rename(&temp_db_path, &db_path).is_ok() {
                         db_downloaded = true;
                         if verbose {
                             println!("Successfully downloaded pre-indexed DB.");
@@ -1539,6 +1624,34 @@ fn sync_registry(
     Ok((reg, reg_changed))
 }
 
+/// Collects the `mirror` Git URLs advertised by a registry's `repo.yaml`.
+///
+/// The previously synced copy at `target_dir` is preferred; otherwise the
+/// document is fetched from `url` (unless Zoi is offline). The primary `url`
+/// itself is never returned.
+fn registry_mirror_urls(url: &str, target_dir: &Path) -> Vec<String> {
+    let repo_config = config::read_repo_config(target_dir).ok().or_else(|| {
+        if offline::is_offline() {
+            return None;
+        }
+        fetch_repo_yaml_content(url)
+            .ok()
+            .and_then(|c| serde_yaml::from_str::<types::RepoConfig>(&c).ok())
+    });
+    let mut mirrors: Vec<String> = Vec::new();
+    if let Some(repo_config) = repo_config {
+        for link in repo_config.git {
+            if link.link_type == "mirror"
+                && link.url != url
+                && !mirrors.contains(&link.url)
+            {
+                mirrors.push(link.url);
+            }
+        }
+    }
+    mirrors
+}
+
 /// Performs a project-local sync of registries.
 ///
 /// In Specification v2, projects can have their own isolated package databases
@@ -1549,7 +1662,7 @@ fn sync_registry(
 /// Returns an error if the sync process fails.
 pub fn run_local(
     verbose: bool,
-    _fallback: bool,
+    fallback: bool,
     force: bool,
     frozen: bool
 ) -> Result<()> {
@@ -1596,13 +1709,68 @@ pub fn run_local(
     let results: Vec<((String, String), String)> = registries
         .into_par_iter()
         .map(|(handle, url, revision)| {
+            // Handles and revisions come from zoi.lua / zoi.lock, which may be
+            // part of an untrusted checkout.
+            core_utils::validate_registry_handle(&handle).map_err(|e| {
+                anyhow!("Invalid registry handle in project configuration: {e}")
+            })?;
+            if revision.starts_with('-') {
+                return Err(anyhow!(
+                    "Invalid revision '{revision}' for registry '{handle}': \
+                     revisions must not start with '-'."
+                ));
+            }
+
             let target_dir = local_db_root.join(&handle);
 
             if force && target_dir.exists() {
                 fs::remove_dir_all(&target_dir)?;
             }
 
-            try_sync_at_path(&url, &target_dir, verbose, m.as_ref(), None)?;
+            if let Err(primary_error) =
+                try_sync_at_path(&url, &target_dir, verbose, m.as_ref(), None)
+            {
+                if !fallback {
+                    return Err(primary_error);
+                }
+                let mirrors = registry_mirror_urls(&url, &target_dir);
+                if mirrors.is_empty() {
+                    return Err(primary_error);
+                }
+                eprintln!(
+                    "{} Sync of registry '{handle}' from {} failed: \
+                     {primary_error}. Trying mirrors...",
+                    "Warning:".yellow(),
+                    url.yellow()
+                );
+                let mut synced = false;
+                let mut last_error = primary_error;
+                for mirror in mirrors {
+                    match try_sync_at_path(
+                        &mirror,
+                        &target_dir,
+                        verbose,
+                        m.as_ref(),
+                        None
+                    ) {
+                        Ok(()) => {
+                            synced = true;
+                            break;
+                        }
+                        Err(e) => {
+                            eprintln!(
+                                "{} Mirror {} failed: {e}",
+                                "Warning:".yellow(),
+                                mirror.yellow()
+                            );
+                            last_error = e;
+                        }
+                    }
+                }
+                if !synced {
+                    return Err(last_error);
+                }
+            }
 
             if !revision.is_empty() {
                 if verbose {
@@ -1611,11 +1779,14 @@ pub fn run_local(
                          '{handle}'..."
                     );
                 }
+                // `<rev> --` makes git treat the argument strictly as a
+                // revision, never as an option or a pathspec.
                 let status = Command::new("git")
                     .arg("-C")
                     .arg(&target_dir)
                     .arg("checkout")
                     .arg(&revision)
+                    .arg("--")
                     .stdout(if verbose {
                         Stdio::inherit()
                     } else {
@@ -1744,6 +1915,14 @@ pub fn run(
 
     if force {
         for (reg, _) in &registries_to_sync {
+            // An empty handle is resolved during the sync itself; joining it
+            // here would point at the db root.
+            if reg.handle.is_empty() {
+                continue;
+            }
+            core_utils::validate_registry_handle(&reg.handle).map_err(|e| {
+                anyhow!("Cannot force-sync registry '{}': {e}", reg.url)
+            })?;
             let db_file = db_root.join(format!("{}.db", reg.handle));
             if db_file.exists() {
                 if verbose {

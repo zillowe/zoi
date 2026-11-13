@@ -30,6 +30,43 @@ use zoi_resolver::resolve;
 use zstd::stream::read::Decoder as ZstdDecoder;
 use zstd::stream::write::Encoder as ZstdEncoder;
 
+/// Top-level key of a pooled `manifest.json` that records the SHA-256 of the
+/// `.pkg.lua` bundled next to it, as `sha256-<hex>`.
+///
+/// The installer parses (and so executes) that `.pkg.lua`, but the embedded
+/// `manifest.sig` only covers `manifest.json`. Recording the definition's
+/// digest inside the signed manifest extends the signature to it. It is an
+/// extra JSON key rather than a `PooledZpaManifest` field so that existing
+/// readers, which ignore unknown keys, keep parsing new archives unchanged.
+pub const PKG_LUA_HASH_KEY: &str = "pkg_lua_sha256";
+
+/// Serializes a pooled manifest for an archive whose bundled package
+/// definition is `package_file`, recording the definition's digest under
+/// [`PKG_LUA_HASH_KEY`].
+///
+/// # Errors
+///
+/// Returns an error if the manifest cannot be serialized or the package file
+/// cannot be hashed.
+fn pooled_manifest_json(
+    manifest: &PooledZpaManifest,
+    package_file: &Path
+) -> Result<String> {
+    let mut value = serde_json::to_value(manifest)?;
+    let hash = zoi_core::hash::calculate_file_hash(
+        package_file,
+        zoi_core::hash::HashAlgorithm::Sha256
+    )?;
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("pooled manifest did not serialize to a map"))?;
+    object.insert(
+        PKG_LUA_HASH_KEY.to_string(),
+        serde_json::Value::String(format!("sha256-{hash}"))
+    );
+    Ok(serde_json::to_string_pretty(&value)?)
+}
+
 /// Resolves the build type to use based on requested type and supported types.
 ///
 /// # Errors
@@ -867,7 +904,8 @@ fn build_for_platform(
                 mappings: sub_mappings
             };
 
-            let manifest_json = serde_json::to_string_pretty(&sub_manifest)?;
+            let manifest_json =
+                pooled_manifest_json(&sub_manifest, package_file)?;
             fs::write(sub_staging.path().join("manifest.json"), manifest_json)?;
 
             fs::copy(
@@ -900,7 +938,8 @@ fn build_for_platform(
             mappings
         };
 
-        let manifest_json = serde_json::to_string_pretty(&pooled_manifest)?;
+        let manifest_json =
+            pooled_manifest_json(&pooled_manifest, package_file)?;
         fs::write(staging_dir.join("manifest.json"), manifest_json)?;
 
         fs::copy(
@@ -1182,15 +1221,21 @@ pub fn run(
         let mut archive = Archive::new(decoder);
         archive.unpack(temp_dir.path())?;
 
-        // Locate the .pkg.lua file inside the bundle
-        let mut pkg_lua = None;
-        for entry in WalkDir::new(temp_dir.path())
-            .into_iter()
-            .filter_map(Result::ok)
-        {
-            if entry.file_name().to_string_lossy().ends_with(".pkg.lua") {
-                pkg_lua = Some(entry.path().to_path_buf());
-                break;
+        // Locate the .pkg.lua file inside the bundle. The top-level (and,
+        // when present, signed) definition is preferred so the file built is
+        // the one the installer verified; a nested search only remains as a
+        // fallback for bundles that carry no top-level definition.
+        let mut pkg_lua =
+            super::bundle::select_bundle_pkg_lua(temp_dir.path())?;
+        if pkg_lua.is_none() {
+            for entry in WalkDir::new(temp_dir.path())
+                .into_iter()
+                .filter_map(Result::ok)
+            {
+                if entry.file_name().to_string_lossy().ends_with(".pkg.lua") {
+                    pkg_lua = Some(entry.path().to_path_buf());
+                    break;
+                }
             }
         }
 

@@ -125,13 +125,15 @@ fn test_sandbox_env_passthrough() -> Result<()> {
 
     // SAFETY: This is a test environment where we ensure thread safety.
     unsafe {
-        std::env::set_var("ZOI_TEST_SECRET_ENV", "my_secret_value");
+        std::env::set_var("ZOI_TEST_PASSTHROUGH_ENV", "passthrough_value");
     }
 
+    // A neutral name: secret-looking names (TOKEN, SECRET, ...) are never
+    // forwarded, which `fix_security_sandbox.rs` covers.
     let config = SandboxConfig {
         enabled: true,
         system: true,
-        env: vec!["ZOI_TEST_SECRET_ENV".to_string()],
+        env: vec!["ZOI_TEST_PASSTHROUGH_ENV".to_string()],
         ..Default::default()
     };
 
@@ -145,11 +147,11 @@ fn test_sandbox_env_passthrough() -> Result<()> {
     let output = cmd.output()?;
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    assert!(stdout.contains("ZOI_TEST_SECRET_ENV=my_secret_value"));
+    assert!(stdout.contains("ZOI_TEST_PASSTHROUGH_ENV=passthrough_value"));
 
     // SAFETY: Cleaning up the environment variable in a test.
     unsafe {
-        std::env::remove_var("ZOI_TEST_SECRET_ENV");
+        std::env::remove_var("ZOI_TEST_PASSTHROUGH_ENV");
     }
 
     Ok(())

@@ -180,6 +180,18 @@ When `enable` is `true`:
 2. It will verify the signature against the local PGP keyring.
 3. If verification fails or the signature is missing, **installation is aborted**. Zoi will not fall back to building from source.
 
+### What a signature covers
+
+- **Archives (`.zpa`):** an embedded signature (`manifest.sig`) signs the archive's root `manifest.json`, which lists the hash of every installed file and, for archives built by Zoi 1.30.0 or later, the SHA-256 of the bundled `.pkg.lua` (`pkg_lua_sha256`). Zoi checks the `.pkg.lua` against that hash before running it. Archives that contain more than one `manifest.json` or `manifest.sig`, or put them anywhere but the archive root, are rejected.
+- **Delta updates (`.zdelta`):** when trusted keys apply, a delta's signature is required; a missing or invalid one makes Zoi fall back to downloading the full archive. The archive rebuilt from a delta must pass the same embedded-signature check as a full download before it is installed or cached.
+- **Source bundles (`.zsa`):** the embedded signature covers the bundled `.pkg.lua` and is verified when trusted keys apply. Unsigned bundles install with a warning.
+
+### Keyring and trusted keys
+
+- Trusted keys and registry authorities must be exact key names or full fingerprints; a short ID cannot accidentally match another key.
+- A key cannot be replaced by a key with a different fingerprint under the same name (by `zoi pgp add`, registry key sync, or a package's `addPgpKey`); remove the old key first.
+- When Zoi runs as root (including through `sudo`), it uses the system keyring in `/var/lib/zoi/pgps` rather than a user's home directory, so an unprivileged user cannot influence what root trusts.
+
 ---
 
 ## Centralized Policy Distribution

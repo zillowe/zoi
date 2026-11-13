@@ -37,7 +37,9 @@ include!(concat!(env!("OUT_DIR"), "/generated_pgp_keys.rs"));
 /// accessed.
 pub fn ensure_builtin_keys() -> Result<()> {
     for (name, bytes) in BUILTIN_KEYS {
-        if let Err(e) = add_key_from_bytes(bytes, name, true) {
+        // Builtin keys ship inside the binary and are the root of trust, so
+        // they are allowed to replace whatever is stored under their name.
+        if let Err(e) = store_key_bytes(bytes, name, true, true) {
             eprintln!(
                 "Warning: Failed to ensure builtin PGP key '{name}': {e}"
             );
@@ -115,53 +117,132 @@ pub fn validate_cert(cert: &Cert) -> Result<()> {
 
 /// Returns the path to the local PGP keyring directory.
 ///
-/// This resides in Zoi's user data directory under `pgps/`. The directory is
-/// created if it does not exist.
+/// For regular users this resides in Zoi's user data directory under `pgps/`.
+/// When the process runs with an effective UID of 0 (e.g. under `sudo`), the
+/// system data directory (`/var/lib/zoi/pgps` on Linux) is used instead, so a
+/// keyring in an unprivileged user's home can never decide what root trusts.
+/// The directory is created if it does not exist.
 ///
 /// # Errors
 ///
 /// Returns an error if the home directory cannot be found or the PGP directory
 /// cannot be created.
 pub fn get_pgp_dir() -> Result<PathBuf> {
-    let pgp_dir = crate::utils::get_user_data_dir()?.join("pgps");
+    let pgp_dir = if crate::utils::is_effective_root() {
+        crate::utils::get_system_data_dir().join("pgps")
+    } else {
+        crate::utils::get_user_data_dir()?.join("pgps")
+    };
     fs::create_dir_all(&pgp_dir)?;
     Ok(pgp_dir)
+}
+
+/// The maximum accepted length of a stored key name.
+const MAX_KEY_NAME_LEN: usize = 128;
+
+/// Validates a key name before it is used as a file name in the keyring.
+///
+/// A key name must be a single, plain path component: non-empty, at most 128
+/// characters, without `/`, `\`, NUL or `..`, and not starting with `.`.
+///
+/// # Errors
+///
+/// Returns an error describing why the name was rejected.
+pub fn validate_key_name(name: &str) -> Result<()> {
+    if name.is_empty()
+        || name.len() > MAX_KEY_NAME_LEN
+        || name.starts_with('.')
+        || name.contains("..")
+        || name.contains('/')
+        || name.contains('\\')
+        || name.contains('\0')
+        || name.chars().any(char::is_control)
+    {
+        return Err(anyhow!(
+            "Invalid PGP key name '{}': a key name must be a single file name \
+             without '/', '\\', '..' or a leading '.'.",
+            name.escape_debug()
+        ));
+    }
+    Ok(())
 }
 
 /// Adds a PGP key from a byte slice to the local keyring.
 ///
 /// The key is saved as `<name>.asc` in the PGP directory. If a key with the
-/// same name exists but has different content, it will be overwritten (with a
-/// warning if `quiet` is false).
+/// same name and the same primary fingerprint already exists, it is updated
+/// (e.g. to pick up new subkeys or an extended expiry). A key with the same
+/// name but a *different* fingerprint is never replaced: the existing key must
+/// be removed explicitly first.
 ///
 /// # Errors
 ///
-/// Returns an error if the PGP directory cannot be accessed, or if the key is
-/// invalid.
+/// Returns an error if the name is not a valid key name, the PGP directory
+/// cannot be accessed, the key is invalid, or a different key is already
+/// stored under `name`.
 pub fn add_key_from_bytes(
     key_bytes: &[u8],
     name: &str,
     quiet: bool
 ) -> Result<()> {
+    store_key_bytes(key_bytes, name, quiet, false)
+}
+
+/// Stores a key in the keyring.
+///
+/// `allow_replace` permits replacing a key with a different fingerprint and is
+/// only used for the builtin keys embedded in the binary.
+fn store_key_bytes(
+    key_bytes: &[u8],
+    name: &str,
+    quiet: bool,
+    allow_replace: bool
+) -> Result<()> {
+    validate_key_name(name)?;
+
     let pgp_dir = get_pgp_dir()?;
     let dest_path = pgp_dir.join(format!("{name}.asc"));
 
-    if dest_path.exists() {
+    let existing_bytes = if dest_path.exists() {
         let existing_bytes = fs::read(&dest_path)?;
         if existing_bytes == key_bytes {
             return Ok(());
         }
-        if !quiet {
+        Some(existing_bytes)
+    } else {
+        None
+    };
+
+    let cert = Cert::from_bytes(key_bytes)?;
+    validate_cert(&cert)?;
+
+    if let Some(existing_bytes) = existing_bytes {
+        if let Ok(existing) = Cert::from_bytes(&existing_bytes) {
+            let same_key = existing.fingerprint() == cert.fingerprint();
+            if !same_key && !allow_replace {
+                return Err(anyhow!(
+                    "A different key (fingerprint {}) is already stored under \
+                     the name '{name}'. Refusing to replace it with key {}. \
+                     Remove the existing key first (`zoi pgp remove {name}`) \
+                     if you really want to replace it.",
+                    existing.fingerprint().to_hex(),
+                    cert.fingerprint().to_hex()
+                ));
+            }
+            if !quiet {
+                println!(
+                    "{} Updating the stored key '{name}'.",
+                    "Note:".yellow(),
+                );
+            }
+        } else if !quiet {
             println!(
-                "{} A different key with the name '{name}' already exists. \
-                 Overwriting.",
+                "{} The stored key file for '{name}' is unreadable. Replacing \
+                 it.",
                 "Warning:".yellow(),
             );
         }
     }
-
-    let cert = Cert::from_bytes(key_bytes)?;
-    validate_cert(&cert)?;
 
     fs::write(&dest_path, key_bytes)?;
     if !quiet {
@@ -297,6 +378,7 @@ pub fn add_key_from_url(url: &str, name: &str, quiet: bool) -> Result<()> {
 /// Returns an error if the key with the given name is not found or cannot be
 /// removed.
 pub fn remove_key_by_name(name: &str) -> Result<()> {
+    validate_key_name(name)?;
     let pgp_dir = get_pgp_dir()?;
     let key_path = pgp_dir.join(format!("{name}.asc"));
 
@@ -488,6 +570,7 @@ pub fn search_keys(term: &str) -> Result<()> {
 /// Returns an error if the key with the given name is not found or cannot be
 /// read.
 pub fn show_key(name: &str) -> Result<()> {
+    validate_key_name(name)?;
     let pgp_dir = get_pgp_dir()?;
     let key_path = pgp_dir.join(format!("{name}.asc"));
 
@@ -654,6 +737,7 @@ pub fn cli_verify_signature(
          '{key_name}'"
     );
 
+    validate_key_name(key_name)?;
     let pgp_dir = get_pgp_dir()?;
     let key_path = pgp_dir.join(format!("{key_name}.asc"));
     if !key_path.exists() {
@@ -744,12 +828,17 @@ pub fn sign_detached(
         .arg("--yes")
         .arg("--detach-sign");
 
-    if let Ok(password) = std::env::var("GPG_PASSWORD") {
+    // The passphrase is handed to gpg over stdin (`--passphrase-fd 0`) rather
+    // than on the command line, where any local user could read it from the
+    // process list. It is also never left in gpg's environment.
+    let password = std::env::var("GPG_PASSWORD").ok();
+    command.env_remove("GPG_PASSWORD");
+    if password.is_some() {
         command
             .arg("--pinentry-mode")
             .arg("loopback")
-            .arg("--passphrase")
-            .arg(password);
+            .arg("--passphrase-fd")
+            .arg("0");
     }
 
     command
@@ -757,9 +846,32 @@ pub fn sign_detached(
         .arg(key_id)
         .arg("--output")
         .arg(signature_path_str)
+        .arg("--")
         .arg(data_path_str);
 
-    let output = command.output()?;
+    let output = if let Some(password) = password {
+        use std::io::Write as _;
+        use std::process::Stdio;
+
+        let mut child = command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+        {
+            let mut stdin = child
+                .stdin
+                .take()
+                .ok_or_else(|| anyhow!("Failed to open stdin for gpg."))?;
+            // gpg reads a single line from the passphrase fd. A write error
+            // (e.g. gpg exited early) is surfaced through gpg's own status.
+            let _ = stdin.write_all(password.as_bytes());
+            let _ = stdin.write_all(b"\n");
+        }
+        child.wait_with_output()?
+    } else {
+        command.output()?
+    };
 
     if !output.status.success() {
         use std::fmt::Write;
@@ -796,8 +908,29 @@ pub fn sign_detached(
     Ok(())
 }
 
+/// Normalizes `identifier` to a compact upper-case fingerprint if it is a full
+/// v4 (40 hex characters) or v6 (64 hex characters) fingerprint, optionally
+/// written in space-separated groups. Returns `None` otherwise.
+pub fn normalize_full_fingerprint(identifier: &str) -> Option<String> {
+    let compact: String =
+        identifier.chars().filter(|c| !c.is_whitespace()).collect();
+    if matches!(compact.len(), 40 | 64)
+        && compact.chars().all(|c| c.is_ascii_hexdigit())
+    {
+        Some(compact.to_ascii_uppercase())
+    } else {
+        None
+    }
+}
+
 /// Resolves a list of names or fingerprints to PGP certificates from the local
 /// keyring.
+///
+/// Each identifier must either be the exact name of a stored key or a *full*
+/// primary-key fingerprint (40 or 64 hex characters, compared
+/// case-insensitively; spaces between groups are ignored). Short key IDs and
+/// fingerprint prefixes are deliberately not accepted, because they can be
+/// collided by an attacker-generated key.
 ///
 /// # Errors
 ///
@@ -810,14 +943,18 @@ pub fn get_certs_by_name_or_fingerprint(
     let mut found_certs = Vec::new();
 
     for identifier in identifiers {
-        let identifier_lower = identifier.to_lowercase();
+        let wanted_fingerprint = normalize_full_fingerprint(identifier);
         let mut found = false;
         for key_info in &all_keys {
-            let fingerprint_lower =
-                key_info.cert.fingerprint().to_string().to_lowercase();
-            if key_info.name == *identifier
-                || fingerprint_lower.starts_with(&identifier_lower)
-            {
+            let fingerprint_matches =
+                wanted_fingerprint.as_deref().is_some_and(|wanted| {
+                    key_info
+                        .cert
+                        .fingerprint()
+                        .to_hex()
+                        .eq_ignore_ascii_case(wanted)
+                });
+            if key_info.name == *identifier || fingerprint_matches {
                 found_certs.push(key_info.cert.clone());
                 found = true;
                 break;
@@ -825,7 +962,9 @@ pub fn get_certs_by_name_or_fingerprint(
         }
         if !found {
             return Err(anyhow!(
-                "Trusted key '{identifier}' not found in Zoi's PGP keyring."
+                "Trusted key '{identifier}' not found in Zoi's PGP keyring. \
+                 Trusted keys must be referenced by their exact stored name \
+                 or by their full 40/64-character fingerprint."
             ));
         }
     }

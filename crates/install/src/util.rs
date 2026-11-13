@@ -793,20 +793,26 @@ pub fn find_delta_info(
     Ok(None)
 }
 
-/// Finds delta patch info for an install node, given the base version.
+/// Finds delta patch info for one upgrade step of an install node, from
+/// `base_version` to `to_version`.
+///
+/// `to_version` is the version this particular step produces. In a
+/// multi-step chain it is an intermediate version rather than the node's
+/// final target, and the delta URL is keyed by it.
 ///
 /// # Errors
 ///
 /// Returns an error if the registry information cannot be retrieved.
 pub fn find_delta_info_for_node(
     node: &InstallNode,
-    base_version: &str
+    base_version: &str,
+    to_version: &str
 ) -> Result<Option<types::DeltaInfo>> {
     let mut pkg = node.pkg.clone();
     if pkg.sub_package.is_none() && node.sub_package.is_some() {
         pkg.sub_package.clone_from(&node.sub_package);
     }
-    find_delta_info(&pkg, &node.registry_handle, base_version, &node.version)
+    find_delta_info(&pkg, &node.registry_handle, base_version, to_version)
 }
 
 /// Finds prebuilt info for an install node.

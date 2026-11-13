@@ -27,7 +27,7 @@ mod packagekit;
 // Paths live in `zoi-system` so the daemon, the CLI client and the systemd unit
 // cannot drift apart. Getting these out of sync is a silent failure: the client
 // would connect to a socket nobody is listening on.
-use zoi_system::protocol::{PID_PATH, SOCKET_PATH};
+use zoi_system::protocol::{PID_PATH, RUNTIME_DIR, SOCKET_PATH};
 
 /// zoid - The `ZoiOS` privileged system daemon.
 #[derive(Parser)]
@@ -83,29 +83,41 @@ fn main() -> Result<()> {
                     }
                 }
                 Ok(Response::Error(e)) => {
-                    eprintln!("Error stopping daemon: {e}");
+                    return Err(anyhow::anyhow!("Error stopping daemon: {e}"));
                 }
                 Err(e) => {
+                    use nix::sys::signal::{self, Signal};
+                    use nix::unistd::Pid;
+
                     eprintln!(
                         "Failed to connect to daemon: {e}. Checking for PID \
                          file..."
                     );
-                    if let Ok(pid_str) = fs::read_to_string(PID_PATH)
-                        && let Ok(pid) = pid_str.trim().parse::<i32>()
-                    {
-                        use nix::sys::signal::{self, Signal};
-                        use nix::unistd::Pid;
-                        if let Err(e) =
-                            signal::kill(Pid::from_raw(pid), Signal::SIGTERM)
-                        {
-                            eprintln!("Failed to kill process {pid}: {e}");
-                        } else {
-                            println!("Killed process {pid}.");
-                            let _ = fs::remove_file(PID_PATH);
+                    let pid = fs::read_to_string(PID_PATH)
+                        .ok()
+                        .and_then(|s| s.trim().parse::<i32>().ok())
+                        .filter(|pid| *pid > 0 && pid_is_zoid(*pid))
+                        .ok_or_else(|| {
+                            anyhow::anyhow!(
+                                "zoid does not appear to be running (no \
+                                 reachable socket and no live zoid PID in \
+                                 {PID_PATH})"
+                            )
+                        })?;
+
+                    signal::kill(Pid::from_raw(pid), Signal::SIGTERM).map_err(
+                        |e| {
+                            anyhow::anyhow!("Failed to kill process {pid}: {e}")
                         }
-                    }
+                    )?;
+                    println!("Killed process {pid}.");
+                    let _ = fs::remove_file(PID_PATH);
                 }
-                _ => eprintln!("Unexpected response from daemon")
+                Ok(_) => {
+                    return Err(anyhow::anyhow!(
+                        "Unexpected response from daemon"
+                    ));
+                }
             }
         }
     }
@@ -120,6 +132,10 @@ fn main() -> Result<()> {
 /// including the pid file systemd maintains itself.
 fn daemonize(no_packagekit: bool) -> Result<()> {
     use nix::unistd::{ForkResult, fork};
+
+    // The child's stderr goes to /dev/null, so anything that can be checked
+    // up front is checked here, where it can still fail the command.
+    check_can_start()?;
 
     // SAFETY: `fork` is safe here because this is the only thread in the
     // process. `main` has not spawned anything, so the child inherits a
@@ -159,16 +175,7 @@ fn daemonize(no_packagekit: bool) -> Result<()> {
 /// authorization model: the daemon does no per-request checking, because an
 /// unprivileged process cannot open the socket at all.
 fn start_daemon(no_packagekit: bool) -> Result<()> {
-    // PID management
-    if Path::new(PID_PATH).exists()
-        && let Ok(old_pid) = fs::read_to_string(PID_PATH)
-        && Path::new(&format!("/proc/{}", old_pid.trim())).exists()
-    {
-        return Err(anyhow::anyhow!(
-            "zoid is already running (PID: {})",
-            old_pid.trim()
-        ));
-    }
+    check_can_start()?;
     fs::write(PID_PATH, std::process::id().to_string())?;
 
     if Path::new(SOCKET_PATH).exists() {
@@ -226,6 +233,66 @@ fn start_daemon(no_packagekit: bool) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Checks that a daemon can start: the runtime directory exists and no other
+/// zoid is running.
+///
+/// Run by the parent before forking as well as by the daemon itself, so that
+/// `zoid start` fails with a non-zero exit status (and a visible message)
+/// instead of reporting success while the detached child dies silently.
+fn check_can_start() -> Result<()> {
+    // Under systemd `RuntimeDirectory=` creates this; without it (the
+    // non-systemd `zoid start` path) nothing does, and every write after
+    // this would fail.
+    ensure_runtime_dir()?;
+
+    // A recorded PID only counts as a running daemon if that process is
+    // actually zoid: PIDs are reused, and a stale file pointing at an
+    // unrelated process must not block startup.
+    if let Ok(old_pid) = fs::read_to_string(PID_PATH)
+        && let Ok(pid) = old_pid.trim().parse::<i32>()
+        && pid > 0
+        && pid != i32::try_from(std::process::id()).unwrap_or(-1)
+        && pid_is_zoid(pid)
+    {
+        return Err(anyhow::anyhow!("zoid is already running (PID: {pid})"));
+    }
+    Ok(())
+}
+
+/// Creates the runtime directory holding the socket and PID file.
+///
+/// Mode 0755 matches what systemd's `RuntimeDirectory=` produces: the socket
+/// inside is 0600, so the directory itself does not need to hide anything.
+fn ensure_runtime_dir() -> Result<()> {
+    use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+
+    let dir = Path::new(RUNTIME_DIR);
+    if !dir.is_dir() {
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o755)
+            .create(dir)
+            .map_err(|e| {
+                anyhow::anyhow!("Failed to create {RUNTIME_DIR}: {e}")
+            })?;
+        fs::set_permissions(dir, fs::Permissions::from_mode(0o755))?;
+    }
+    Ok(())
+}
+
+/// Returns whether `pid` is a live process running a `zoid` binary.
+///
+/// Checked through `/proc/<pid>/exe` rather than the mere existence of
+/// `/proc/<pid>`, so a PID that has been recycled for another program is
+/// treated as stale. A deleted-and-replaced binary shows up as
+/// `zoid (deleted)`, which still counts.
+fn pid_is_zoid(pid: i32) -> bool {
+    fs::read_link(format!("/proc/{pid}/exe")).is_ok_and(|exe| {
+        exe.file_name()
+            .is_some_and(|name| name.to_string_lossy().contains("zoid"))
+    })
 }
 
 /// Ignores `SIGHUP` so the process does not die from a `systemctl reload`.
@@ -292,67 +359,8 @@ fn handle_client(
             Err(e) => Response::Error(e.to_string())
         },
         Request::RollbackGeneration(target_id) => {
-            let mut gens = gen_manager.list_generations()?;
-            gens.sort_by_key(|g| g.id);
-
-            let current_id =
-                gen_manager.get_current_generation_id()?.unwrap_or(0);
-
-            if target_id >= current_id {
-                Response::Error(format!(
-                    "Target generation {target_id} is not older than current \
-                     generation {current_id}"
-                ))
-            } else {
-                let gens_to_rollback: Vec<_> = gens
-                    .into_iter()
-                    .filter(|g| g.id > target_id && g.id <= current_id)
-                    .rev()
-                    .collect();
-
-                let mut rolled_back_ids = Vec::new();
-                let mut error = None;
-
-                for g in gens_to_rollback {
-                    if let Some(tid) = g.transaction_id {
-                        println!(
-                            "Rolling back transaction {} for generation {}...",
-                            tid, g.id
-                        );
-                        if let Err(e) = zoi_transaction::rollback(&tid) {
-                            error = Some(format!(
-                                "Failed to roll back transaction {} for \
-                                 generation {}: {}",
-                                tid, g.id, e
-                            ));
-                            break;
-                        }
-                    } else {
-                        println!(
-                            "Warning: Generation {} has no transaction ID. \
-                             Performing legacy activation.",
-                            g.id
-                        );
-                    }
-                    rolled_back_ids.push(g.id);
-                }
-
-                if let Some(err) = error {
-                    Response::Error(err)
-                } else if let Err(e) =
-                    gen_manager.activate_generation(target_id)
-                {
-                    Response::Error(format!(
-                        "Transactions rolled back, but failed to activate \
-                         generation {target_id}: {e}"
-                    ))
-                } else {
-                    Response::Success(format!(
-                        "Successfully rolled back to generation {target_id}. \
-                         (Rolled back generations: {rolled_back_ids:?})"
-                    ))
-                }
-            }
+            rollback_generation(target_id, gen_manager)
+                .unwrap_or_else(|e| Response::Error(e.to_string()))
         }
         Request::PinGeneration(id, pinned) => {
             match gen_manager.pin_generation(id, pinned) {
@@ -366,192 +374,258 @@ fn handle_client(
             }
         }
         Request::ApplySystemConfig(config) => {
-            println!("Applying system configuration...");
-
-            // --- Phase 1: Declarative Uninstallation ---
-            // We identify packages that are currently installed in the system
-            // scope but are no longer present in the new system.lua
-            // configuration.
-            if let Ok(installed) = zoi_resolver::local::get_installed_packages()
-            {
-                let current_system_packages: Vec<_> = installed
-                    .into_iter()
-                    .filter(|m| m.scope == zoi::Scope::System)
-                    .collect();
-
-                let new_package_specs = &config.packages;
-
-                for manifest in current_system_packages {
-                    let mut is_still_requested = false;
-                    for spec in new_package_specs {
-                        if let Ok(request) =
-                            zoi_resolver::resolve::parse_source_string(spec)
-                            && request.name == manifest.name
-                            && request.sub_package == manifest.sub_package
-                            && request
-                                .repo
-                                .as_ref()
-                                .is_none_or(|r| r == &manifest.repo)
-                            && request
-                                .handle
-                                .as_ref()
-                                .is_none_or(|h| h == &manifest.registry_handle)
-                        {
-                            is_still_requested = true;
-                            break;
-                        }
-                    }
-
-                    if !is_still_requested {
-                        let source =
-                            zoi_resolver::local::installed_manifest_source(
-                                &manifest
-                            );
-                        println!(
-                            "Removing package no longer in configuration: \
-                             {source}..."
-                        );
-                        if let Err(e) = zoi_uninstall::run(
-                            &source,
-                            Some(zoi::Scope::System),
-                            true,
-                            false,
-                            false
-                        ) {
-                            eprintln!(
-                                "Warning: failed to uninstall orphaned system \
-                                 package {source}: {e}"
-                            );
-                        }
-                    }
-                }
-            }
-
-            // --- Phase 2: Installation ---
-            let sources = config.packages.clone();
-            let install_options = zoi::SourceInstallOptions {
-                scope_override: Some(zoi::Scope::System),
-                yes: true,
-                ..Default::default()
-            };
-
-            if let Err(e) = zoi::install_sources(&sources, &install_options) {
-                Response::Error(format!(
-                    "Failed to install system packages: {e}"
-                ))
-            } else {
-                let transaction_id =
-                    zoi_transaction::get_last_transaction_id().ok().flatten();
-                match gen_manager.create_generation_with_transaction(
-                    config.packages,
-                    transaction_id
-                ) {
-                    Ok(id) => {
-                        // --- Boot ---
-                        //
-                        // The kernel pipeline (depmod, initramfs, Secure Boot
-                        // signing, bootloader entries) runs here as well as
-                        // from the transaction hooks, because `zoi system
-                        // apply` is the path a fresh install takes and it has
-                        // to be able to produce a bootable system on its own.
-                        let mut boot_msg = String::new();
-                        let cmdline = config
-                            .system
-                            .kernel_params
-                            .as_deref()
-                            .unwrap_or("");
-
-                        match zoi_system::kernel::regenerate_all(cmdline) {
-                            Ok(report) => {
-                                if !report.is_empty() {
-                                    report.print();
-                                    boot_msg = format!(
-                                        " (kernel prepared via {})",
-                                        report
-                                            .bootloader
-                                            .as_deref()
-                                            .unwrap_or("no bootloader found")
-                                    );
-                                }
-                            }
-                            Err(e) => {
-                                boot_msg =
-                                    format!(" (Boot update failed: {e})");
-                            }
-                        }
-
-                        if let Err(e) = gen_manager.activate_generation(id) {
-                            Response::Error(format!(
-                                "Failed to activate new generation {id}: {e}"
-                            ))
-                        } else {
-                            // Apply accounts. Groups are reconciled before
-                            // users because a
-                            // user's supplementary memberships have to resolve
-                            // to real GIDs.
-                            match zoi_system::account::apply_accounts(
-                                &config.groups,
-                                &config.users,
-                                false
-                            ) {
-                                Ok(report) => {
-                                    zoi_system::account::print_report(&report);
-                                }
-                                Err(e) => {
-                                    eprintln!(
-                                        "Warning: Failed to apply \
-                                         users/groups: {e}"
-                                    );
-                                }
-                            }
-
-                            // Apply Services
-                            if let Err(e) = zoi_system::service::apply_services(
-                                &config.services
-                            ) {
-                                eprintln!(
-                                    "Warning: Failed to apply some services: \
-                                     {e}"
-                                );
-                            }
-
-                            // Update fstab
-                            let fstab_content =
-                                zoi_system::mount::generate_fstab(
-                                    &config.filesystems
-                                );
-                            if let Err(e) =
-                                std::fs::write("/etc/fstab", fstab_content)
-                            {
-                                eprintln!(
-                                    "Warning: Failed to update /etc/fstab: {e}"
-                                );
-                            }
-
-                            // Prune old generations
-                            if let Ok(zoi_cfg) = zoi_core::config::read_config()
-                                && let Err(e) = gen_manager.prune_generations(
-                                    zoi_cfg.system_generations_limit
-                                )
-                            {
-                                eprintln!(
-                                    "Warning: Failed to prune old \
-                                     generations: {e}"
-                                );
-                            }
-
-                            Response::Success(format!(
-                                "Applied system configuration. New \
-                                 generation: {id}{boot_msg}"
-                            ))
-                        }
-                    }
-                    Err(e) => Response::Error(e.to_string())
-                }
-            }
+            apply_system_config(*config, gen_manager)
         }
     };
 
     zoi_system::protocol::send_message(&mut stream, &response)?;
     Ok(should_exit)
+}
+
+/// Takes the Zoi store lock on behalf of a daemon request.
+///
+/// The daemon mutates the same store as the CLI, so it must hold the same lock
+/// or a concurrent `zoi install` could interleave with it. The lock is
+/// re-entrant per thread, so the library calls made while it is held (which
+/// take it themselves) do not deadlock.
+fn acquire_store_lock() -> Result<zoi_core::lock::LockGuard> {
+    zoi_core::lock::acquire_lock().map_err(|e| {
+        anyhow::anyhow!(
+            "Another Zoi operation is in progress ({e}); try again once it \
+             has finished."
+        )
+    })
+}
+
+/// Rolls the system back to an older generation.
+///
+/// Every failure is returned as an error so the caller can turn it into a
+/// [`Response::Error`]: the client is always owed a reply.
+fn rollback_generation(
+    target_id: u32,
+    gen_manager: &GenerationManager
+) -> Result<Response> {
+    let _lock = acquire_store_lock()?;
+
+    let mut gens = gen_manager.list_generations()?;
+    gens.sort_by_key(|g| g.id);
+
+    let current_id = gen_manager.get_current_generation_id()?.unwrap_or(0);
+
+    if target_id >= current_id {
+        return Ok(Response::Error(format!(
+            "Target generation {target_id} is not older than current \
+             generation {current_id}"
+        )));
+    }
+
+    let gens_to_rollback: Vec<_> = gens
+        .into_iter()
+        .filter(|g| g.id > target_id && g.id <= current_id)
+        .rev()
+        .collect();
+
+    let mut rolled_back_ids = Vec::new();
+
+    for g in gens_to_rollback {
+        if let Some(tid) = g.transaction_id {
+            println!(
+                "Rolling back transaction {} for generation {}...",
+                tid, g.id
+            );
+            if let Err(e) = zoi_transaction::rollback(&tid) {
+                return Ok(Response::Error(format!(
+                    "Failed to roll back transaction {} for generation {}: {}",
+                    tid, g.id, e
+                )));
+            }
+        } else {
+            println!(
+                "Warning: Generation {} has no transaction ID. Performing \
+                 legacy activation.",
+                g.id
+            );
+        }
+        rolled_back_ids.push(g.id);
+    }
+
+    if let Err(e) = gen_manager.activate_generation(target_id) {
+        return Ok(Response::Error(format!(
+            "Transactions rolled back, but failed to activate generation \
+             {target_id}: {e}"
+        )));
+    }
+
+    Ok(Response::Success(format!(
+        "Successfully rolled back to generation {target_id}. (Rolled back \
+         generations: {rolled_back_ids:?})"
+    )))
+}
+
+/// Returns the explicitly installed system packages that `config` no longer
+/// requests.
+///
+/// Packages installed as dependencies are never returned: they belong to
+/// whatever requested them, and removing them here would break a package the
+/// configuration still wants.
+fn orphaned_system_packages(
+    config: &zoi_system::config::SystemConfig
+) -> Vec<String> {
+    let Ok(installed) = zoi_resolver::local::get_installed_packages() else {
+        return Vec::new();
+    };
+
+    let requests: Vec<_> = config
+        .packages
+        .iter()
+        .filter_map(|spec| {
+            zoi_resolver::resolve::parse_source_string(spec).ok()
+        })
+        .collect();
+
+    installed
+        .into_iter()
+        .filter(|m| m.scope == zoi::Scope::System)
+        .filter(|m| matches!(m.reason, zoi_core::types::InstallReason::Direct))
+        .filter(|manifest| {
+            !requests.iter().any(|request| {
+                request.name == manifest.name
+                    && request.sub_package == manifest.sub_package
+                    && request.repo.as_ref().is_none_or(|r| r == &manifest.repo)
+                    && request
+                        .handle
+                        .as_ref()
+                        .is_none_or(|h| h == &manifest.registry_handle)
+            })
+        })
+        .map(|manifest| {
+            zoi_resolver::local::installed_manifest_source(&manifest)
+        })
+        .collect()
+}
+
+/// Reconciles the machine against a `system.lua` configuration.
+///
+/// The whole operation holds the store lock. The requested packages are
+/// installed first and packages dropped from the configuration are removed
+/// only once that succeeded: removing first would leave the system without
+/// them (and possibly unbootable) if the install then failed.
+fn apply_system_config(
+    config: zoi_system::config::SystemConfig,
+    gen_manager: &GenerationManager
+) -> Response {
+    println!("Applying system configuration...");
+
+    let _lock = match acquire_store_lock() {
+        Ok(lock) => lock,
+        Err(e) => return Response::Error(e.to_string())
+    };
+
+    // --- Phase 1: Installation ---
+    let install_options = zoi::SourceInstallOptions {
+        scope_override: Some(zoi::Scope::System),
+        yes: true,
+        ..Default::default()
+    };
+
+    if let Err(e) = zoi::install_sources(&config.packages, &install_options) {
+        return Response::Error(format!(
+            "Failed to install system packages: {e}. No packages were removed."
+        ));
+    }
+    let transaction_id =
+        zoi_transaction::get_last_transaction_id().ok().flatten();
+
+    // --- Phase 2: Declarative uninstallation ---
+    // Explicitly installed system packages that the new configuration no
+    // longer lists are removed, now that everything it does list is in place.
+    for source in orphaned_system_packages(&config) {
+        println!("Removing package no longer in configuration: {source}...");
+        if let Err(e) = zoi_uninstall::run(
+            &source,
+            Some(zoi::Scope::System),
+            true,
+            false,
+            false
+        ) {
+            eprintln!(
+                "Warning: failed to uninstall orphaned system package \
+                 {source}: {e}"
+            );
+        }
+    }
+
+    let id = match gen_manager
+        .create_generation_with_transaction(config.packages, transaction_id)
+    {
+        Ok(id) => id,
+        Err(e) => return Response::Error(e.to_string())
+    };
+
+    // --- Boot ---
+    //
+    // The kernel pipeline (depmod, initramfs, Secure Boot signing, bootloader
+    // entries) runs here as well as from the transaction hooks, because `zoi
+    // system apply` is the path a fresh install takes and it has to be able
+    // to produce a bootable system on its own.
+    let mut boot_msg = String::new();
+    let cmdline = config.system.kernel_params.as_deref().unwrap_or("");
+
+    match zoi_system::kernel::regenerate_all(cmdline) {
+        Ok(report) => {
+            if !report.is_empty() {
+                report.print();
+                boot_msg = format!(
+                    " (kernel prepared via {})",
+                    report
+                        .bootloader
+                        .as_deref()
+                        .unwrap_or("no bootloader found")
+                );
+            }
+        }
+        Err(e) => {
+            boot_msg = format!(" (Boot update failed: {e})");
+        }
+    }
+
+    if let Err(e) = gen_manager.activate_generation(id) {
+        return Response::Error(format!(
+            "Failed to activate new generation {id}: {e}"
+        ));
+    }
+
+    // Apply accounts. Groups are reconciled before users because a user's
+    // supplementary memberships have to resolve to real GIDs.
+    match zoi_system::account::apply_accounts(
+        &config.groups,
+        &config.users,
+        false
+    ) {
+        Ok(report) => zoi_system::account::print_report(&report),
+        Err(e) => eprintln!("Warning: Failed to apply users/groups: {e}")
+    }
+
+    // Apply Services
+    if let Err(e) = zoi_system::service::apply_services(&config.services) {
+        eprintln!("Warning: Failed to apply some services: {e}");
+    }
+
+    // Update fstab
+    let fstab_content = zoi_system::mount::generate_fstab(&config.filesystems);
+    if let Err(e) = std::fs::write("/etc/fstab", fstab_content) {
+        eprintln!("Warning: Failed to update /etc/fstab: {e}");
+    }
+
+    // Prune old generations
+    if let Ok(zoi_cfg) = zoi_core::config::read_config()
+        && let Err(e) =
+            gen_manager.prune_generations(zoi_cfg.system_generations_limit)
+    {
+        eprintln!("Warning: Failed to prune old generations: {e}");
+    }
+
+    Response::Success(format!(
+        "Applied system configuration. New generation: {id}{boot_msg}"
+    ))
 }

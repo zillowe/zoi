@@ -1,5 +1,11 @@
 ---@meta
 -- Zoi Package Definitions for lua-language-server (LSP)
+--
+-- Top-level code runs in a restricted metadata environment (during sync,
+-- show, search and resolution): cmd, zpatch, zsed, the z* staging functions,
+-- addPgpKey, UTILS.FILE, UTILS.DOWNLOAD, UTILS.EXTRACT, UTILS.MAKE_ARCHIVE and
+-- UTILS.FS.copy/move/chmod are only available inside lifecycle functions.
+-- BUILD_DIR is informational; assigning it has no effect.
 
 ---@class SystemInfo
 ---@field OS "linux"|"macos"|"windows" The operating system name.
@@ -20,7 +26,21 @@ SYSTEM = {}
 ---@field scope "user"|"system"|"project"? The currently requested installation scope.
 ---@field PATH { user: string, system: string } Zoi installation paths.
 ---@field PKG { store: string, template: string, root: string, home: string, lua: string } Package-specific absolute paths.
+---@field CREATE_PKG_DIR string? Directory passed to the package by `zoi create` (app templates only).
+---@field LOCATION ZoiLocation Same table as the global `LOCATION`.
 ZOI = {}
+
+---@class ZoiLocation
+---@field PKGSTORE string? During a build: `STAGING_DIR/pkgstore`. Otherwise: the user package store base directory.
+---@field HOME string? During a build: `STAGING_DIR/usrhome`. Otherwise: the user's home directory.
+---@field ROOT string During a build: `STAGING_DIR/usrroot`. Otherwise: "/" (or "C:\\" on Windows).
+---@field TEMPLATE string? During a build: `STAGING_DIR/createpkgdir`. Otherwise: the current working directory.
+---@field PKGLUADIR string? Absolute path of the directory containing the `.pkg.lua` file.
+---@field BUILDDIR string? Absolute path of the build directory (same as `BUILD_DIR`), when set.
+---@field STAGINGDIR string? Absolute path of the staging directory (same as `STAGING_DIR`), when set.
+
+---@type ZoiLocation Resolved absolute locations for the current build (also available as `ZOI.LOCATION`).
+LOCATION = {}
 
 ---@class Maintainer
 ---@field name string Maintainer name.
@@ -34,6 +54,37 @@ ZOI = {}
 
 ---@class CiConfig
 ---@field tags table<string, string>? Runner tags per OS (e.g. { linux = "saas-linux-medium-amd64" }).
+
+---@class AlternativeEntry
+---@field name string Name of the alternative group (e.g. "awk").
+---@field path string Absolute path of this implementation (e.g. "/usr/bin/gawk").
+---@field link string Absolute path of the canonical link (e.g. "/usr/bin/awk").
+---@field priority integer? Higher wins (defaults to 100).
+
+---@class SandboxConfig
+---@field enabled boolean? Whether sandboxing is enabled (defaults to false).
+---@field network boolean? Allow network access (defaults to false).
+---@field system boolean? Allow access to system files (defaults to false).
+---@field cwd boolean? Allow access to the current working directory (defaults to false).
+---@field read string[]? Paths allowed for reading.
+---@field write string[]? Paths allowed for writing.
+---@field env string[]? Environment variables passed into the sandbox.
+
+---@class ExtensionChange
+---@field type "repo-git"|"registry-repo"|"registry-add"|"repo-add"|"project"|"pgp"|"plugin"|"hook" The kind of change.
+---@field add string? Value for repo-git, registry-repo, registry-add, repo-add and project changes.
+---@field name string? Name for pgp, plugin and hook changes.
+---@field key string? PGP public key content (pgp).
+---@field script string? Lua script content (plugin).
+---@field content string? Hook script content (hook).
+
+---@class ExtensionInfo
+---@field type string The extension type.
+---@field changes ExtensionChange[] Changes applied when the extension is added.
+
+---@class ShellCompletion
+---@field shell string The shell (e.g. "bash", "zsh").
+---@field filename string The completion script filename.
 
 ---@class PkgMetadata
 ---@field name string Required. The name of the package.
@@ -49,6 +100,7 @@ ZOI = {}
 ---@field author Author? The original software author.
 ---@field license string? The SPDX license identifier.
 ---@field bins string[]? List of binary names to link.
+---@field alternatives AlternativeEntry[]? Alternative implementations this package registers (e.g. awk, vi).
 ---@field conflicts string[]? List of conflicting packages.
 ---@field provides string[]? List of virtual packages provided.
 ---@field replaces string[]? List of packages this one replaces.
@@ -69,6 +121,10 @@ ZOI = {}
 ---@field rollback boolean? Whether to enable rollback for this package.
 ---@field installed_size integer? Expected size on disk (bytes).
 ---@field archive_size integer? Size of the pre-compiled archive (bytes).
+---@field sandbox SandboxConfig? Sandbox security configuration.
+---@field extension ExtensionInfo? Configuration for extension-type packages.
+---@field alt string? Pointer to an alternative package definition.
+---@field completions ShellCompletion[]? Shell completion scripts provided by the package.
 ---@field quiet (boolean | string[] | table<string, boolean>)? Lifecycle functions to silence command output for (e.g. {"prepare", "build"}, {build = true}, or true).
 PKG = {}
 
@@ -94,19 +150,19 @@ SUBPKG = nil
 ---@field required string[]? List of required dependencies.
 ---@field optional string[]? List of optional dependencies.
 ---@field options DependencyOptions[]? List of selectable dependency groups.
----@field sub_packages table<string, DependencyGroup>? Per-sub-package dependencies.
+---@field sub_packages table<string, string[]|DependencyGroup>? Per-sub-package dependencies.
 
 ---@class TypedBuildDependencies
----@field types table<string, DependencyGroup> Map of build type to dependencies.
+---@field types table<string, string[]|DependencyGroup> Map of build type to dependencies.
 
 ---@class BuildDependencyEntry
 ---@field type string Build type (e.g. "source").
 ---@field packages string[] List of dependency strings for that build type.
 
 ---@class Dependencies
----@field runtime DependencyGroup? Runtime dependencies.
----@field build (DependencyGroup|TypedBuildDependencies|BuildDependencyEntry[])? Build-time dependencies.
----@field test DependencyGroup? Test-time dependencies.
+---@field runtime (string[]|DependencyGroup)? Runtime dependencies (a plain list or a group).
+---@field build (string[]|DependencyGroup|TypedBuildDependencies|BuildDependencyEntry[])? Build-time dependencies.
+---@field test (string[]|DependencyGroup)? Test-time dependencies (a plain list or a group).
 
 ---@class Service
 ---@field run string The command to run the service.
@@ -326,6 +382,34 @@ function UTILS.FETCH.GITLAB.LATEST.release(args) end
 ---@return string
 function UTILS.FETCH.GITLAB.LATEST.commit(args) end
 
+--- Gitea API helpers. `domain` defaults to "https://gitea.com".
+UTILS.FETCH.GITEA = { LATEST = {} }
+---@param args GithubLatestArgs
+---@return string
+function UTILS.FETCH.GITEA.LATEST.tag(args) end
+
+---@param args GithubLatestArgs
+---@return string
+function UTILS.FETCH.GITEA.LATEST.release(args) end
+
+---@param args GithubLatestArgs
+---@return string
+function UTILS.FETCH.GITEA.LATEST.commit(args) end
+
+--- Forgejo API helpers. `domain` defaults to "https://codeberg.org".
+UTILS.FETCH.FORGEJO = { LATEST = {} }
+---@param args GithubLatestArgs
+---@return string
+function UTILS.FETCH.FORGEJO.LATEST.tag(args) end
+
+---@param args GithubLatestArgs
+---@return string
+function UTILS.FETCH.FORGEJO.LATEST.release(args) end
+
+---@param args GithubLatestArgs
+---@return string
+function UTILS.FETCH.FORGEJO.LATEST.commit(args) end
+
 UTILS.PARSE = {}
 ---@param str string
 ---@return table?
@@ -373,7 +457,8 @@ function UTILS.FS.copy(src, dest) end
 function UTILS.FS.move(src, dest) end
 
 ---@param path string
----@param mode integer
+---@param mode integer Octal mode as an integer (e.g. 493 for 0755). No-op on Windows.
+---@return boolean
 function UTILS.FS.chmod(path, mode) end
 
 UTILS.FIND = {}
@@ -389,5 +474,5 @@ function UTILS.ARCHIVE.list(path) end
 
 --- Downloads and extracts an archive.
 ---@param source string URL or local path.
----@param out_dir string Subdirectory in BUILD_DIR.
+---@param out_dir string? Subdirectory in BUILD_DIR (defaults to "extracted").
 function UTILS.EXTRACT(source, out_dir) end

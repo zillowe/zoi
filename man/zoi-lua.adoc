@@ -88,10 +88,13 @@ declare *project*, *packages*, *registries*, *tasks*, *environments*,
   root, the home directory, and the script path.
 
 *LOCATION*::
-  Absolute staging paths. During builds, *PKGSTORE* points into the
-  staging area while *HOME*, *ROOT*, and *TEMPLATE* mirror the real
-  install roots; *PKGLUADIR* is the directory of the `.pkg.lua` script,
-  and *BUILDDIR*/*STAGINGDIR* are the active work directories.
+  Absolute staging paths, also available as *ZOI.LOCATION*. During builds,
+  *PKGSTORE*, *HOME*, *ROOT*, and *TEMPLATE* point into the staging area
+  (`STAGING_DIR/pkgstore`, `STAGING_DIR/usrhome`, `STAGING_DIR/usrroot`,
+  and `STAGING_DIR/createpkgdir`); outside a build they fall back to the
+  user package store, the home directory, `/`, and the current directory.
+  *PKGLUADIR* is the directory of the `.pkg.lua` script, and
+  *BUILDDIR*/*STAGINGDIR* are the active work directories.
 
 *PKG*::
   The resolved metadata table. Every key passed to *metadata* is mirrored
@@ -127,6 +130,16 @@ declare *project*, *packages*, *registries*, *tasks*, *environments*,
   bundling for large repositories), and *quiet* (boolean, list of stage
   names such as `{"prepare", "build"}`, or a table of booleans like
   `{build = true}` to silence command output during lifecycle functions).
++
+Further optional keys: *readme* (URL or path),
+*backup* (config paths preserved across upgrades), *installed_size* and
+*archive_size* (bytes), *ci* (a table with *tags*, mapping OS to CI runner
+tag), *alternatives* (a list of `{name, path, link, priority}` entries;
+*priority* defaults to 100), *sandbox* (a table with booleans *enabled*,
+*network*, *system*, *cwd* and string lists *read*, *write*, *env*),
+*extension* (a table with *type* and a *changes* list, for extension
+packages), *alt* (a pointer to an alternative package definition), and
+*completions* (a list of `{shell, filename}` entries).
 
 *dependencies*(_table_)::
   Define build-time and runtime requirements with the keys *runtime*,
@@ -137,7 +150,10 @@ declare *project*, *packages*, *registries*, *tasks*, *environments*,
   list of `{type, packages}` entries (the form used by published registry
   indexes). A dependency string looks like
   `[manager:]package[@version][:description]`; the manager defaults to
-  `zoi`, for example `"zoi:core/foo@1.2.3"` or `"pacman:zip"`. Local
+  `zoi`, for example `"zoi:core/foo@1.2.3"` or `"pacman:zip"`. Zoi
+  dependencies may name one sub-package with `zoi:@repo/name:sub` (for
+  example `"zoi:@core/gcc:libgcc"`); a sub-package is a single word, so a
+  description directly after the name must contain a space. Local
   definitions use paths relative to the declaring `.pkg.lua`, such as
   `"zoi:./helper.pkg.lua"` or `"zoi:../shared/utility"`. A directory must
   contain `<directory-name>.pkg.lua` or exactly one `.pkg.lua` file.
@@ -297,8 +313,18 @@ immediately.
 *UTILS.MAKE_ARCHIVE*(_source_, _output_, [_algo_])::
   Create an archive from *BUILD_DIR*-relative paths.
 
-*UTILS.FS.exists* / *copy* / *move* / *chmod*::
-  Immediate filesystem operations.
+*UTILS.FS.exists*(_path_)::
+  Return whether _path_ exists (also checked relative to *BUILD_DIR*).
+
+*UTILS.FS.copy*(_src_, _dest_)::
+  Copy a file or directory recursively. Returns true.
+
+*UTILS.FS.move*(_src_, _dest_)::
+  Rename/move a file or directory. Returns true.
+
+*UTILS.FS.chmod*(_path_, _mode_)::
+  Set Unix permissions; _mode_ is an integer such as `tonumber("755", 8)`.
+  No-op on Windows. Returns true.
 
 *UTILS.FIND.file*(_dir_, _name_)::
   Recursively find a file under *BUILD_DIR* and return its relative

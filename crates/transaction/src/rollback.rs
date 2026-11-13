@@ -1,25 +1,37 @@
 //! Rollback logic for Zoi transactions.
 
+use std::cmp::Ordering;
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 
 use anyhow::{Result, anyhow};
 use colored::Colorize;
 use zoi_core::{types, utils as core_utils};
 use zoi_resolver::{local, resolve};
+use zoi_uninstall as uninstall;
 
 /// Rolls back a package to its previous version.
+///
+/// The previous version is the highest version that is still kept in the
+/// store, has a valid install manifest for the same package (and
+/// sub-package), and is lower than the active version. The active version is
+/// removed through the regular uninstall path and the previous one is
+/// re-activated from the store: `latest`, shims, completions, dependent
+/// links, database row, file index and lockfile all move to it.
+///
+/// Nothing is changed when the previous version cannot be restored from the
+/// store alone (for example because it installed files under `${usrroot}`
+/// or `${usrhome}`, which the store does not keep).
+///
 /// # Errors
 ///
-/// Returns an error if the rollback fails.
-/// # Panics
-///
-/// Panics if the scope cannot be resolved.
+/// Returns an error if the package is not installed or ambiguous, no older
+/// stored version exists, the previous version cannot be restored from the
+/// store, or the uninstall/activation fails.
 pub fn run(package_name: &str, yes: bool) -> Result<()> {
     println!("Attempting to roll back '{}'...", package_name.cyan());
 
     let request = resolve::parse_source_string(package_name)?;
-    let sub_package = request.sub_package.clone();
 
     let scope_order = [
         types::Scope::User,
@@ -27,7 +39,6 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
         types::Scope::Project
     ];
     let mut current_manifest = None;
-    let mut scope = None;
     for candidate_scope in scope_order {
         let mut matches = local::find_installed_manifests_matching(
             &request,
@@ -37,7 +48,6 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
             0 => {}
             1 => {
                 current_manifest = Some(matches.remove(0));
-                scope = Some(candidate_scope);
                 break;
             }
             _ => {
@@ -52,69 +62,30 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
     let Some(current_manifest) = current_manifest else {
         return Err(anyhow!("Package '{package_name}' is not installed."));
     };
-    let scope = scope.expect("Scope should be resolved if manifest is found");
 
     let package_dir = local::get_package_dir(
-        scope,
+        current_manifest.scope,
         &current_manifest.registry_handle,
         &current_manifest.repo,
         &current_manifest.name
     )?;
 
-    let current_version = current_manifest.version.clone();
-    let manifest_filename = local::manifest_filename(sub_package.as_deref());
-
-    let mut versions: Vec<String> = Vec::new();
-    if let Ok(entries) = fs::read_dir(&package_dir) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name != "latest"
-                && name != "dependents"
-                && name != current_version
-            {
-                versions.push(name);
-            }
-        }
-    }
-
-    if versions.is_empty() {
+    let Some((previous_version, _previous_manifest)) =
+        find_previous_version(&package_dir, &current_manifest)
+    else {
         return Err(anyhow!(
-            "No previous versions found for package '{}'.",
+            "No previous version older than {} found in the store for package \
+             '{}'.",
+            current_manifest.version,
             current_manifest.name
-        ));
-    }
-
-    versions.sort_by(|a, b| {
-        let va = semver::Version::parse(a)
-            .unwrap_or_else(|_| semver::Version::new(0, 0, 0));
-        let vb = semver::Version::parse(b)
-            .unwrap_or_else(|_| semver::Version::new(0, 0, 0));
-        va.cmp(&vb)
-    });
-    let previous_version = versions.last().expect("Versions list is not empty");
-
-    println!(
-        "Rolling back from version {} to {}...",
-        current_version.yellow(),
-        previous_version.green()
-    );
-
-    let prev_version_dir = package_dir.join(previous_version);
-    let prev_manifest_path =
-        local::find_store_manifest(&prev_version_dir, sub_package.as_deref())
-            .or_else(|| {
-                // Fall back to the precomputed name for a precise error below.
-                let candidate = prev_version_dir.join(&manifest_filename);
-                candidate.exists().then_some(candidate)
-            });
-    let Some(prev_manifest_path) = prev_manifest_path else {
-        return Err(anyhow!(
-            "Previous manifest not found in: {}",
-            prev_version_dir.display()
         ));
     };
 
-    let prev_manifest = local::read_store_manifest(&prev_manifest_path)?;
+    println!(
+        "Rolling back from version {} to {}...",
+        current_manifest.version.yellow(),
+        previous_version.green()
+    );
 
     if !yes
         && !core_utils::ask_for_confirmation("Do you want to proceed?", false)
@@ -122,96 +93,12 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
         return Err(anyhow!("Rollback aborted by user."));
     }
 
-    for file_path_str in &prev_manifest.installed_files {
-        let file_path = std::path::Path::new(file_path_str);
-        create_shim(file_path);
-    }
-
-    if let Some(completions) = &prev_manifest.completions {
-        for completion in completions {
-            let store_path = package_dir
-                .join(previous_version)
-                .join("data/shell")
-                .join(&completion.shell)
-                .join(&completion.filename);
-            let completions_root =
-                super::get_completions_root(scope, &completion.shell)?;
-            let pkg_dir = completions_root.join(&prev_manifest.name);
-            let link_path = pkg_dir.join(&completion.filename);
-            if store_path.exists() {
-                let _ =
-                    super::create_completion_symlink(&store_path, &link_path);
-            }
-        }
-    }
-
-    let current_version_dir = package_dir.join(&current_version);
-    let mut has_other_manifests = false;
-    if let Ok(entries) = fs::read_dir(&current_version_dir) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with("manifest")
-                && std::path::Path::new(&name).extension().is_some_and(|ext| {
-                    ext.eq_ignore_ascii_case("json")
-                        || ext.eq_ignore_ascii_case("yaml")
-                })
-                && name != manifest_filename
-            {
-                has_other_manifests = true;
-                break;
-            }
-        }
-    }
-
-    if !has_other_manifests {
-        for file_path_str in &current_manifest.installed_files {
-            // Manifest entries use placeholders such as ${usrroot}, so they
-            // must be expanded before any filesystem lookup.
-            let expanded = core_utils::expand_placeholders(
-                file_path_str,
-                &current_version_dir,
-                scope
-            )?;
-            let file_path = PathBuf::from(expanded);
-            // Use symlink_metadata so links are removed even when they dangle
-            // or point to a directory; only the link is deleted.
-            let Ok(meta) = fs::symlink_metadata(&file_path) else {
-                continue;
-            };
-            if meta.file_type().is_symlink() {
-                let _ = fs::remove_file(&file_path);
-            } else if meta.is_dir() {
-                // Only remove if empty to be safe: a populated directory may
-                // contain files that no longer belong to this package.
-                if fs::read_dir(&file_path)
-                    .is_ok_and(|mut entries| entries.next().is_none())
-                {
-                    let _ = fs::remove_dir(&file_path);
-                }
-            } else {
-                let _ = fs::remove_file(&file_path);
-            }
-        }
-    }
-
-    let current_manifest_path = current_version_dir.join(&manifest_filename);
-    if current_manifest_path.exists() {
-        fs::remove_file(current_manifest_path)?;
-    }
-
-    if !has_other_manifests && current_version_dir.exists() {
-        let _ = fs::remove_dir_all(current_version_dir);
-    }
-
-    let latest_link = package_dir.join("latest");
-    if latest_link.exists() || latest_link.is_symlink() {
-        let _ = fs::remove_file(&latest_link);
-    }
-
-    #[cfg(unix)]
-    std::os::unix::fs::symlink(previous_version, latest_link)?;
-    #[cfg(windows)]
-    let _ = std::os::windows::fs::symlink_dir(previous_version, latest_link);
+    uninstall::rollback_to_stored_version(
+        &current_manifest,
+        &previous_version,
+        yes,
+        false
+    )?;
 
     println!(
         "{} Successfully rolled back {} to version {}.",
@@ -223,14 +110,68 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
     Ok(())
 }
 
-/// Searches for a binary in the previous manifest to determine if a shim is
-/// needed.
-#[allow(dead_code)]
-fn find_binary_in_prev_manifest(_path: &std::path::Path) -> Option<PathBuf> {
-    None
+/// Compares two version strings, using semver when both parse and plain
+/// string comparison otherwise.
+fn compare_versions(a: &str, b: &str) -> Ordering {
+    match (
+        semver::Version::parse(a.trim_start_matches('v')),
+        semver::Version::parse(b.trim_start_matches('v'))
+    ) {
+        (Ok(va), Ok(vb)) => va.cmp(&vb),
+        _ => a.cmp(b)
+    }
 }
 
-/// Ensures a shim or binary entry exists at the given path.
-fn create_shim(path: &std::path::Path) {
-    let _ = zoi_install::shim::create_shim(path);
+/// Finds the version to roll back to: the highest stored version that is
+/// lower than the active one.
+///
+/// Only real version directories are considered: entries that are not
+/// directories (such as `*.zoisave` backups), hidden directories (such as
+/// leftover `.tmp-install-*` staging directories), and directories without a
+/// readable install manifest for the same package, sub-package, repository
+/// and registry are skipped. The manifest's version must match its directory
+/// name.
+fn find_previous_version(
+    package_dir: &Path,
+    current: &types::InstallManifest
+) -> Option<(String, types::InstallManifest)> {
+    let entries = fs::read_dir(package_dir).ok()?;
+    let mut candidates: Vec<(String, types::InstallManifest)> = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name == "latest" || name == "dependents" || name.starts_with('.') {
+            continue;
+        }
+        let version_dir = entry.path();
+        // `latest` is a symlink; real version directories are not.
+        if version_dir.is_symlink() || !version_dir.is_dir() {
+            continue;
+        }
+        let Some(manifest_path) = local::find_store_manifest(
+            &version_dir,
+            current.sub_package.as_deref()
+        ) else {
+            continue;
+        };
+        let Ok(manifest) = local::read_store_manifest(&manifest_path) else {
+            continue;
+        };
+        if manifest.version != name
+            || !manifest.name.eq_ignore_ascii_case(&current.name)
+            || manifest.sub_package != current.sub_package
+            || !manifest.repo.eq_ignore_ascii_case(&current.repo)
+            || !manifest
+                .registry_handle
+                .eq_ignore_ascii_case(&current.registry_handle)
+        {
+            continue;
+        }
+        if compare_versions(&name, &current.version) != Ordering::Less {
+            continue;
+        }
+        candidates.push((name, manifest));
+    }
+    candidates
+        .into_iter()
+        .max_by(|a, b| compare_versions(&a.0, &b.0))
 }

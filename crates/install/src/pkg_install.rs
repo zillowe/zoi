@@ -118,11 +118,66 @@ struct InstallingPackage<'a> {
     /// Repository tier the package was installed from.
     repo: &'a str,
     /// Registry handle the package belongs to.
-    registry: &'a str
+    registry: &'a str,
+    /// Scope the package is being installed into.
+    scope: types::Scope
 }
 
-/// Checks for file conflicts between a source directory and a destination
-/// directory, prompting the user for confirmation if conflicts are found.
+/// An incoming file destination, in both the placeholder form recorded in
+/// manifests and the `package_files` index (e.g. `${usrroot}/usr/bin/zoi`)
+/// and the absolute path it expands to.
+struct IncomingFile {
+    /// Placeholder form, as recorded in `installed_files`.
+    tracked: String,
+    /// Absolute filesystem path the file is written to.
+    path: PathBuf
+}
+
+/// Lists the files under `source_dir` as they would land under `dest_dir`,
+/// tracked under `placeholder_root` (`${usrroot}` or `${usrhome}`).
+fn incoming_files_from_dir(
+    source_dir: &Path,
+    dest_dir: &Path,
+    placeholder_root: &str
+) -> Result<Vec<IncomingFile>> {
+    let mut incoming = Vec::new();
+    for entry in WalkDir::new(source_dir)
+        .into_iter()
+        .filter_map(std::result::Result::ok)
+        .skip(1)
+    {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let relative_path = entry.path().strip_prefix(source_dir)?;
+        incoming.push(IncomingFile {
+            tracked: format!(
+                "{placeholder_root}/{}",
+                relative_path.to_string_lossy().replace('\\', "/")
+            ),
+            path: dest_dir.join(relative_path)
+        });
+    }
+    Ok(incoming)
+}
+
+/// Fails unless the caller may write `${usrroot}` files.
+///
+/// Writing to the real system root needs administrator rights. With a
+/// sysroot configured the files land in that tree instead, which the caller
+/// may legitimately own, so the filesystem's own permission checks decide.
+fn ensure_can_write_usrroot() -> Result<()> {
+    if zoi_core::sysroot::get_sysroot().is_none() && !utils::is_admin() {
+        return Err(anyhow!(
+            "Administrator privileges required to install system-wide files. \
+             Please run with sudo or as an administrator."
+        ));
+    }
+    Ok(())
+}
+
+/// Checks incoming files against what already exists on disk, prompting the
+/// user for confirmation if conflicts are found.
 ///
 /// The check consults the global `package_files` index rather than only the
 /// incoming package's own previous manifest. That distinction is what lets a
@@ -136,8 +191,7 @@ struct InstallingPackage<'a> {
 /// has been installed at least once, and it is also the only record for a
 /// package installed before this index existed.
 fn check_and_handle_file_conflicts(
-    source_dir: &Path,
-    dest_dir: &Path,
+    incoming: &[IncomingFile],
     owned_files: &HashSet<String>,
     package: Option<&InstallingPackage<'_>>,
     yes: bool
@@ -145,93 +199,82 @@ fn check_and_handle_file_conflicts(
     let mut stray_files = Vec::new();
     let mut owned_by_others: Vec<FileConflict> = Vec::new();
 
+    // `owned_files` holds placeholder-form paths such as
+    // `${usrroot}/usr/bin/zoi` (older manifests may hold absolute ones).
+    // Incoming files are compared both by their placeholder form and by
+    // their absolute path against the expanded records, so either form of
+    // a previous claim is recognized.
+    let scope = package.map_or(types::Scope::User, |pkg| pkg.scope);
+    let owned_expanded: HashSet<String> = owned_files
+        .iter()
+        .filter_map(|file| {
+            utils::expand_placeholders(file, Path::new(""), scope).ok()
+        })
+        .collect();
+
     // Resolved once rather than per file: this runs for every incoming file,
     // and a system-scope package contributes thousands of them.
     //
-    // A database that cannot be opened, or a package with no row yet, both
-    // degrade to "no owners known" rather than failing the install. Losing the
-    // ownership index turns a cross-package clobber back into the plain
-    // stray-file prompt, which is the behaviour this check had before, so the
-    // failure mode is a weaker check and never a broken install.
+    // Installed packages and their files are indexed in the `local`
+    // database (keyed by the registry handle they came from), so that is
+    // the one consulted here. A database that cannot be opened, or a package
+    // with no row yet, both degrade to "no owners known" rather than failing
+    // the install: losing the ownership index turns a cross-package clobber
+    // back into the plain stray-file prompt, so the failure mode is a weaker
+    // check and never a broken install.
     let (conn, current_pkg_id) = match package {
-        Some(pkg) => {
-            // `open_connection` keys the database file by registry handle, and
-            // an empty handle is how the local store is named.
-            let registry_key = if pkg.registry.is_empty() {
-                "local"
-            } else {
-                pkg.registry
-            };
-            match db::open_connection(registry_key) {
-                Ok(conn) => {
-                    let id = db::get_package_id(
-                        &conn,
-                        pkg.name,
-                        pkg.sub_package,
-                        pkg.repo,
-                        registry_key
-                    )
-                    .ok();
-                    (Some(conn), id)
-                }
-                Err(_) => (None, None)
+        Some(pkg) => match db::open_connection("local") {
+            Ok(conn) => {
+                let id = db::get_package_id_scoped(
+                    &conn,
+                    pkg.name,
+                    pkg.sub_package,
+                    pkg.repo,
+                    pkg.registry,
+                    Some(pkg.scope)
+                )
+                .ok();
+                (Some(conn), id)
             }
-        }
+            Err(_) => (None, None)
+        },
         None => (None, None)
     };
 
-    for entry in WalkDir::new(source_dir)
-        .into_iter()
-        .filter_map(std::result::Result::ok)
-        .skip(1)
-    {
-        if !entry.file_type().is_file() {
+    for file in incoming {
+        if !file.path.exists() && !file.path.is_symlink() {
             continue;
         }
 
-        let relative_path = entry.path().strip_prefix(source_dir)?;
-        let dest_path = dest_dir.join(relative_path);
-
-        if !dest_path.exists() {
-            continue;
-        }
-
-        // `owned_files` stores placeholder-form paths such as
-        // `${usrroot}/usr/bin/zoi`, so the comparison has to be made against
-        // that same form rather than the expanded destination path. Comparing
-        // the expanded path against the stored form never matches, which made
-        // every reinstall look like a conflict against itself.
-        let expanded = zoi_core::utils::expand_placeholders(
-            &dest_path.to_string_lossy(),
-            Path::new(""),
-            types::Scope::System
-        );
-        let is_self_owned = expanded
-            .as_ref()
-            .is_ok_and(|p| owned_files.contains(p))
-            || owned_files.contains(&dest_path.to_string_lossy().to_string());
-
+        let absolute = file.path.to_string_lossy().to_string();
+        let is_self_owned = owned_files.contains(&file.tracked)
+            || owned_files.contains(&absolute)
+            || owned_expanded.contains(&absolute);
         if is_self_owned {
             continue;
         }
 
+        // `package_files` stores the placeholder form; legacy rows may hold
+        // the absolute path, so that is consulted as a fallback.
         let owners = conn
             .as_ref()
-            .and_then(|c| {
-                db::get_other_owners(
-                    c,
-                    &dest_path.to_string_lossy(),
-                    current_pkg_id
-                )
-                .ok()
+            .map(|c| {
+                let mut owners =
+                    db::get_other_owners(c, &file.tracked, current_pkg_id)
+                        .unwrap_or_default();
+                if owners.is_empty() {
+                    owners = db::get_other_owners(c, &absolute, current_pkg_id)
+                        .unwrap_or_default();
+                }
+                owners
             })
             .unwrap_or_default();
 
         if owners.is_empty() {
-            stray_files.push(dest_path);
+            stray_files.push(file.path.clone());
         } else {
             owned_by_others.push(FileConflict {
-                path: dest_path,
+                path: file.path.clone(),
                 owners
             });
         }
@@ -324,6 +367,16 @@ pub fn run(
     pb: Option<&indicatif::ProgressBar>
 ) -> Result<(Vec<String>, BTreeMap<String, String>)> {
     let scope = scope_override.unwrap_or(types::Scope::User);
+    // The sub-packages whose install manifests this run produces: the
+    // installer records one manifest per requested sub-package, or the main
+    // manifest when none was requested.
+    let own_subs: Vec<Option<String>> = match &sub_packages {
+        Some(subs) => subs
+            .iter()
+            .map(|s| (!s.is_empty()).then(|| s.clone()))
+            .collect(),
+        None => vec![None]
+    };
 
     // Handle meta-packages with no archive
     if package_file.as_os_str().is_empty() {
@@ -374,6 +427,13 @@ pub fn run(
     let temp_dir = Builder::new().prefix("zoi-install-").tempdir()?;
     let unpack_path = temp_dir.path().to_path_buf();
 
+    // Later entries must never replace earlier ones. Built archives never
+    // repeat a path, and allowing it would let an archive show one
+    // `manifest.json` or `.pkg.lua` to the signature verifier and install
+    // another (directly, or through a directory symlink).
+    archive.set_overwrite(false);
+    let mut trust_scan = crate::archive_trust::TrustScan::default();
+
     for entry_res in archive
         .entries()
         .map_err(|e| anyhow!("Failed to read archive entries: {e}"))?
@@ -388,27 +448,66 @@ pub fn run(
             .path()
             .map_err(|e| anyhow!("Failed to get entry path: {e}"))?
             .to_path_buf();
+        let is_regular_file = entry.header().entry_type().is_file();
+        let trust_entry = crate::archive_trust::classify_entry(&path);
         entry.unpack_in(&unpack_path).map_err(|e| {
             anyhow!("Failed to unpack file '{}': {}", path.display(), e)
         })?;
-    }
-
-    let mut pkg_lua_path = None;
-    for entry in WalkDir::new(temp_dir.path())
-        .into_iter()
-        .filter_map(std::result::Result::ok)
-    {
-        if entry.file_name().to_string_lossy().ends_with(".pkg.lua") {
-            pkg_lua_path = Some(entry.path().to_path_buf());
-            break;
+        if let Some((kind, top_level)) = trust_entry {
+            // Root trust entries are read back right after they are written.
+            // With overwriting disabled nothing later in the stream can
+            // replace them, so these are exactly the bytes the signature
+            // verifier (which applies the same rules) saw.
+            let data = match &top_level {
+                Some(name) if is_regular_file => {
+                    Some(fs::read(unpack_path.join(name))?)
+                }
+                _ => None
+            };
+            trust_scan.record(
+                kind,
+                top_level.as_deref(),
+                is_regular_file,
+                data
+            )?;
         }
     }
-    let pkg_lua_path = pkg_lua_path.ok_or_else(|| {
-        anyhow!(
-            "Could not find .pkg.lua file in archive '{}'",
-            package_file.display()
-        )
+    let trust = trust_scan.finish().map_err(|e| {
+        anyhow!("Refusing to install '{}': {e}", package_file.display())
     })?;
+
+    // The package definition is parsed (and so executed) before anything is
+    // installed. When the manifest records its digest, which signed
+    // manifests from current builds do, the definition must match it.
+    let pkg_lua_path = if let Some((name, bytes)) = trust.single_pkg_lua()? {
+        if let Some(manifest) = &trust.manifest {
+            crate::archive_trust::check_pkg_lua_binding(manifest, Some(bytes))?;
+        }
+        unpack_path.join(name)
+    } else {
+        if let Some(manifest) = &trust.manifest {
+            crate::archive_trust::check_pkg_lua_binding(manifest, None)?;
+        }
+        // Legacy archives may keep the definition below the root.
+        let mut pkg_lua_path = None;
+        for entry in WalkDir::new(temp_dir.path())
+            .into_iter()
+            .filter_map(std::result::Result::ok)
+        {
+            if entry.file_type().is_file()
+                && entry.file_name().to_string_lossy().ends_with(".pkg.lua")
+            {
+                pkg_lua_path = Some(entry.path().to_path_buf());
+                break;
+            }
+        }
+        pkg_lua_path.ok_or_else(|| {
+            anyhow!(
+                "Could not find .pkg.lua file in archive '{}'",
+                package_file.display()
+            )
+        })?
+    };
 
     let platform = utils::get_platform()?;
     let metadata = zoi_lua::parser::parse_lua_package_for_platform(
@@ -424,26 +523,24 @@ pub fn run(
         true
     )?;
 
-    let pooled_manifest_path =
-        utils::safe_join(&unpack_path, Path::new("manifest.json"))?;
-    if pooled_manifest_path.exists() {
-        let content =
-            utils::read_file_within(&unpack_path, &pooled_manifest_path)?;
-        if let Ok(pooled_manifest) =
-            serde_json::from_str::<types::PooledZpaManifest>(&content)
-        {
-            return extract_pooled_zpa(
-                &pooled_manifest,
-                &unpack_path,
-                scope,
-                &metadata,
-                sub_packages,
-                link_bins,
-                pb,
-                yes,
-                registry_handle
-            );
-        }
+    // Only the root `manifest.json` recorded during extraction counts; a file
+    // that merely ended up at that path some other way is ignored.
+    if let Some(manifest) = &trust.manifest
+        && let Ok(pooled_manifest) =
+            serde_json::from_slice::<types::PooledZpaManifest>(manifest)
+    {
+        return extract_pooled_zpa(
+            &pooled_manifest,
+            &unpack_path,
+            scope,
+            &metadata,
+            sub_packages,
+            &own_subs,
+            link_bins,
+            pb,
+            yes,
+            registry_handle
+        );
     }
 
     let version = metadata.version.as_ref().ok_or_else(|| {
@@ -536,27 +633,29 @@ pub fn run(
                 copy_dir_all(&pkgstore_src, staging_dir.path())?;
             }
 
+            // The database row this install updates is keyed by the
+            // requested sub-package, not by each sub-package unpacked here.
+            let installing = InstallingPackage {
+                name: &metadata.name,
+                sub_package: own_subs.first().and_then(Option::as_deref),
+                repo: &metadata.repo,
+                registry: registry_handle,
+                scope
+            };
+
             let usrroot_src = sub_data_dir.join("usrroot");
             if usrroot_src.exists() {
-                if !utils::is_admin() {
-                    return Err(anyhow!(
-                        "Administrator privileges required to install \
-                         system-wide files. Please run with sudo or as an \
-                         administrator."
-                    ));
-                }
+                ensure_can_write_usrroot()?;
                 let root_dest =
                     zoi_core::sysroot::apply_sysroot(PathBuf::from("/"));
                 check_and_handle_file_conflicts(
-                    &usrroot_src,
-                    &root_dest,
+                    &incoming_files_from_dir(
+                        &usrroot_src,
+                        &root_dest,
+                        "${usrroot}"
+                    )?,
                     &owned_files,
-                    Some(&InstallingPackage {
-                        name: &metadata.name,
-                        sub_package: sub_opt,
-                        repo: &metadata.repo,
-                        registry: registry_handle
-                    }),
+                    Some(&installing),
                     yes
                 )?;
                 copy_dir_all(&usrroot_src, &root_dest)?;
@@ -584,15 +683,13 @@ pub fn run(
                 let home_dest = zoi_core::utils::get_user_home()
                     .ok_or_else(|| anyhow!("Could not find home directory"))?;
                 check_and_handle_file_conflicts(
-                    &usrhome_src,
-                    &home_dest,
+                    &incoming_files_from_dir(
+                        &usrhome_src,
+                        &home_dest,
+                        "${usrhome}"
+                    )?,
                     &owned_files,
-                    Some(&InstallingPackage {
-                        name: &metadata.name,
-                        sub_package: sub_opt,
-                        repo: &metadata.repo,
-                        registry: registry_handle
-                    }),
+                    Some(&installing),
                     yes
                 )?;
                 copy_dir_all(&usrhome_src, &home_dest)?;
@@ -635,10 +732,18 @@ pub fn run(
         }
     }
 
-    copy_dir_all(staging_dir.path(), &version_dir)?;
-
-    finalize_installation(
+    let replaced = place_version_dir(
+        staging_dir.path(),
         &version_dir,
+        &own_subs,
+        metadata
+            .sub_packages
+            .as_ref()
+            .is_some_and(|s| !s.is_empty())
+    )?;
+    finalize_or_restore(
+        &version_dir,
+        replaced,
         &metadata,
         scope,
         link_bins,
@@ -878,6 +983,7 @@ fn extract_pooled_zpa(
     scope: types::Scope,
     metadata: &types::Package,
     sub_packages: Option<Vec<String>>,
+    own_subs: &[Option<String>],
     link_bins: bool,
     pb: Option<&indicatif::ProgressBar>,
     yes: bool,
@@ -932,8 +1038,9 @@ fn extract_pooled_zpa(
 
     let pool_dir = unpack_path.join("pool");
 
-    let mut conflicts = Vec::new();
     let mut owned_files = HashSet::new();
+    let mut incoming = Vec::new();
+    let mut writes_usrroot = false;
 
     // ${createpkgdir} resolves to the invocation directory, so its absolute
     // location is recorded at install time instead of the placeholder.
@@ -964,49 +1071,49 @@ fn extract_pooled_zpa(
         if let Some(sub_mapping) = pooled_manifest.mappings.get(sub)
             && let Some(scope_mapping) = sub_mapping.scopes.get(&scope)
         {
+            writes_usrroot |= scope_mapping
+                .files
+                .iter()
+                .map(|f| f.dest.as_str())
+                .chain(scope_mapping.symlinks.iter().map(|l| l.link.as_str()))
+                .chain(scope_mapping.dirs.iter().map(|d| d.path.as_str()))
+                .any(|dest| dest.starts_with("${usrroot}"));
+
             for mapped_file in &scope_mapping.files {
-                let dest_path = expand_pooled_path(
-                    &mapped_file.dest,
-                    staging_dir.path(),
-                    scope
-                )?;
-                // We only check conflicts for files that land outside the Zoi
-                // store's staging area
-                if !mapped_file.dest.starts_with("${pkgstore}")
-                    && dest_path.exists()
-                    && !owned_files.contains(&mapped_file.dest)
-                    // Older manifests may have recorded the expanded form.
-                    && !owned_files
-                        .contains(&dest_path.to_string_lossy().to_string())
-                {
-                    conflicts.push(dest_path);
+                // Only files landing outside the Zoi store's staging area
+                // can collide with anything.
+                if mapped_file.dest.starts_with("${pkgstore}") {
+                    continue;
                 }
+                incoming.push(IncomingFile {
+                    tracked: track_dest(&mapped_file.dest)?,
+                    path: expand_pooled_path(
+                        &mapped_file.dest,
+                        staging_dir.path(),
+                        scope
+                    )?
+                });
             }
         }
     }
 
-    if !conflicts.is_empty() {
-        println!();
-        println!("{}", "File Conflict Detected:".red().bold());
-        println!(
-            "The following files that this package wants to install already \
-             exist on your system:"
-        );
-        for file in &conflicts {
-            println!("- {}", file.display());
-        }
-        println!();
-
-        if !utils::ask_for_confirmation(
-            "Do you want to overwrite these files and continue with the \
-             installation?",
-            yes
-        ) {
-            return Err(anyhow!(
-                "Installation aborted by user due to file conflicts."
-            ));
-        }
+    // Same admission and ownership checks as the legacy `data/` layout, so
+    // both archive formats behave alike.
+    if writes_usrroot {
+        ensure_can_write_usrroot()?;
     }
+    check_and_handle_file_conflicts(
+        &incoming,
+        &owned_files,
+        Some(&InstallingPackage {
+            name: &metadata.name,
+            sub_package: own_subs.first().and_then(Option::as_deref),
+            repo: &metadata.repo,
+            registry: registry_handle,
+            scope
+        }),
+        yes
+    )?;
 
     for sub in subs_to_install {
         let Some(sub_mapping) = pooled_manifest.mappings.get(&sub) else {
@@ -1036,23 +1143,35 @@ fn extract_pooled_zpa(
                 staging_dir.path(),
                 scope
             )?;
+            // A directory that already exists (`/usr/bin`, `~/.config`, or
+            // one another package created) is shared: the archive's
+            // recorded mode and owner only apply to directories this install
+            // creates. Older archives record every intermediate directory,
+            // so this must not rely on the build having filtered them.
+            let existed = fs::symlink_metadata(&dest_path).is_ok();
             fs::create_dir_all(&dest_path)?;
 
             #[cfg(unix)]
             {
-                if let Some(mode) = mapped_dir.mode {
-                    use std::os::unix::fs::PermissionsExt;
-                    fs::set_permissions(
-                        &dest_path,
-                        fs::Permissions::from_mode(mode)
-                    )?;
-                }
-                if let (Some(owner), Some(group)) =
-                    (&mapped_dir.owner, &mapped_dir.group)
-                {
-                    let _ = utils::set_path_owner(&dest_path, owner, group);
+                if !existed {
+                    if let Some(mode) = mapped_dir.mode {
+                        use std::os::unix::fs::PermissionsExt;
+                        // setuid/setgid/sticky bits are never taken from an
+                        // archive.
+                        fs::set_permissions(
+                            &dest_path,
+                            fs::Permissions::from_mode(mode & 0o777)
+                        )?;
+                    }
+                    if let (Some(owner), Some(group)) =
+                        (&mapped_dir.owner, &mapped_dir.group)
+                    {
+                        let _ = utils::set_path_owner(&dest_path, owner, group);
+                    }
                 }
             }
+            #[cfg(not(unix))]
+            let _ = existed;
         }
 
         // Step 2: Extract files
@@ -1100,14 +1219,23 @@ fn extract_pooled_zpa(
                 fs::create_dir_all(parent)?;
             }
 
+            // Never write through a symlink sitting at the destination: that
+            // would modify whatever file it points to instead of replacing
+            // the link.
+            if dest_path.is_symlink() {
+                fs::remove_file(&dest_path)?;
+            }
             fs::copy(&pool_file, &dest_path)?;
 
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
+                // Builds record `mode & 0o777`; masking again here keeps a
+                // crafted manifest from installing setuid/setgid/sticky
+                // files, which Zoi packages have no way to request.
                 fs::set_permissions(
                     &dest_path,
-                    fs::Permissions::from_mode(mapped_file.mode)
+                    fs::Permissions::from_mode(mapped_file.mode & 0o777)
                 )?;
                 if let (Some(owner), Some(group)) =
                     (&mapped_file.owner, &mapped_file.group)
@@ -1146,11 +1274,18 @@ fn extract_pooled_zpa(
     }
 
     // Finalize staging-to-store move
-    fs::create_dir_all(&version_dir)?;
-    copy_dir_all(staging_dir.path(), &version_dir)?;
-
-    finalize_installation(
+    let replaced = place_version_dir(
+        staging_dir.path(),
         &version_dir,
+        own_subs,
+        metadata
+            .sub_packages
+            .as_ref()
+            .is_some_and(|s| !s.is_empty())
+    )?;
+    finalize_or_restore(
+        &version_dir,
+        replaced,
         metadata,
         scope,
         link_bins,
@@ -1163,6 +1298,175 @@ fn extract_pooled_zpa(
     }
 
     Ok((installed_files, file_digests))
+}
+
+/// Runs [`finalize_installation`], putting the previous version directory
+/// back if it fails after [`place_version_dir`] replaced it.
+fn finalize_or_restore(
+    version_dir: &Path,
+    replaced: Option<ReplacedVersionDir>,
+    metadata: &types::Package,
+    scope: types::Scope,
+    link_bins: bool,
+    pb: Option<&indicatif::ProgressBar>,
+    installed_files: &mut Vec<String>
+) -> Result<()> {
+    if let Err(e) = finalize_installation(
+        version_dir,
+        metadata,
+        scope,
+        link_bins,
+        pb,
+        installed_files
+    ) {
+        if let Some(previous) = replaced
+            && let Err(restore_error) = previous.restore(version_dir)
+        {
+            eprintln!(
+                "Warning: failed to restore the previous '{}': {restore_error}",
+                version_dir.display()
+            );
+        }
+        return Err(e);
+    }
+    Ok(())
+}
+
+/// The previous tree of a version directory replaced by
+/// [`place_version_dir`], kept until the install completes so it can be put
+/// back if a later step fails. Dropping it deletes the previous tree.
+struct ReplacedVersionDir {
+    /// Holds the previous tree at `holder/previous`.
+    holder: tempfile::TempDir
+}
+
+impl ReplacedVersionDir {
+    /// Puts the previous tree back at `version_dir`.
+    fn restore(self, version_dir: &Path) -> Result<()> {
+        if fs::symlink_metadata(version_dir).is_ok() {
+            fs::remove_dir_all(version_dir)?;
+        }
+        fs::rename(self.holder.path().join("previous"), version_dir)?;
+        Ok(())
+    }
+}
+
+/// Returns whether a top-level version-directory file name is an install
+/// manifest (current JSON or legacy YAML naming).
+fn is_store_manifest_name(name: &str) -> bool {
+    name.starts_with("manifest")
+        && Path::new(name).extension().is_some_and(|ext| {
+            ext.eq_ignore_ascii_case("json")
+                || ext.eq_ignore_ascii_case("yaml")
+                || ext.eq_ignore_ascii_case("yml")
+        })
+}
+
+/// Moves a fully staged store tree into place as `version_dir`.
+///
+/// A fresh install renames the staging directory into place. A reinstall of
+/// the same version replaces the existing directory rather than merging into
+/// it, so files the previous build shipped but this one does not cannot
+/// linger. The previous tree is moved aside first and returned so the caller
+/// can restore it if finishing the install fails. Zoi's own records in the
+/// old directory (this package's install manifests and the persisted
+/// `package.pkg.lua`) are carried over unless the new tree ships them, so
+/// they stay in place until the installer rewrites them.
+///
+/// Split packages (`split`) share one version directory between
+/// sub-packages, which may even be installed concurrently within one
+/// transaction, so it is never replaced wholesale (the same applies when the
+/// directory holds another sub-package's manifest). Instead this install's
+/// own previously recorded store files are removed and the new tree is
+/// merged in.
+///
+/// `own_subs` are the sub-packages whose manifests this install writes
+/// (`None` for the package's main manifest).
+fn place_version_dir(
+    staging: &Path,
+    version_dir: &Path,
+    own_subs: &[Option<String>],
+    split: bool
+) -> Result<Option<ReplacedVersionDir>> {
+    if split {
+        fs::create_dir_all(version_dir)?;
+    } else if fs::symlink_metadata(version_dir).is_err() {
+        fs::rename(staging, version_dir)?;
+        return Ok(None);
+    }
+
+    let mut own_manifests = HashSet::new();
+    for sub in own_subs {
+        let json = local::manifest_filename(sub.as_deref());
+        let stem = json.trim_end_matches(".json").to_string();
+        own_manifests.insert(format!("{stem}.yaml"));
+        own_manifests.insert(format!("{stem}.yml"));
+        own_manifests.insert(json);
+    }
+
+    let mut carried = Vec::new();
+    let mut shared = split;
+    for entry in fs::read_dir(version_dir)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().to_string();
+        if is_store_manifest_name(&name) {
+            if own_manifests.contains(&name) {
+                carried.push(name);
+            } else {
+                shared = true;
+            }
+        } else if name == "package.pkg.lua" {
+            carried.push(name);
+        }
+    }
+
+    if shared {
+        for name in carried.iter().filter(|n| is_store_manifest_name(n)) {
+            let Ok(previous) =
+                local::read_store_manifest(&version_dir.join(name))
+            else {
+                continue;
+            };
+            for file in previous.installed_files {
+                if let Some(rel) = file.strip_prefix("${pkgstore}/")
+                    && let Ok(path) =
+                        utils::safe_join(version_dir, Path::new(rel))
+                    && fs::symlink_metadata(&path).is_ok_and(|m| !m.is_dir())
+                {
+                    fs::remove_file(&path)?;
+                }
+            }
+        }
+        copy_dir_all(staging, version_dir)?;
+        return Ok(None);
+    }
+
+    for name in &carried {
+        let dest = staging.join(name);
+        if fs::symlink_metadata(&dest).is_err() {
+            fs::copy(version_dir.join(name), &dest)?;
+        }
+    }
+
+    let parent = version_dir.parent().ok_or_else(|| {
+        anyhow!("Version directory has no parent: {}", version_dir.display())
+    })?;
+    let holder = tempfile::Builder::new()
+        .prefix(".tmp-previous-")
+        .tempdir_in(parent)?;
+    let previous = holder.path().join("previous");
+    fs::rename(version_dir, &previous)?;
+    if let Err(e) = fs::rename(staging, version_dir) {
+        let _ = fs::rename(&previous, version_dir);
+        return Err(anyhow!(
+            "Failed to move the staged package into '{}': {e}",
+            version_dir.display()
+        ));
+    }
+    Ok(Some(ReplacedVersionDir { holder }))
 }
 
 /// Expands placeholders in a pooled path to their absolute filesystem paths.

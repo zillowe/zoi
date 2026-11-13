@@ -114,7 +114,7 @@ Most packaging systems split the process into metadata definition, dependency de
 You can convert a Scoop manifest directly into a Zoi package definition:
 
 ```powershell
-zoi migrate scoop ./my-tool.json -o ./my-tool.pkg.lua
+zoi package migrate scoop ./my-tool.json -o ./my-tool.pkg.lua
 ```
 
 This generates a `.pkg.lua` scaffold that maps Scoop fields into Zoi metadata, dependencies, hooks, and lifecycle functions. It includes broad manifest coverage, including architecture overrides, install/uninstall scripts, persist paths, hash/url matrices, and preserves the original manifest in a Lua table for manual refinement.
@@ -127,11 +127,11 @@ Use `--dry-run` to print the generated `.pkg.lua` to stdout without writing a fi
 
 If you are migrating CI scripts or internal tooling to newer Zoi command flows, prefer these flags:
 
-- `zoi install --plan-json`
-- `zoi uninstall --plan-json`
-- `zoi update --plan-json`
+- `zoi install --dry-run --plan-json`
+- `zoi uninstall --dry-run --plan-json`
+- `zoi update --dry-run --plan-json`
 
-These emit a stable `zoi.plan.v1` envelope with command-specific fields, which is safer for automation than scraping human-readable output.
+`--plan-json` requires `--dry-run`; Zoi rejects it on its own. These emit a stable `zoi.plan.v1` envelope with command-specific fields, which is safer for automation than scraping human-readable output.
 
 For human troubleshooting in CI logs, pair with `--explain` to print resolver/selection reasons.
 

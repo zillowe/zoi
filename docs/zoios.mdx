@@ -22,7 +22,9 @@ Reads a `system.lua` file and applies its state to the machine. This involves:
 1. Resolving all required packages.
 2. Creating a new **System Generation** record.
 3. Directly installing/updating packages in the system root within an atomic transaction.
-4. **Declarative State Enforcement**: Automatically identifies and removes any packages currently installed in the system scope that are not explicitly listed in the configuration file.
+4. **Declarative State Enforcement**: After the configured packages install successfully, removes system-scope packages you installed directly that the configuration no longer lists. Packages installed as dependencies are left alone, and if installing fails nothing is removed. The whole operation holds the store lock.
+
+`zoi system` subcommands act on the running machine through `zoid`, so they reject the global `--root` option. To prepare a separate root, use `zoi system distro build` instead.
 
 ```sh
 # Apply the default system configuration

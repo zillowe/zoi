@@ -7,6 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
+use colored::Colorize;
 use walkdir::WalkDir;
 use zoi_core::types::{self, InstallManifest, Scope};
 use zoi_core::{config, utils};
@@ -318,8 +319,18 @@ pub fn get_installed_manifests_in_scope(
         }
 
         for manifest_path in manifest_paths_in_latest(&latest_path) {
-            let manifest = read_store_manifest(&manifest_path)?;
-            manifests.push(manifest);
+            // One corrupt or half-written manifest must not make every
+            // lookup in this scope (install, uninstall, list, rollback) fail.
+            match read_store_manifest(&manifest_path) {
+                Ok(manifest) => manifests.push(manifest),
+                Err(e) => {
+                    eprintln!(
+                        "{} skipping unreadable install manifest {}: {e}",
+                        "Warning:".yellow(),
+                        manifest_path.display()
+                    );
+                }
+            }
         }
     }
 
@@ -512,24 +523,117 @@ pub fn add_dependent(package_dir: &Path, dependent_id: &str) -> Result<()> {
 
 /// Removes a dependent ID from a package's dependents list.
 ///
+/// Dependent IDs have been recorded in several shapes over time:
+/// `#handle@repo/name@version` (install graph), `#handle@repo/name:sub@version`
+/// (lockfile / source strings) and the legacy unversioned
+/// `#handle@repo/name`. Besides the exact ID, this also removes recorded
+/// entries that refer to the same parent in another shape:
+///
+/// - the package base (`#handle@repo/name`) must match (case-insensitive);
+/// - versions must match when both IDs carry one; a recorded ID without a
+///   version matches any version;
+/// - sub-packages must match when both IDs carry one; a recorded ID without a
+///   sub-package (the install-graph shape, which drops it) matches any
+///   sub-package of the same parent. A recorded `:sub` entry is not removed by
+///   an ID without a sub-package, so removing `name` never drops the link held
+///   by `name:sub`.
+///
 /// # Errors
 ///
 /// Returns an error if the dependent file cannot be removed.
 pub fn remove_dependent(package_dir: &Path, dependent_id: &str) -> Result<()> {
     let dependents_dir = package_dir.join("dependents");
-    if dependents_dir.exists() {
-        let dependent_file = dependents_dir.join(hex::encode(dependent_id));
-        if dependent_file.exists() {
-            fs::remove_file(dependent_file)?;
-        } else if let Some(pos) = dependent_id.rfind('@') {
-            let legacy_id = &dependent_id[..pos];
-            let legacy_file = dependents_dir.join(hex::encode(legacy_id));
-            if legacy_file.exists() {
-                fs::remove_file(legacy_file)?;
-            }
+    if !dependents_dir.exists() {
+        return Ok(());
+    }
+    let dependent_file = dependents_dir.join(hex::encode(dependent_id));
+    if dependent_file.exists() {
+        fs::remove_file(dependent_file)?;
+    }
+
+    let given = parse_dependent_id(dependent_id);
+    for entry in fs::read_dir(&dependents_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(file_name) = path.file_name().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        let Ok(decoded) = hex::decode(file_name) else {
+            continue;
+        };
+        let Ok(recorded) = String::from_utf8(decoded) else {
+            continue;
+        };
+        if dependent_ids_match(&given, &parse_dependent_id(&recorded)) {
+            fs::remove_file(&path)?;
         }
     }
     Ok(())
+}
+
+/// Components of a dependent ID such as `#handle@repo/name:sub@version`.
+#[derive(Debug)]
+struct DependentIdParts<'a> {
+    /// Everything up to and including the package name
+    /// (`#handle@repo/name`).
+    base: String,
+    /// Sub-package named by the ID, if any.
+    sub_package: Option<&'a str>,
+    /// Version named by the ID, if any.
+    version: Option<&'a str>
+}
+
+/// Splits a dependent ID into its base, sub-package and version.
+fn parse_dependent_id(id: &str) -> DependentIdParts<'_> {
+    // The version separator is the first `@` after the last `/`; the `@`
+    // after `#handle` belongs to the prefix.
+    let split_pos = if let Some(pos) = id.rfind('/') {
+        pos + 1
+    } else if id.starts_with('#') {
+        id.find('@').map_or(0, |pos| pos + 1)
+    } else {
+        0
+    };
+    let (prefix, tail) = id.split_at(split_pos);
+    let (name_sub, version) = match tail.split_once('@') {
+        Some((name_sub, version)) => {
+            (name_sub, Some(version).filter(|v| !v.is_empty()))
+        }
+        None => (tail, None)
+    };
+    let (name, sub_package) = match name_sub.split_once(':') {
+        Some((name, sub)) => (name, Some(sub).filter(|s| !s.is_empty())),
+        None => (name_sub, None)
+    };
+    DependentIdParts {
+        base: format!("{prefix}{name}"),
+        sub_package,
+        version
+    }
+}
+
+/// Returns whether a recorded dependent ID refers to the same parent as the
+/// ID being removed. See [`remove_dependent`] for the rules.
+fn dependent_ids_match(
+    given: &DependentIdParts<'_>,
+    recorded: &DependentIdParts<'_>
+) -> bool {
+    if !given.base.eq_ignore_ascii_case(&recorded.base) {
+        return false;
+    }
+    if let (Some(a), Some(b)) = (given.version, recorded.version)
+        && a != b
+    {
+        return false;
+    }
+    match (given.sub_package, recorded.sub_package) {
+        (Some(a), Some(b)) => a == b,
+        (None, Some(_)) => false,
+        (_, None) => true
+    }
 }
 
 /// Returns a list of all dependent IDs for a package.
@@ -557,6 +661,55 @@ pub fn get_dependents(package_dir: &Path) -> Result<Vec<String>> {
     Ok(dependents)
 }
 
+/// Writes `contents` to `path` atomically.
+///
+/// The data is written to a temporary file in the same directory, flushed to
+/// disk, and then renamed over `path`, so readers either see the old file or
+/// the complete new one - never a truncated file left behind by a crash or a
+/// full disk.
+///
+/// # Errors
+///
+/// Returns an error if the temporary file cannot be written or renamed.
+pub fn write_file_atomic(path: &Path, contents: &[u8]) -> Result<()> {
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| anyhow!("Invalid file path: {}", path.display()))?
+        .to_string_lossy();
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or_default();
+    let tmp_path =
+        parent.join(format!(".{file_name}.tmp-{}-{nanos}", std::process::id()));
+
+    let result = write_and_rename(&tmp_path, path, contents);
+    if result.is_err() {
+        let _ = fs::remove_file(&tmp_path);
+    }
+    result
+}
+
+/// Writes `contents` to `tmp_path`, syncs it, and renames it over `path`.
+fn write_and_rename(
+    tmp_path: &Path,
+    path: &Path,
+    contents: &[u8]
+) -> Result<()> {
+    use std::io::Write;
+
+    let mut file = fs::File::create(tmp_path)?;
+    file.write_all(contents)?;
+    file.sync_all()?;
+    drop(file);
+    fs::rename(tmp_path, path)?;
+    Ok(())
+}
+
 /// Writes an installation manifest to the store and updates the 'latest'
 /// symlink.
 ///
@@ -577,7 +730,7 @@ pub fn write_manifest(manifest: &InstallManifest) -> Result<()> {
         version_dir.join(manifest_filename(manifest.sub_package.as_deref()));
 
     let content = serde_json::to_string_pretty(&manifest)?;
-    fs::write(&manifest_path, content)?;
+    write_file_atomic(&manifest_path, content.as_bytes())?;
 
     // Clean up the legacy YAML twin so readers never see both formats.
     let legacy_path = version_dir

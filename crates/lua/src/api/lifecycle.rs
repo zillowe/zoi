@@ -3,6 +3,30 @@ use std::path::Path;
 
 use mlua::{self, Lua, LuaSerdeExt, Table, Value};
 
+/// Resolves `file_name` relative to the directory containing the package file
+/// at `package_file`, refusing absolute paths, `..` components and symlinks
+/// that lead outside that directory.
+fn resolve_in_package_dir(
+    package_file: &Path,
+    file_name: &str
+) -> Result<std::path::PathBuf, mlua::Error> {
+    let parent = package_file.parent().ok_or_else(|| {
+        mlua::Error::RuntimeError(
+            "Could not determine parent directory of package file".to_string()
+        )
+    })?;
+    let parent = if parent.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        parent
+    };
+    zoi_core::utils::safe_join(parent, Path::new(file_name)).map_err(|e| {
+        mlua::Error::RuntimeError(format!(
+            "'{file_name}' must be a path inside the package directory: {e}"
+        ))
+    })
+}
+
 /// Exposes the core Package DSL and lifecycle functions to the Lua environment.
 ///
 /// This module defines the primary entry points for a `.pkg.lua` script:
@@ -29,13 +53,7 @@ pub fn add_import_util(
         if let Ok(refs) = lua.globals().get::<Table>("__ZoiReferencedFiles") {
             let _ = refs.push(file_name.clone());
         }
-        let parent = current_path_buf.parent().ok_or_else(|| {
-            mlua::Error::RuntimeError(
-                "Could not determine parent directory of package file"
-                    .to_string()
-            )
-        })?;
-        let path = parent.join(&file_name);
+        let path = resolve_in_package_dir(&current_path_buf, &file_name)?;
         let content = fs::read_to_string(&path)
             .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
 
@@ -92,13 +110,7 @@ pub fn add_include_util(
             {
                 let _ = refs.push(file_name.clone());
             }
-            let parent = current_path_buf.parent().ok_or_else(|| {
-                mlua::Error::RuntimeError(
-                    "Could not determine parent directory of package file"
-                        .to_string()
-                )
-            })?;
-            let path = parent.join(file_name);
+            let path = resolve_in_package_dir(&current_path_buf, &file_name)?;
             let code = fs::read_to_string(path)
                 .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
             lua.load(&code).exec()?;

@@ -12,6 +12,27 @@ use semver::Version;
 
 use crate::pkg::{cache, local, resolve, types};
 
+/// Extracts the version from a cached archive file name.
+///
+/// Cached archives are named `{name}-{version}-{platform}.zpa`. Both the
+/// version (pre-releases such as `1.0.0-rc.1`) and the platform
+/// (`linux-amd64`) may contain dashes, so the name is matched as an exact
+/// `{name}-` prefix and the platform is stripped from the right instead of
+/// splitting on `-`. Archives of other packages that merely share the prefix
+/// (`foo` vs `foo-bar`) and sub-package archives are rejected because what
+/// remains is not a valid semantic version.
+pub fn version_from_cached_archive(
+    file_name: &str,
+    package_name: &str,
+    platform: &str
+) -> Option<String> {
+    let rest = file_name.strip_prefix(package_name)?.strip_prefix('-')?;
+    let rest = rest.strip_suffix(".zpa")?;
+    let version = rest.strip_suffix(platform)?.strip_suffix('-')?;
+    Version::parse(version).ok()?;
+    Some(version.to_string())
+}
+
 /// Runs the `downgrade` command to switch to an older version of a package.
 ///
 /// # Errors
@@ -54,21 +75,15 @@ pub fn run(
     }
 
     if let Ok(archive_cache) = cache::get_archive_cache_root()
+        && let Ok(platform) = zoi_core::utils::get_platform()
         && let Ok(entries) = fs::read_dir(archive_cache)
     {
         for entry in entries.flatten() {
             let filename = entry.file_name().to_string_lossy().to_string();
-            if filename.starts_with(&pkg.name)
-                && std::path::Path::new(&filename)
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
+            if let Some(v_str) =
+                version_from_cached_archive(&filename, &pkg.name, &platform)
             {
-                let parts: Vec<&str> = filename.split('-').collect();
-                if let Some(v_str) = parts.get(1)
-                    && Version::parse(v_str).is_ok()
-                {
-                    versions.insert((*v_str).to_string());
-                }
+                versions.insert(v_str);
             }
         }
     }

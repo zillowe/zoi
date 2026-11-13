@@ -60,11 +60,17 @@ pub fn elevate_install_node(
             None
         )?;
 
-    if let types::InstallReason::Dependency { ref parent } = node.reason {
+    // Same linking as the non-elevated install path: record the display
+    // parent (never the "unknown" placeholder), then link this package as a
+    // dependent of every installed dependency it declares.
+    if let types::InstallReason::Dependency { ref parent } = node.reason
+        && parent != "unknown"
+    {
         let package_dir =
             local::get_package_dir(pkg.scope, handle, &pkg.repo, &pkg.name)?;
         local::add_dependent(&package_dir, parent)?;
     }
+    crate::pkg::install::installer::link_dependents(&node)?;
 
     let manifest = manifest::create_manifest(
         pkg,
@@ -132,13 +138,19 @@ pub fn elevate_uninstall(
 
     if pkg_lua_path.exists() {
         let lua = Lua::new();
+        // Give the uninstall script a throwaway working directory so `cmd`
+        // and other build-time APIs work; it is removed afterwards.
+        let work_dir = tempfile::Builder::new()
+            .prefix("zoi-uninstall-")
+            .tempdir()?;
+        let work_dir_str = work_dir.path().to_string_lossy().to_string();
         if crate::pkg::lua::functions::setup_lua_environment(
             &lua,
             &crate::pkg::utils::get_platform()?,
             Some(&manifest.version),
             pkg_lua_path.to_str(),
             None,
-            None,
+            Some(&work_dir_str),
             None,
             manifest.sub_package.as_deref(),
             Some(manifest.scope),

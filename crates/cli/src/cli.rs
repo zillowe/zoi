@@ -106,6 +106,7 @@ const MAIN_HELP_TEMPLATE: &str = "\
                                   bundle
   \x1b[32mpgp\x1b[0m                 Manage PGP keys for package signature \
                                   verification
+  \x1b[32mhelper\x1b[0m              Helper commands for various tasks
 
 \x1b[1;33mSystem & Storage:\x1b[0m
   \x1b[32mdoctor\x1b[0m              Checks for common issues and provides \
@@ -344,8 +345,9 @@ enum Commands {
         #[arg(long)]
         fallback: bool,
 
-        /// Do not check for installed package managers
-        #[arg(long = "no-pm")]
+        /// Do not check for installed package managers (not applicable to
+        /// --local, which never checks them)
+        #[arg(long = "no-pm", conflicts_with = "local")]
         no_package_managers: bool,
 
         /// Force re-sync by removing existing databases and re-cloning from
@@ -360,7 +362,7 @@ enum Commands {
 
         /// When used with --local, sync using revisions from zoi.lock instead
         /// of zoi.lua
-        #[arg(long)]
+        #[arg(long, requires = "local")]
         frozen: bool,
 
         /// The scope to sync the registries to
@@ -489,7 +491,10 @@ enum Commands {
         /// Interactively choose which upgradable packages to update (with
         /// --all)
         #[arg(long, requires = "all")]
-        interactive: bool
+        interactive: bool,
+        /// Only update packages installed in this scope
+        #[arg(long, value_enum)]
+        scope: Option<InstallScope>
     },
 
     /// Installs one or more packages from a name, local file, URL, or git
@@ -1186,8 +1191,16 @@ pub fn run() -> anyhow::Result<()> {
                 | Commands::Update { .. }
                 | Commands::Autoremove { .. }
                 | Commands::Rollback { .. }
+                | Commands::Downgrade { .. }
+                | Commands::Transaction {
+                    command: TransactionCommands::Undo { .. }
+                }
                 | Commands::Package(_)
         );
+        // `shell -p` and `exec` also install (ephemeral) packages into the
+        // store, but they take the lock themselves around the install and
+        // cleanup phases only, so it is not held while the user's program
+        // runs.
 
         let _lock_guard = if needs_lock {
             Some(lock::acquire_lock()?)
@@ -1300,8 +1313,14 @@ pub fn run() -> anyhow::Result<()> {
                 explain,
                 plan_json,
                 verbose,
-                interactive
-            } => cmd::update::run(
+                interactive,
+                scope
+            } => cmd::update::run_scoped(
+                scope.map(|s| match s {
+                    InstallScope::User => crate::types::Scope::User,
+                    InstallScope::System => crate::types::Scope::System,
+                    InstallScope::Project => crate::types::Scope::Project
+                }),
                 all,
                 &package_names,
                 cli.yes,

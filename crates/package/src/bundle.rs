@@ -7,7 +7,7 @@
 
 use std::collections::HashSet;
 use std::fs::{self, File};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use anyhow::{Result, anyhow};
 use colored::Colorize;
@@ -372,7 +372,11 @@ pub fn run(
 
                     let meta = fs::symlink_metadata(entry.path())?;
                     if meta.is_symlink() {
-                        let target = fs::read_link(entry.path())?;
+                        let target = bundle_link_target(
+                            pkg_dir,
+                            entry_rel,
+                            fs::read_link(entry.path())?
+                        );
                         let mut header = tar::Header::new_gnu();
                         header.set_metadata(&meta);
                         tar_builder.append_link(
@@ -390,7 +394,11 @@ pub fn run(
             } else {
                 let meta = fs::symlink_metadata(&abs_path)?;
                 if meta.is_symlink() {
-                    let target = fs::read_link(&abs_path)?;
+                    let target = bundle_link_target(
+                        pkg_dir,
+                        rel_path,
+                        fs::read_link(&abs_path)?
+                    );
                     let mut header = tar::Header::new_gnu();
                     header.set_metadata(&meta);
                     tar_builder.append_link(
@@ -440,7 +448,11 @@ pub fn run(
         }
 
         if meta.is_symlink() {
-            let target = fs::read_link(entry.path())?;
+            let target = bundle_link_target(
+                fetch_dir.path(),
+                rel_path,
+                fs::read_link(entry.path())?
+            );
             let mut header = tar::Header::new_gnu();
             header.set_metadata(&meta);
             tar_builder.append_link(&mut header, rel_path, target)?;
@@ -510,4 +522,139 @@ pub fn run(
     }
 
     Ok(output_path)
+}
+
+/// Picks the package definition of an extracted source bundle.
+///
+/// Only top-level `*.pkg.lua` regular files are considered, because that is
+/// where [`run`] places the definition and where its embedded
+/// `<name>.pkg.lua.sig` signature sits. A definition with a signature beside
+/// it wins, so the file that gets built is the one the installer verified.
+/// Without a signature a single definition is used as-is, and several are
+/// resolved by name order so the choice is at least deterministic.
+///
+/// Returns `None` when the bundle has no top-level definition.
+///
+/// # Errors
+///
+/// Returns an error if the extraction directory cannot be read.
+pub fn select_bundle_pkg_lua(extract_dir: &Path) -> Result<Option<PathBuf>> {
+    let mut definitions = Vec::new();
+    for entry in fs::read_dir(extract_dir)? {
+        let entry = entry?;
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.ends_with(".pkg.lua") && entry.file_type()?.is_file() {
+            definitions.push(name);
+        }
+    }
+    definitions.sort();
+    let signed = definitions
+        .iter()
+        .find(|name| extract_dir.join(format!("{name}.sig")).is_file());
+    Ok(signed
+        .or_else(|| definitions.first())
+        .map(|name| extract_dir.join(name)))
+}
+
+/// Returns the target a symlink found while bundling should be stored with.
+///
+/// Relative targets are kept verbatim. Absolute targets inside `root` are
+/// rewritten relative to the link (see [`relocate_symlink_target`]) so they
+/// still resolve once the bundle is extracted elsewhere. Absolute targets
+/// outside `root` are kept verbatim with a warning: following them would copy
+/// arbitrary host files into the bundle.
+fn bundle_link_target(
+    root: &Path,
+    link_rel: &Path,
+    target: PathBuf
+) -> PathBuf {
+    if !target.is_absolute() {
+        return target;
+    }
+    if let Some(relative) = relocate_symlink_target(root, link_rel, &target) {
+        return relative;
+    }
+    eprintln!(
+        "{}: symlink '{}' points outside the bundle ({}); storing it \
+         unchanged, it may not resolve after extraction.",
+        "Warning".yellow(),
+        link_rel.display(),
+        target.display()
+    );
+    target
+}
+
+/// Normalizes a path lexically: drops `.` components and resolves `..`
+/// against the components collected so far (never above the root).
+fn normalize_lexically(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            other => normalized.push(other.as_os_str())
+        }
+    }
+    normalized
+}
+
+/// Rewrites an absolute symlink `target` that points inside `root` into a
+/// path relative to the directory holding the link.
+///
+/// `link_rel` is the link's own path relative to `root`. Upstream bootstrap
+/// scripts (gnulib's, for one) create absolute links into the temporary
+/// fetch directory; stored verbatim they dangle as soon as the bundle is
+/// extracted anywhere else.
+///
+/// Returns `None` when `target` is relative or does not lie inside `root`
+/// (compared both as given and canonicalized, since the temporary directory
+/// may itself sit behind a symlink such as macOS's `/tmp`).
+#[must_use]
+pub fn relocate_symlink_target(
+    root: &Path,
+    link_rel: &Path,
+    target: &Path
+) -> Option<PathBuf> {
+    if !target.is_absolute() {
+        return None;
+    }
+    let target = normalize_lexically(target);
+
+    let mut roots = Vec::new();
+    if let Ok(absolute) = std::path::absolute(root) {
+        roots.push(normalize_lexically(&absolute));
+    }
+    if let Ok(canonical) = root.canonicalize() {
+        roots.push(canonical);
+    }
+    let target_rel = roots
+        .iter()
+        .find_map(|r| target.strip_prefix(r).ok())?
+        .to_path_buf();
+
+    let link_rel = normalize_lexically(link_rel);
+    let link_dir: Vec<Component<'_>> = link_rel
+        .parent()
+        .map(|p| p.components().collect())
+        .unwrap_or_default();
+    let target_parts: Vec<Component<'_>> = target_rel.components().collect();
+    let common = link_dir
+        .iter()
+        .zip(&target_parts)
+        .take_while(|(a, b)| a == b)
+        .count();
+
+    let mut relative = PathBuf::new();
+    for _ in common..link_dir.len() {
+        relative.push("..");
+    }
+    for part in target_parts.iter().skip(common) {
+        relative.push(part.as_os_str());
+    }
+    if relative.as_os_str().is_empty() {
+        relative.push(".");
+    }
+    Some(relative)
 }

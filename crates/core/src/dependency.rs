@@ -39,6 +39,21 @@ static VER_RE: LazyLock<Regex> = LazyLock::new(|| {
         .expect("Static VER_RE regex is valid")
 });
 
+/// Regex for Zoi dependencies, which may name a sub-package and a registry:
+/// `[#handle@]@repo/name[:sub][@version|<op>version][:description]`.
+///
+/// A sub-package is a single token without whitespace (e.g. `libgcc`,
+/// `libstdc++`); anything after a colon that does not form such a token is the
+/// description (e.g. `@core/bubblewrap:for building pure packages`). The
+/// version may contain spaces, as in comma-separated ranges like
+/// `@>=1.0, <2.0`, and ends at the next colon.
+static ZOI_DEP_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"^(?P<pkg>(?:#[^@:\s/]+)?@?[^@:\s=><~^]+(?::[A-Za-z0-9][A-Za-z0-9+._-]*)?)(?P<ver>@[^:]+|[=><~^][^:]*)?(?::(?P<desc>.*))?$"
+    )
+    .expect("Static ZOI_DEP_RE regex is valid")
+});
+
 /// External package-manager command templates interpolate these components as
 /// shell words, so reject shell-control syntax before executing a template.
 static EXTERNAL_PACKAGE_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -56,7 +71,10 @@ static EXTERNAL_VERSION_RE: LazyLock<Regex> = LazyLock::new(|| {
 /// Parses a dependency string into its constituent parts.
 ///
 /// The expected format is `manager:package[@version][:description]`.
-/// If the manager is omitted, it defaults to "zoi".
+/// If the manager is omitted, it defaults to "zoi". Zoi dependencies may also
+/// name a sub-package and a registry handle:
+/// `zoi:[#handle@]@repo/name[:sub][@version][:description]`, where `sub` is a
+/// single token without whitespace and is kept as part of `package`.
 ///
 /// Arguments:
 /// - `dep_str`: The raw dependency string from a package definition.
@@ -81,36 +99,66 @@ pub fn parse_dependency_string(
         return Err(anyhow!("Invalid dependency string: {dep_str}"));
     }
 
-    let caps = DEP_RE
-        .captures(rest)
-        .ok_or_else(|| anyhow!("Failed to parse dependency string: {rest}"))?;
+    let (package, mut version_str, description) = if manager == "zoi" {
+        // Zoi dependencies keep their sub-package (`@core/gcc:libgcc`) as part
+        // of the package, so it reaches source resolution instead of being
+        // mistaken for a description.
+        let caps = ZOI_DEP_RE.captures(rest).ok_or_else(|| {
+            anyhow!("Failed to parse Zoi dependency string: {rest}")
+        })?;
+        let package = caps
+            .name("pkg")
+            .ok_or_else(|| {
+                anyhow!("Regex matched but pkg group not found in '{rest}'")
+            })?
+            .as_str()
+            .trim();
+        let version_str = caps
+            .name("ver")
+            .map(|m| m.as_str().trim().to_string())
+            .filter(|v| !v.is_empty());
+        let description = caps
+            .name("desc")
+            .map(|m| m.as_str().trim())
+            .filter(|d| !d.is_empty());
+        (package, version_str, description)
+    } else {
+        let caps = DEP_RE.captures(rest).ok_or_else(|| {
+            anyhow!("Failed to parse dependency string: {rest}")
+        })?;
 
-    let package_and_version = caps
-        .name("pkg_and_ver")
-        .ok_or_else(|| {
-            anyhow!("Regex matched but pkg_and_ver group not found in '{rest}'")
-        })?
-        .as_str()
-        .trim();
-    let description = caps.name("desc").map(|m| m.as_str().trim());
+        let package_and_version = caps
+            .name("pkg_and_ver")
+            .ok_or_else(|| {
+                anyhow!(
+                    "Regex matched but pkg_and_ver group not found in '{rest}'"
+                )
+            })?
+            .as_str()
+            .trim();
+        let description = caps.name("desc").map(|m| m.as_str().trim());
 
-    let ver_caps = VER_RE.captures(package_and_version).ok_or_else(|| {
-        anyhow!(
-            "Failed to parse package and version from: {package_and_version}"
-        )
-    })?;
+        let ver_caps =
+            VER_RE.captures(package_and_version).ok_or_else(|| {
+                anyhow!(
+                    "Failed to parse package and version from: \
+                     {package_and_version}"
+                )
+            })?;
 
-    let package = ver_caps
-        .name("pkg")
-        .ok_or_else(|| {
-            anyhow!(
-                "Regex matched but pkg group not found in \
-                 '{package_and_version}'"
-            )
-        })?
-        .as_str()
-        .trim();
-    let mut version_str = ver_caps.name("ver").map(|m| m.as_str().to_string());
+        let package = ver_caps
+            .name("pkg")
+            .ok_or_else(|| {
+                anyhow!(
+                    "Regex matched but pkg group not found in \
+                     '{package_and_version}'"
+                )
+            })?
+            .as_str()
+            .trim();
+        let version_str = ver_caps.name("ver").map(|m| m.as_str().to_string());
+        (package, version_str, description)
+    };
 
     if let Some(v) = &version_str
         && v.starts_with('@')

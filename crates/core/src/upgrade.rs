@@ -171,6 +171,42 @@ fn extract_archive(archive_path: &Path, target_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Looks up the expected SHA-512 for `filename` in a `sha512sum`-style
+/// listing.
+///
+/// Lines are `<hex>  <name>`, where the name may carry a `./` prefix (the
+/// release script runs `sha512sum` through `find .`) or a `*` binary-mode
+/// marker. The name must match exactly: a substring match would let the entry
+/// for one asset satisfy the lookup for another whose name contains it.
+fn expected_checksum(
+    checksums_content: &str,
+    filename: &str
+) -> Option<String> {
+    checksums_content.lines().find_map(|line| {
+        let mut fields = line.split_whitespace();
+        let hash = fields.next()?;
+        let name = fields.next()?;
+        let name = name.trim_start_matches('*');
+        let name = name.strip_prefix("./").unwrap_or(name);
+        (name == filename).then(|| hash.to_ascii_lowercase())
+    })
+}
+
+/// Returns the lowercase hex SHA-512 of `data`.
+fn sha512_hex(data: &[u8]) -> String {
+    hex::encode(Sha512::digest(data))
+}
+
+/// Name of the `checksums.txt` entry carrying the SHA-512 of the raw `zoi`
+/// binary for a platform.
+///
+/// The published archives are not reproducible from the binary alone (tar and
+/// zip headers carry timestamps and ownership), so a binary rebuilt from a
+/// delta patch can only be verified against a checksum of the binary itself.
+fn binary_checksum_name(os: &str, arch: &str) -> String {
+    format!("zoi-{os}-{arch}.bin")
+}
+
 /// Verifies the SHA-512 checksum of a file against expected content.
 fn verify_checksum(
     file_path: &Path,
@@ -178,10 +214,7 @@ fn verify_checksum(
     filename: &str
 ) -> Result<()> {
     println!("Verifying checksum for {filename}...");
-    let expected_hash = checksums_content
-        .lines()
-        .find(|line| line.contains(filename))
-        .and_then(|line| line.split_whitespace().next())
+    let expected_hash = expected_checksum(checksums_content, filename)
         .ok_or(anyhow!("Checksum not found for {filename}."))?;
 
     let mut file = File::open(file_path)?;
@@ -200,7 +233,7 @@ fn verify_checksum(
     }
     let actual_hash = hex::encode(hasher.finalize());
 
-    if actual_hash != expected_hash {
+    if !actual_hash.eq_ignore_ascii_case(&expected_hash) {
         return Err(anyhow!(
             "Checksum mismatch for {filename}! The file may be corrupt."
         ));
@@ -276,11 +309,27 @@ fn try_delta_upgrade(
     );
     let download_url = format!("{base_url}/{bsdiff_filename}");
 
-    if !checksums_content.contains(&bsdiff_filename) {
+    if expected_checksum(checksums_content, &bsdiff_filename).is_none() {
         return Err(anyhow!(
             "Delta patch not available for this upgrade path."
         ));
     }
+
+    // The patch is verified on download, but applying it to a local binary
+    // that differs from the one it was generated against produces an
+    // arbitrary result. Without a published checksum for the target binary
+    // there is no way to tell, so the delta path is only taken when one
+    // exists. Checked before downloading so a missing entry costs nothing.
+    let binary_entry = binary_checksum_name(os, arch);
+    let expected_binary_hash =
+        expected_checksum(checksums_content, &binary_entry).ok_or_else(
+            || {
+                anyhow!(
+                    "No checksum published for the upgraded binary \
+                     ({binary_entry}); cannot verify a delta upgrade."
+                )
+            }
+        )?;
 
     let temp_dir = Builder::new().prefix("zoi-delta-upgrade").tempdir()?;
     let temp_patch_path = temp_dir.path().join(&bsdiff_filename);
@@ -309,6 +358,19 @@ fn try_delta_upgrade(
     let mut new_binary = Vec::new();
     zbsdiff::Bspatch::new(&raw_patch)?
         .apply(&old_binary, std::io::Cursor::new(&mut new_binary))?;
+
+    let actual_binary_hash = sha512_hex(&new_binary);
+    if !actual_binary_hash.eq_ignore_ascii_case(&expected_binary_hash) {
+        return Err(anyhow!(
+            "The patched binary does not match the published checksum \
+             ({binary_entry}); the local binary probably differs from the one \
+             the patch was built against."
+        ));
+    }
+    println!(
+        "Checksum verified successfully for {}.",
+        "patched binary".green()
+    );
 
     let binary_filename = if os == "windows" { "zoi.exe" } else { "zoi" };
     let new_binary_path = temp_dir.path().join(binary_filename);
@@ -462,8 +524,12 @@ pub fn run(
     let checksums_txt_url = format!("{base_url}/checksums.txt");
 
     println!("Downloading archive and checksums from: {checksums_txt_url}");
-    let checksums_txt_content =
-        reqwest::blocking::get(&checksums_txt_url)?.text()?;
+    // - An error page must never be parsed as a checksum list: a 404 body
+    // - would simply fail to match, but failing loudly is clearer.
+    let checksums_txt_content = reqwest::blocking::get(&checksums_txt_url)?
+        .error_for_status()
+        .map_err(|e| anyhow!("Failed to download checksums.txt: {e}"))?
+        .text()?;
 
     let (new_binary_path, _temp_dir_guard) = if force {
         fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?
@@ -498,7 +564,53 @@ pub fn run(
 
 #[cfg(test)]
 mod tests {
-    use super::zfvm_to_semver;
+    use super::{
+        binary_checksum_name, expected_checksum, sha512_hex, zfvm_to_semver
+    };
+
+    #[test]
+    fn checksum_lookup_matches_names_exactly() {
+        let listing = "\
+aaa  ./zoi-linux-amd64.tar.zst
+bbb  ./zoi-mini-linux-amd64.tar.zst
+CCC  *zoi-linux-amd64.bin
+ddd  zoid-linux-amd64.tar.zst
+";
+        assert_eq!(
+            expected_checksum(listing, "zoi-linux-amd64.tar.zst").as_deref(),
+            Some("aaa")
+        );
+        assert_eq!(
+            expected_checksum(listing, "zoi-linux-amd64.bin").as_deref(),
+            Some("ccc")
+        );
+        assert_eq!(
+            expected_checksum(listing, "zoid-linux-amd64.tar.zst").as_deref(),
+            Some("ddd")
+        );
+        // A substring of a listed name must not match.
+        assert!(expected_checksum(listing, "linux-amd64.tar.zst").is_none());
+        assert!(expected_checksum(listing, "zoi-linux-amd64").is_none());
+    }
+
+    #[test]
+    fn binary_checksum_entry_is_per_platform() {
+        assert_eq!(
+            binary_checksum_name("linux", "amd64"),
+            "zoi-linux-amd64.bin"
+        );
+        assert_eq!(
+            binary_checksum_name("windows", "arm64"),
+            "zoi-windows-arm64.bin"
+        );
+    }
+
+    #[test]
+    fn sha512_hex_is_lowercase_hex() {
+        let digest = sha512_hex(b"");
+        assert_eq!(digest.len(), 128);
+        assert!(digest.starts_with("cf83e1357eefb8bdf1542850d66d8007"));
+    }
 
     /// Projects a version the way `archive.sh` names its bsdiff patches.
     fn project(number: &str, status: &str) -> String {
