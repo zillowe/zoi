@@ -194,7 +194,8 @@ fn check_and_handle_file_conflicts(
     incoming: &[IncomingFile],
     owned_files: &HashSet<String>,
     package: Option<&InstallingPackage<'_>>,
-    yes: bool
+    yes: bool,
+    pb: Option<&indicatif::ProgressBar>
 ) -> Result<()> {
     let mut stray_files = Vec::new();
     let mut owned_by_others: Vec<FileConflict> = Vec::new();
@@ -280,59 +281,74 @@ fn check_and_handle_file_conflicts(
         }
     }
 
-    if !stray_files.is_empty() {
-        println!();
-        println!("{}", "File Conflict Detected:".red().bold());
-        println!(
-            "The following files that this package wants to install already \
-             exist on your system:"
-        );
-        for file in &stray_files {
-            println!("- {}", file.display());
-        }
-        println!();
-
-        if !utils::ask_for_confirmation(
-            "Do you want to overwrite these files and continue with the \
-             installation?",
-            yes
-        ) {
-            return Err(anyhow!(
-                "Installation aborted by user due to file conflicts."
-            ));
-        }
+    if stray_files.is_empty() && owned_by_others.is_empty() {
+        return Ok(());
     }
 
-    if !owned_by_others.is_empty() {
-        println!();
-        println!("{}", "File Conflict With Another Package:".red().bold());
-        println!(
-            "The following files are owned by other installed packages. \
-             Installing this package would replace them, leaving the other \
-             package broken:"
-        );
-        for conflict in &owned_by_others {
+    // The report and the question are printed with every progress bar
+    // paused: installs run in parallel and their spinners would otherwise
+    // redraw over both, leaving an invisible prompt waiting for an answer.
+    let report_and_confirm = || -> Result<()> {
+        if !stray_files.is_empty() {
+            println!();
+            println!("{}", "File Conflict Detected:".red().bold());
             println!(
-                "- {} (owned by {})",
-                conflict.path.display(),
-                conflict.owners.join(", ")
+                "The following files that this package wants to install \
+                 already exist on your system:"
             );
-        }
-        println!();
+            for file in &stray_files {
+                println!("- {}", file.display());
+            }
+            println!();
 
-        if !utils::ask_for_confirmation(
-            "Do you want to overwrite these files anyway? The packages listed \
-             above may stop working correctly.",
-            yes
-        ) {
-            return Err(anyhow!(
-                "Installation aborted by user due to file conflicts with \
-                 other packages."
-            ));
+            if !utils::ask_for_confirmation(
+                "Do you want to overwrite these files and continue with the \
+                 installation?",
+                yes
+            ) {
+                return Err(anyhow!(
+                    "Installation aborted by user due to file conflicts."
+                ));
+            }
         }
+
+        if !owned_by_others.is_empty() {
+            println!();
+            println!(
+                "{}",
+                "File Conflict With Another Package:".red().bold()
+            );
+            println!(
+                "The following files are owned by other installed \
+                 packages. Installing this package would replace them, \
+                 leaving the other package broken:"
+            );
+            for conflict in &owned_by_others {
+                println!(
+                    "- {} (owned by {})",
+                    conflict.path.display(),
+                    conflict.owners.join(", ")
+                );
+            }
+            println!();
+
+            if !utils::ask_for_confirmation(
+                "Do you want to overwrite these files anyway? The packages \
+                 listed above may stop working correctly.",
+                yes
+            ) {
+                return Err(anyhow!(
+                    "Installation aborted by user due to file conflicts with \
+                     other packages."
+                ));
+            }
+        }
+        Ok(())
+    };
+    match pb {
+        Some(pb) => pb.suspend(report_and_confirm),
+        None => report_and_confirm()
     }
-
-    Ok(())
 }
 
 /// Performs the low-level extraction and staging of a package archive.
@@ -656,7 +672,8 @@ pub fn run(
                     )?,
                     &owned_files,
                     Some(&installing),
-                    yes
+                    yes,
+                    pb
                 )?;
                 copy_dir_all(&usrroot_src, &root_dest)?;
                 for entry in WalkDir::new(&usrroot_src)
@@ -690,7 +707,8 @@ pub fn run(
                     )?,
                     &owned_files,
                     Some(&installing),
-                    yes
+                    yes,
+                    pb
                 )?;
                 copy_dir_all(&usrhome_src, &home_dest)?;
                 for entry in WalkDir::new(&usrhome_src)
@@ -1112,7 +1130,8 @@ fn extract_pooled_zpa(
             registry: registry_handle,
             scope
         }),
-        yes
+        yes,
+        pb
     )?;
 
     for sub in subs_to_install {
