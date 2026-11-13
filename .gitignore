@@ -14,7 +14,6 @@ scripts/release
 scripts/release-all
 
 # config
-config.mk
 config.just
 
 # env
