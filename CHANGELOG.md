@@ -4,7 +4,47 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](./INSTALL.md).
 
-## [Prod. Release 1.29.12](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.12) - 2026-11-08
+## [Prod. Release 1.29.13](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.13) - 2026-11-13
+
+### 🔀 Merge Requests
+
+- Fix(security): Close pre-release trust gaps and state bugs before v1.30.0 [!136](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/136) by @zillowez
+- Feat(cli): Harden --pure builds against host dependencies [!130](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/130) by @zillowez
+
+### ✨ Features
+
+- [`0d599a5d`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/0d599a5d5646aeea2fb220c48c8110fc6a51ff37) *(package)* Strip ELF files at build time with optional debug sub-package
+- [`c0eddcea`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/c0eddcea76adb0f854422d9e505d518bca7ae781) *(cli)* Point Zoi-managed installs from zoi upgrade to zoi update
+- [`c842c16f`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/c842c16f1c2c99681f7ff91c313db78346612735) *(cli)* Harden --pure builds against host dependencies
+
+### 🎨 Styling
+
+- [`f7634206`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/f763420623c94106fb0eb08a0a4a18ad6c26c0eb) Fix formating
+
+### 💼 Other
+
+- [`1f8488a3`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/1f8488a3ef47362dd7b8684f619308e0ef5dfea8) *(changelog)* Show merge requests and issue links in git-cliff output
+- [`b5fe0061`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/b5fe00611e3f09a00ea498294d6bbfc15976b1c1) *(package)* Fix clippy warnings in strip and build
+- [`de6fd799`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/de6fd7997ef6897968b070d081b00b58fa9dbb1b) *(tests)* Rename regression test files by topic
+
+### 🛡️ Dependencies
+
+- [`137f413c`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/137f413cd9b7704cc6a6095748877aa71f022e9c) Allow BSD-2-Clause for zstd-sys
+- [`1fba1602`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/1fba1602bd519bea2d1eeb355a4cc45885229bc8) Update deps
+
+### 🧪 Testing
+
+- [`d959db20`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/d959db206720624f7ebb8ec6aa6639027b1bb555) *(package)* Cover staging roots being left out of pooled mappings
+
+### 🩹 Bug Fixes
+
+- [`e9d111f5`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/e9d111f543d09324a9cea7ab981fbb7aed81373f) *(package)* Ignore allocated debug-named sections when detecting debug info
+- [`42b53619`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/42b53619f227ddcc42c2627216825e03de998ec7) *(install)* Pick the requested sub-package's archive after a source build
+- [`b85df5f7`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/b85df5f7b0517a1fac2105bfcfcf61cfdbad6190) *(tests)* Match the shim's installed-manifest error in tool-versions tests
+- [`996eb3ea`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/996eb3ea0590a895e640a728934371ea783dd020) *(security)* Close pre-release trust gaps and state bugs before v1.30.0
+- [`7edbc713`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/7edbc7131e4e1f11612491f715b00cae57ac5007) *(package)* Ignore top-level staging directories in file pooling and building
+
+## [Prod. Release 1.29.12](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.12) - 2026-11-07
 
 ### ✨ Features
 
@@ -106,6 +146,10 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 ## [Prod. Release 1.29.0](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.0) - 2026-10-16
 
+### 🔀 Merge Requests
+
+- Deps: Update Rust crate toml to 1.1.7 [!96](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/96)
+
 ### ♻️ Refactor
 
 - [`0c34c408`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/0c34c4087aa3438119e0cb3cbbcb7fde33e3a49b) *(cli)* Remove zoi use command and integrate pin/unpin config sync
@@ -140,6 +184,12 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 - [`06f58bc9`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/06f58bc9d4137fc7ed80327d7d661cda13ba3ebd) *(install)* Enforce package file ownership at install time
 
 ## [Prod. Release 1.28.0](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.28.0) - 2026-09-17
+
+### 🔀 Merge Requests
+
+- Feat(telemetry): Integrate Sentry for error tracking and local crash reports [!84](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/84) by @zillowez
+- Deps: Update Rust crate uuid to 1.26.1 [!81](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/81)
+- Deps: Update Rust crate toml to 1.1.6 [!80](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/80)
 
 ### ♻️ Refactor
 
@@ -177,6 +227,12 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 - [`cce2f8b7`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/cce2f8b7b77bd63e633dd22873a1e960f6278828) *(hooks)* Trigger post-transaction hooks during installation and fix placeholder matching
 
 ## [Prod. Release 1.27.2](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.27.2) - 2026-09-10
+
+### 🔀 Merge Requests
+
+- Deps: Update Rust crate reqwest to 0.13.5 [!79](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/79)
+- Deps: Update Rust crate zstd to 0.14.0 [!77](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/77)
+- Deps: Update Rust crate dirs to v7 [!78](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/78)
 
 ### ♻️ Refactor
 
@@ -216,6 +272,10 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 - [`45f50550`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/45f505503d0920367ab1e8c9898ccd869baa9a76) *(lua)* Support external license URLs in license validation
 - [`16f5aaea`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/16f5aaea72afcc7619fea62001080fca52bbd980) Add package verification, embedded signatures, delta upgrades, and transaction undo
 
+### 🔀 Merge Requests
+
+- [`7e7839c2`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/7e7839c275081c44e07a0c01f7322e1b7057659e) Branch 'new-release' into 'main' [!68](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/68)
+
 ### 🛡️ Dependencies
 
 - [`601ad612`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/601ad612c97708dcef88368771cf1f7b68593378) Update
@@ -244,7 +304,15 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 - [`b3512413`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/b3512413a802b82409814a96538ef3efef3ad474) Enhance packaging security, service management, and directory copying
 
+### 🔀 Merge Requests
+
+- [`cbf12732`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/cbf127329177ffc85a037dccb685d5b0c87e3d65) Branch 'minor-release' into 'main' [!67](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/67)
+
 ## [Prod. Release 1.25.5](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.25.5) - 2026-08-22
+
+### 🔀 Merge Requests
+
+- [`a04d45c0`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/a04d45c09a406c13ac5dd29be8354cd47d4f58b5) Branch 'fix-zoi' into 'main' [!64](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/64)
 
 ### 🛡️ Dependencies
 
@@ -275,6 +343,18 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 - [`b60615a2`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/b60615a29d6c5d965d71e2358978a6a0301c0d54) Add lint and fmt rules
 - [`57c1ee71`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/57c1ee711e10d4f99ab82a7e031f298a896bdc2f) Format using rustfmt
 - [`03c02088`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/03c0208850196fb8b07b64016b5c17b74337296a) Adhere to Clippy style
+
+### 🔀 Merge Requests
+
+- [`13a1f035`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/13a1f03529506a7ba8575e4a3011ee45086d429d) Branch 'renovate/clap_mangen-0.x' into 'main' [!61](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/61)
+- [`8311032f`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/8311032f77c9013d53a9f675ce4f94fab2c0d91b) Branch 'renovate/serde_yaml-0.x' into 'main' [!60](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/60)
+- [`67804c1d`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/67804c1dbcfb09e6271cd9dee30285cefec9a385) Branch 'renovate/comfy-table-8.x' into 'main' [!54](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/54)
+- [`15d4b5ac`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/15d4b5ac5c00d1b71b0a4d069e33bfcc808e97e8) Branch 'renovate/spdx-0.x' into 'main' [!57](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/57)
+- [`ce1b2dfd`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/ce1b2dfddbdc20d6c4660319c85b51cb8fb9b4e0) Branch 'renovate/thiserror-2.x' into 'main' [!59](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/59)
+- [`27a3ec28`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/27a3ec289e228ed6f846e1353e70664a5104f161) Branch 'renovate/rusqlite-0.x' into 'main' [!58](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/58)
+- [`914ec818`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/914ec81875ecd3c8ade503d9a1be787395362036) Branch 'renovate/ignore-0.x' into 'main' [!51](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/51)
+- [`c9f57849`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/c9f57849f7a90f7e346f7116615f069db4292f33) Branch 'renovate/clap-4.x' into 'main' [!55](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/55)
+- [`17593df9`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/17593df9ba473bdd18c72b1d7c1a75a024999dc2) Branch 'renovate/base64-0.x' into 'main' [!52](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/52)
 
 ### 🔧 Configuration
 
@@ -320,6 +400,11 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 - [`52bf8552`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/52bf85525a94f9ff21bacd1881e0ff846995648a) *(core)* Add support for doas as privilege escalator
 - [`8ba65e63`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/8ba65e63a32e8cde1f68ce72d3a019d156f7d001) *(lua)* Add init system detection to system environment
 
+### 🔀 Merge Requests
+
+- [`113b0c51`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/113b0c51b381055bd97e3de050162e0da2c1928d) Branch 'renovate/clap-4.x' into 'main' [!50](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/50)
+- [`aface922`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/aface922fe071453d5369ee51124fcfe5d9ea67b) Branch 'renovate/toml-1.x' into 'main' [!49](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/49)
+
 ### 🛡️ Dependencies
 
 - [`75131a87`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/75131a87b3f369d9f2dd18be89fa98707904b9bb) Update Rust crate clap to 4.6.5
@@ -353,6 +438,19 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🏗️ Structure
 
 - [`cb8ae4d0`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/cb8ae4d016724014965ffad9592082f4a2842b8d) Reorganize core path and home directory logic
+
+### 🔀 Merge Requests
+
+- [`bb839fc9`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/bb839fc96ccfea60890bb4490f9093565d713ed9) Branch 'renovate/clap_complete-4.x' into 'main' [!48](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/48)
+- [`369f42a6`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/369f42a6c4698297973c59638773449a771e113a) Branch 'renovate/base64-0.x' into 'main' [!47](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/47)
+- [`67a1c2c7`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/67a1c2c7c7b3b9e28377e5d755acc37da46c1f42) Branch 'renovate/serde-monorepo' into 'main' [!40](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/40)
+- [`1bdca07a`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/1bdca07a24bd44d91583c530a5cafd8a9e4dc203) Branch 'renovate/diffy-0.x' into 'main' [!39](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/39)
+- [`44c739f7`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/44c739f7a363c666c67c23030951dd18396c99d8) Branch 'renovate/clap-4.x' into 'main' [!46](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/46)
+- [`1cc887ab`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/1cc887ab0c5d032051c5e9bcffcd0923ad2b428d) Branch 'renovate/anyhow-1.x' into 'main' [!37](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/37)
+- [`85f68454`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/85f6845486796ef03839c88057202d33a9c3cea3) Branch 'renovate/ignore-0.x' into 'main' [!42](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/42)
+- [`bb9d14d8`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/bb9d14d8f153218c48444a14c1bf947e6fcf2ea3) Branch 'renovate/glob-0.x' into 'main' [!43](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/43)
+- [`994379b9`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/994379b90a825a0e73381df292478db6503b872d) Branch 'renovate/serde_json-1.x' into 'main' [!44](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/44)
+- [`40f8bb1f`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/40f8bb1f04cd4e94b2860d86e4be730033a1f8e3) Branch 'renovate/thiserror-2.x' into 'main' [!45](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/45)
 
 ### 🔧 Configuration
 
@@ -403,6 +501,14 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 - [`4cfc8eab`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/4cfc8eab0de4e5c4904e26cb83ac994673723784) *(install)* Implement context-aware default scoping
 - [`85adcfd1`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/85adcfd134b6054df7776498cc7290172ecac55f) *(upgrade)* Implement delta upgrades via bsdiff
 - [`bc31fdd9`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/bc31fdd9a0fb8ccfc6af9b5be0068681eef4af5d) *(core)* Implement explicit installation scope control
+
+### 🔀 Merge Requests
+
+- [`097d1348`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/097d13487eddc4b1d5b11d9319b0f3f1360b3da9) Branch 'distro-builder' into 'main' [!38](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/38)
+- [`bf686843`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/bf68684300e056647af92a6d5cb0038b0295612d) Branch 'renovate/uuid-1.x' into 'main' [!33](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/33)
+- [`675bb97c`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/675bb97c57f42af857fcc397540ea3941154cdb6) Branch 'renovate/toml-1.x' into 'main' [!34](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/34)
+- [`88e8c332`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/88e8c3323ee8215425f51b8899dbda60544f4acd) Branch 'renovate/regex-1.x' into 'main' [!36](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/36)
+- [`cd6c75cc`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/cd6c75cceffbd8ccd406d5496c993f8cb0df6820) Branch 'renovate/clap-4.x' into 'main' [!35](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/35)
 
 ### 🛠️ Build
 
@@ -465,6 +571,10 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 - [`bf4495b7`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/bf4495b78de258b266e28e983588284e995d59ec) Implement parallel package preparation and align CLI with Spec v2
 - [`85fe1fde`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/85fe1fde87af41323fe732edd21f62cd43435592) *(install)* Implement two-phase package installation process
+
+### 🔀 Merge Requests
+
+- [`b6d21306`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/b6d21306739bdcf8d2fb2a7ec5ebb668360442a6) Merge branch 'renovate/mlua-0.x' into 'main' [!29](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/29)
 
 ### 🛠️ Build
 
@@ -629,7 +739,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 ### 🛠️ Build
 
-- [`736464d8`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/736464d83af653a4f27bf94f8f23c5ef30748c19) Add deb and rpm package support
+- [`736464d8`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/736464d83af653a4f27bf94f8f23c5ef30748c19) Add deb and rpm package support [#29](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/work_items/29)
 
 ### 🩹 Bug Fixes
 
@@ -1134,7 +1244,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 ### 🔒 Security
 
-- [`292e1055`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/292e105556d7cdf89d013f5d7607d53cb9b8c384) Closes #26 Docker image vulnerability
+- [`292e1055`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/292e105556d7cdf89d013f5d7607d53cb9b8c384) Closes #26 Docker image vulnerability [#26](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/work_items/26)
 
 ## [Prod. Release 1.2.2](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.2.2) - 2025-10-27
 
@@ -1329,7 +1439,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 - [`0277450f`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/0277450f159b9990c960d8e9c5d766293e083b05) *(pkg)* Ensure symlinks are removed on uninstall
 - [`4b80db7b`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/4b80db7bb7b7ac4600515e48a163772a98a49f1c) *(packaging)* Use GitLab project ID for release fetching
 - [`69f57ae4`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/69f57ae4399d28ccb7f01b6f17e45ede2862f775) *(update)* Correct package resolution for update command
-- [`05f83753`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/05f83753b33560ef539a2b53952d3ac65f3dfea6) *(path)* Correct PATH verification for custom definitions
+- [`05f83753`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/05f83753b33560ef539a2b53952d3ac65f3dfea6) *(path)* Correct PATH verification for custom definitions [#24](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/work_items/24)
 - [`b707a1e2`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/b707a1e211f5f91284e6e5b183ede7c57fdde256) *(pkg)* Prevent resolution of nested packages
 
 ## [Prod. Beta 5.0.5](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Beta-5.0.5) - 2025-09-09
@@ -1797,11 +1907,11 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 ### ✨ Features
 
-- [`60d7270b`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/60d7270bda32bf9cf4b4b214aed942afaa16f8d4) *(upgrade)* Implement patch-based self-update
+- [`60d7270b`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/60d7270bda32bf9cf4b4b214aed942afaa16f8d4) *(upgrade)* Implement patch-based self-update [#13](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/work_items/13)
 - [`f41df585`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/f41df5855286206637786b649bcbc1fc976e2dfc) *(pkg, cmd)* Implement flexible versioning and installation scopes
 - [`fe2668bd`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/fe2668bd45be0134ea0fc48116e5728717c63c9b) *(pkg)* Add package collections and alt source resolution
 - [`dbff8ee6`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/dbff8ee65e08987eea77f1f46e06a19805858c23) Enhance output and add repository warnings
-- [`1061627e`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/1061627e41b860f6a746c06cee98eed38e64ad40) *(platform)* Add FreeBSD and OpenBSD support
+- [`1061627e`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/1061627e41b860f6a746c06cee98eed38e64ad40) *(platform)* Add FreeBSD and OpenBSD support [#17](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/work_items/17)
 
 ### 🩹 Bug Fixes
 
@@ -1875,7 +1985,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 ### ♻️ Refactor
 
-- [`83d08053`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/83d08053add1a36c677faa765d84b7e86160729e) Rust rewrite
+- [`83d08053`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/83d08053add1a36c677faa765d84b7e86160729e) Rust rewrite [#6](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/work_items/6) [#10](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/work_items/10)
 - [`ce57e5c8`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/ce57e5c85738e73aee46a843c06a4c26aa75d559) Change GitLab repo namespace
 
 ### ✨ Features
