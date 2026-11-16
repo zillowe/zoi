@@ -1090,6 +1090,19 @@ fn command_name(command: &Commands) -> &'static str {
     }
 }
 
+/// Whether a parse error comes from running `zoi` with no arguments at all.
+///
+/// Clap reports that as a missing subcommand (`arg_required_else_help`) and
+/// exits with status 2, the code for a usage error. `zoi` on its own is a
+/// request for the overview, so it is treated like `zoi --help`. Missing
+/// subcommands elsewhere (`zoi --root /mnt`, `zoi system`) stay errors.
+#[must_use]
+pub fn is_bare_invocation(err: &clap::Error, arg_count: usize) -> bool {
+    err.kind()
+        == clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
+        && arg_count <= 1
+}
+
 /// The main entry point for the Zoi CLI.
 ///
 /// # Errors
@@ -1107,7 +1120,17 @@ pub fn run() -> anyhow::Result<()> {
 
     let commit: &str = option_env!("ZOI_COMMIT_HASH").unwrap_or("dev");
     let cmd = Cli::command().styles(styles.clone());
-    let matches = cmd.clone().get_matches();
+    let matches = match cmd.clone().try_get_matches() {
+        Ok(matches) => matches,
+        Err(err) if is_bare_invocation(&err, std::env::args_os().len()) => {
+            // Plain `zoi` asks for the overview, like `zoi --help`: print it
+            // to stdout and succeed instead of clap's usage-error exit 2.
+            cmd.clone().print_help()?;
+            println!();
+            return Ok(());
+        }
+        Err(err) => err.exit()
+    };
     let cli = match Cli::from_arg_matches(&matches) {
         Ok(cli) => cli,
         Err(err) => {

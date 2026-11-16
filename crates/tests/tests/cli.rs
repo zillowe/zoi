@@ -50,3 +50,17 @@ fn test_cli_parsing_conflicting_flags() {
         .expect_err("unwrap_err failed");
     assert_eq!(err.kind(), clap::error::ErrorKind::ArgumentConflict);
 }
+
+#[test]
+fn bare_zoi_is_a_help_request_not_a_usage_error() {
+    let err = Cli::command()
+        .try_get_matches_from(vec!["zoi"])
+        .expect_err("bare zoi shows help");
+    assert!(zoi::cli::is_bare_invocation(&err, 1));
+
+    // A missing subcommand after other arguments is still a usage error.
+    let err = Cli::command()
+        .try_get_matches_from(vec!["zoi", "system"])
+        .expect_err("missing system subcommand");
+    assert!(!zoi::cli::is_bare_invocation(&err, 2));
+}
