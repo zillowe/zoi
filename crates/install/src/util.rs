@@ -353,12 +353,18 @@ pub fn verify_file_hash(
     let actual_hash = zoi_core::hash::calculate_file_hash(file_path, algo)?;
     let actual_clean = actual_hash.trim().to_lowercase();
 
+    let name = file_path.file_name().map_or_else(
+        || file_path.display().to_string(),
+        |n| n.to_string_lossy().to_string()
+    );
+
     let result = actual_clean == expected_clean;
     if result {
         let msg = format!(
-            "{} Hash verified: {}",
+            "{} Hash verified: {} ({})",
             "::".bold().blue(),
-            expected_clean[..12].dimmed()
+            name.cyan(),
+            expected_clean.get(..12).unwrap_or_default().dimmed()
         );
         if let Some(p) = pb {
             p.println(msg);
@@ -366,7 +372,11 @@ pub fn verify_file_hash(
             println!("{msg}");
         }
     } else {
-        let mut msg = format!("{}\n", "Hash verification failed!".red().bold());
+        let mut msg = format!(
+            "{} {}\n",
+            "Hash verification failed:".red().bold(),
+            name.cyan()
+        );
         let _ = writeln!(msg, "  Expected: {}", expected_clean.yellow());
         let _ = writeln!(msg, "  Actual:   {}", actual_clean.cyan());
         let _ = write!(

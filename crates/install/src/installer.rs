@@ -111,7 +111,61 @@ pub fn download_and_cache_archive(
         }
     }
 
-    let archive_path = if let Some(path) =
+    // Prints a status line above the progress bars (or plainly without
+    // them).
+    let report = |msg: String| {
+        if let Some(p) = pb {
+            p.println(msg);
+        } else {
+            println!("{msg}");
+        }
+    };
+
+    // Downloads the full archive into the cache. A freshly downloaded
+    // archive invalidates any cached detached signature: cache names carry
+    // no revision, so that `.sig` may belong to an earlier build.
+    let download_full = || -> Result<PathBuf> {
+        fs::remove_file(&cached_sig_path).ok();
+        let part_path =
+            archive_cache_root.join(format!("{archive_filename}.part"));
+
+        if part_path.exists() && pb.is_none() {
+            println!("Resuming partial download: {}", part_path.display());
+        }
+
+        let mut last_error = None;
+        let candidate_urls =
+            cache::mirror_candidate_urls(&details.info.final_url);
+        let mut downloaded = false;
+        for candidate_url in candidate_urls {
+            match util::download_file_with_progress(
+                &candidate_url,
+                &part_path,
+                pb,
+                Some(details.download_size)
+            ) {
+                Ok(()) => {
+                    downloaded = true;
+                    break;
+                }
+                Err(e) => last_error = Some((candidate_url, e))
+            }
+        }
+        if !downloaded {
+            let (url, error) = last_error.ok_or_else(|| {
+                anyhow!("archive download failed but no error recorded")
+            })?;
+            return Err(anyhow!(
+                "Failed to download package archive from {url}: {error}"
+            ));
+        }
+
+        fs::rename(&part_path, &cached_archive_path)?;
+        Ok(cached_archive_path.clone())
+    };
+
+    let mut from_cache = false;
+    let mut archive_path = if let Some(path) =
         pkgdir::find_in_pkg_dirs(archive_filename)
     {
         if pb.is_none() {
@@ -122,6 +176,7 @@ pub fn download_and_cache_archive(
         if pb.is_none() {
             println!("Using cached archive: {}", cached_archive_path.display());
         }
+        from_cache = true;
         cached_archive_path.clone()
     } else {
         if zoi_core::offline::is_offline() {
@@ -173,42 +228,7 @@ pub fn download_and_cache_archive(
         if delta_applied {
             cached_archive_path.clone()
         } else {
-            let part_path =
-                archive_cache_root.join(format!("{archive_filename}.part"));
-
-            if part_path.exists() && pb.is_none() {
-                println!("Resuming partial download: {}", part_path.display());
-            }
-
-            let mut last_error = None;
-            let candidate_urls =
-                cache::mirror_candidate_urls(&details.info.final_url);
-            let mut downloaded = false;
-            for candidate_url in candidate_urls {
-                match util::download_file_with_progress(
-                    &candidate_url,
-                    &part_path,
-                    pb,
-                    Some(details.download_size)
-                ) {
-                    Ok(()) => {
-                        downloaded = true;
-                        break;
-                    }
-                    Err(e) => last_error = Some((candidate_url, e))
-                }
-            }
-            if !downloaded {
-                let (url, error) = last_error.ok_or_else(|| {
-                    anyhow!("archive download failed but no error recorded")
-                })?;
-                return Err(anyhow!(
-                    "Failed to download package archive from {url}: {error}"
-                ));
-            }
-
-            fs::rename(&part_path, &cached_archive_path)?;
-            cached_archive_path.clone()
+            download_full()?
         }
     };
 
@@ -238,7 +258,28 @@ pub fn download_and_cache_archive(
         };
 
         if !util::verify_file_hash(&archive_path, &hash, pb)? {
-            return Err(anyhow!("Hash verification failed"));
+            // Cache names carry the version but not the revision, so a
+            // cached archive can be an earlier build of the same version.
+            // That is a stale cache entry, not tampering: replace it.
+            if !from_cache || zoi_core::offline::is_offline() {
+                return Err(anyhow!(
+                    "Hash verification failed for {archive_filename} ({})",
+                    node.pkg.name
+                ));
+            }
+            report(format!(
+                "{} Cached {} is outdated; downloading it again.",
+                "::".bold().yellow(),
+                archive_filename.cyan()
+            ));
+            fs::remove_file(&cached_archive_path).ok();
+            archive_path = download_full()?;
+            if !util::verify_file_hash(&archive_path, &hash, pb)? {
+                return Err(anyhow!(
+                    "Hash verification failed for {archive_filename} ({})",
+                    node.pkg.name
+                ));
+            }
         }
     }
 
@@ -257,6 +298,7 @@ pub fn download_and_cache_archive(
     // too: the delta container carries the manifest and its signature
     // verbatim.
     let mut embedded_verified = false;
+    let mut signature_checked = false;
     if has_pgp_identifiers && let Some(ref identifiers) = pgp_identifiers {
         let trusted_certs = pgp::get_certs_by_name_or_fingerprint(identifiers)?;
         let result = if is_source_bundle {
@@ -270,13 +312,13 @@ pub fn download_and_cache_archive(
         };
         match result {
             Ok(true) => {
-                if verbose {
-                    println!(
-                        "{}",
-                        "Embedded signature verified successfully.".green()
-                    );
-                }
+                report(format!(
+                    "{} Signature verified: {} (embedded)",
+                    "::".bold().green(),
+                    archive_filename.cyan()
+                ));
                 embedded_verified = true;
+                signature_checked = true;
             }
             Ok(false) => {}
             Err(e) => {
@@ -286,7 +328,9 @@ pub fn download_and_cache_archive(
                     fs::remove_file(&cached_archive_path).ok();
                 }
                 return Err(anyhow!(
-                    "Embedded signature verification failed: {e}"
+                    "Embedded signature verification failed for \
+                     {archive_filename} ({}): {e}",
+                    node.pkg.name
                 ));
             }
         }
@@ -368,10 +412,20 @@ pub fn download_and_cache_archive(
             &archive_path,
             &sig_path,
             trusted_certs
-        )?;
-        if verbose {
-            println!("{}", "Signature verified successfully.".green());
-        }
+        )
+        .map_err(|e| {
+            anyhow!(
+                "Signature verification failed for {archive_filename} ({}): \
+                 {e}",
+                node.pkg.name
+            )
+        })?;
+        signature_checked = true;
+        report(format!(
+            "{} Signature verified: {} (detached)",
+            "::".bold().green(),
+            archive_filename.cyan()
+        ));
     } else if !embedded_verified
         && details.info.pgp_url.is_none()
         && has_authorities
@@ -392,6 +446,16 @@ pub fn download_and_cache_archive(
                  package"
             ));
         }
+    }
+
+    if !signature_checked && !has_pgp_identifiers {
+        report(format!(
+            "{} Signature not checked: {} (no trusted keys configured for \
+             registry '{}')",
+            "::".bold().yellow(),
+            archive_filename.cyan(),
+            node.registry_handle
+        ));
     }
 
     Ok(archive_path)
