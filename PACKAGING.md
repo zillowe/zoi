@@ -15,26 +15,53 @@ These are required to compile Zoi from source.
 - **Rust**: Current minimum version is `1.93.0` 2024 edition from the stable
 channel (see [`rust-toolchain.toml`](./rust-toolchain.toml) for the channel and
 [`Cargo.toml`](./Cargo.toml) for the Rust version and edition).
-- **C Compiler**: A C compiler like `gcc` is required. Packages like
-`build-essential` (Debian/Ubuntu) or `base-devel` (Arch Linux) usually provide this.
+- **C/C++ Compiler**: A C and C++ compiler like `gcc`/`g++` is required (Luau,
+the embedded Lua VM, is C++). Packages like `build-essential` (Debian/Ubuntu)
+or `base-devel` (Arch Linux) usually provide this.
 - **Clang/LLVM**: `clang` and `libclang-dev` (Debian/Ubuntu) or `clang-devel`
-(Fedora) are required for `bindgen` (used by `openssl-sys` and other crates).
-- **OpenSSL**: The development libraries for OpenSSL are required. This is
-usually `libssl-dev` (Debian/Ubuntu) or `openssl-devel` (Fedora/CentOS).
+(Fedora) are required for `bindgen`.
+- **Perl and Make**: Needed to compile the bundled OpenSSL (see
+[Bundled libraries](#bundled-libraries)). Not needed when linking the system
+OpenSSL.
 - **pkg-config**: The `pkg-config` utility is needed to locate libraries.
 - **liblzma**: The development libraries for lzma (`liblzma-dev`).
 - **Git**: Required to embed the commit hash in the binary version information.
 
+#### Bundled libraries
+
+By default OpenSSL, libgit2 and SQLite are compiled from source and linked
+statically, so the binary does not depend on those libraries being installed.
+This is what Zoi's own releases do. Compiling OpenSSL makes up a large share of
+a clean build.
+
+Distributions that prefer to link their own copies can do so with these
+environment variables at build time. The resulting binary then needs those
+libraries installed at runtime.
+
+| Variable | Effect | Needs |
+| --- | --- | --- |
+| `OPENSSL_NO_VENDOR=1` | Link the system OpenSSL | `libssl-dev` / `openssl-devel` |
+| `LIBGIT2_NO_VENDOR=1` | Link the system libgit2 | libgit2 **1.9.7 or newer 1.9.x** (`libgit2-dev`); older versions are rejected |
+| `LIBSQLITE3_SYS_USE_PKG_CONFIG=1` | Link the system SQLite | `libsqlite3-dev` / `sqlite-devel` |
+
+Add `OPENSSL_STATIC=1` or `SQLITE3_STATIC=1` to link the system library
+statically instead (it must ship a static `.a`, as Debian's `-dev` packages
+do).
+
 #### Runtime Dependencies
 
-These are required for Zoi to run correctly after installation.
+Zoi's release binaries have no required runtime dependencies besides the C
+library.
 
-- **Essential:**
-  - `git`: Required for interacting with git repositories
-  - `gpg`: Required for verifying the authority of packages.
 - **Optional:**
-  - `bubblewrap`: The `bwrap` binary is required for building pure packages
-  and running isolated apps.
+  - `git`: Used by `zoi clone`, git-based project imports and dependencies,
+  external git repositories, and `zoi sync -v`. Registry sync itself uses the
+  bundled libgit2 and only falls back to `git` if that fails.
+  - `gpg`: Only needed to *sign* packages (`zoi package build --sign`).
+  Verifying signatures uses Zoi's built-in OpenPGP implementation.
+  - `bubblewrap`: The `bwrap` binary is required for building pure packages,
+  running isolated apps, and running package hooks inside a target root
+  (`zoi system distro build`, `--root`).
 
 ## Build Process
 
