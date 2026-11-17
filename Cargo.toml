@@ -189,7 +189,6 @@ diffy = "0.5.2"
 ignore = "0.4.34"
 aes-gcm = "0.11.1"
 rand = { version = "0.10.4", features = ["std", "thread_rng", "sys_rng"] }
-getrandom = "0.4.3"
 argon2 = "0.6.0"
 base64 = "0.23.1"
 posthog-rs = { version = "0.33.1", default-features = false }
@@ -220,7 +219,6 @@ zoi-sync = { path = "crates/sync", version = "1.30.0" }
 zoi-uninstall = { path = "crates/uninstall", version = "1.30.0" }
 zoi-transaction = { path = "crates/transaction", version = "1.30.0" }
 zoi-plugins = { path = "crates/plugins", version = "1.30.0" }
-zoi-daemon = { path = "crates/daemon", version = "1.30.0" }
 zoi-system = { path = "crates/system", version = "1.30.0" }
 zoi = { path = "crates/zoi-rs", version = "1.30.0", package = "zoi-rs" }
 

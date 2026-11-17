@@ -35,7 +35,6 @@ fs2.workspace = true
 nix.workspace = true
 hex.workspace = true
 home.workspace = true
-junction.workspace = true
 indicatif.workspace = true
 reqwest.workspace = true
 self-replace.workspace = true
@@ -51,3 +50,7 @@ walkdir.workspace = true
 zip.workspace = true
 zstd.workspace = true
 openssl.workspace = true
+
+# Directory links on Windows fall back to junctions (utils::symlink_dir).
+[target.'cfg(windows)'.dependencies]
+junction.workspace = true

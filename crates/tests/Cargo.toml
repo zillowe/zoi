@@ -78,7 +78,6 @@ zync-rs.workspace = true
 rusqlite.workspace = true
 rustc-hash.workspace = true
 
-zoi.workspace = true
 zoi-core.workspace = true
 zoi-db.workspace = true
 zoi-deps.workspace = true
@@ -98,3 +97,7 @@ clap_complete.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 zoi-sandbox.workspace = true
+
+# Used by the integration tests in tests/, not by the (empty) library.
+[dev-dependencies]
+zoi.workspace = true
