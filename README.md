@@ -61,7 +61,7 @@
   - [Zoi Mini](#zoi-mini)
     - [Quick Start (Zero-Install)](#quick-start-zero-install)
 - [Usage](#usage)
-- [Repositories & Mirrors](#repositories-mirrors)
+- [Repositories & Mirrors](#repositories--mirrors)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -348,13 +348,6 @@ Here are some common commands to get you started.
 For more detailed information, please refer to the
 [Docs](https://zillowe.qzz.io/docs/zds/zoi).
 
-## Contributing
-
-We welcome contributions from the community! If you'd like to contribute,
-please read our [Contributing Guidelines](./CONTRIBUTING.md) for more information.
-
-New features, enhancements and bug reports are welcome.
-
 ## Repositories & Mirrors
 
 Zoi is hosted on multiple forges. The primary locations and mirrors are:
@@ -369,6 +362,13 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
 
 For details and CLI usage examples about Zoidberg registry, see the docs page:
 [Zoidberg](https://zillowe.qzz.io/docs/zds/zoi/zoidberg).
+
+## Contributing
+
+We welcome contributions from the community! If you'd like to contribute,
+please read our [Contributing Guidelines](./CONTRIBUTING.md) for more information.
+
+New features, enhancements and bug reports are welcome.
 
 ## License
 
