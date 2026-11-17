@@ -11,6 +11,11 @@ OS_NAME := env("OS_NAME", shell("uname -s | tr '[:upper:]' '[:lower:]'"))
 ARCH_NAME := env("ARCH_NAME", shell("uname -m"))
 WITH_BIN := env("WITH_BIN", "both")
 
+# Cargo packages for WITH_BIN. Packages are named with -p because the
+# workspace's default-members is only zoi-rs, so `--bin zoi-mini` or
+# `--bin zoid` would not be found.
+CARGO_PKGS := if WITH_BIN == "zoi" { "-p zoi-rs" } else if WITH_BIN == "zoi-mini" { "-p zoi-mini" } else if WITH_BIN == "zoid" { "-p zoi-daemon" } else if WITH_BIN == "both" { "-p zoi-rs -p zoi-mini" } else { "-p zoi-rs -p zoi-mini -p zoi-daemon" }
+
 BINDIR := env("BINDIR", PREFIX + "/bin")
 MANDIR := env("MANDIR", PREFIX + "/share/man")
 DEBUGDIR := env("DEBUGDIR", "dist")
@@ -45,17 +50,7 @@ build:
     @if ! command -v clang >/dev/null 2>&1; then echo "Error: 'clang' is not installed. It is required for bindgen."; exit 1; fi
     @echo "Building Zoi targets: {{ WITH_BIN }} in {{ PROFILE }} mode (commit: {{ COMMIT_HASH }})..."; \
     set -a; source .env 2>/dev/null; export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; \
-    if [ "{{ WITH_BIN }}" = "zoi" ]; then \
-        cargo build --bin zoi --profile {{ PROFILE }}; \
-    elif [ "{{ WITH_BIN }}" = "zoi-mini" ]; then \
-        cargo build --bin zoi-mini --profile {{ PROFILE }}; \
-    elif [ "{{ WITH_BIN }}" = "zoid" ]; then \
-        cargo build --bin zoid --profile {{ PROFILE }}; \
-    elif [ "{{ WITH_BIN }}" = "both" ]; then \
-        cargo build --bin zoi --bin zoi-mini --profile {{ PROFILE }}; \
-    else \
-        cargo build --bin zoi --bin zoi-mini --bin zoid --profile {{ PROFILE }}; \
-    fi
+    cargo build {{ CARGO_PKGS }} --profile {{ PROFILE }}
     @echo "Build complete for {{ OS_NAME }} ({{ ARCH_NAME }})."
 
 # Build Zoi in debug mode
@@ -64,17 +59,7 @@ dev:
     @if ! command -v clang >/dev/null 2>&1; then echo "Error: 'clang' is not installed. It is required for bindgen."; exit 1; fi
     @echo "Building Zoi targets: {{ WITH_BIN }} in debug mode (commit: {{ COMMIT_HASH }})..."; \
     set -a; source .env 2>/dev/null; export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; \
-    if [ "{{ WITH_BIN }}" = "zoi" ]; then \
-        cargo build --bin zoi; \
-    elif [ "{{ WITH_BIN }}" = "zoi-mini" ]; then \
-        cargo build --bin zoi-mini; \
-    elif [ "{{ WITH_BIN }}" = "zoid" ]; then \
-        cargo build --bin zoid; \
-    elif [ "{{ WITH_BIN }}" = "both" ]; then \
-        cargo build --bin zoi --bin zoi-mini; \
-    else \
-        cargo build --bin zoi --bin zoi-mini --bin zoid; \
-    fi
+    cargo build {{ CARGO_PKGS }}
     @mkdir -p "{{ DEV_BINDIR }}"
     @if [ "{{ WITH_BIN }}" = "zoi" ] || [ "{{ WITH_BIN }}" = "all" ] || [ "{{ WITH_BIN }}" = "both" ]; then \
         cp -f "{{ DEBUG_SRC_BIN }}" "{{ DEV_BINDIR }}/{{ NAME }}{{ EXE_EXT }}"; \

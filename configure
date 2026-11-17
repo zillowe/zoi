@@ -4,27 +4,51 @@ PREFIX="/usr/local"
 DEBUGDIR="dist"
 WITH_BIN="zoi"
 
-for arg in "$@"; do
+USAGE="Usage: ./configure [--prefix=/path/to/install] [--debug-dir=dist] [--with-bin=zoi|zoi-mini|zoid|both|all]"
+
+# Each option takes its value as --opt=value or --opt value.
+while [ $# -gt 0 ]; do
+  arg=$1
   case $arg in
-  --prefix=*)
-    PREFIX=$(echo "$arg" | sed 's/--prefix=//')
-    ;;
-  --debug-dir=*)
-    DEBUGDIR=$(echo "$arg" | sed 's/--debug-dir=//')
-    ;;
-  --with-bin=*)
-    WITH_BIN=$(echo "$arg" | sed 's/--with-bin=//')
-    if [ "$WITH_BIN" != "zoi" ] && [ "$WITH_BIN" != "zoi-mini" ] && [ "$WITH_BIN" != "zoid" ] && [ "$WITH_BIN" != "all" ]; then
-      echo "Error: --with-bin must be 'zoi', 'zoi-mini', 'zoid', or 'all'."
+  --prefix | --debug-dir | --with-bin)
+    if [ $# -lt 2 ] || [ -z "$2" ]; then
+      echo "Error: $arg needs a value."
+      echo "$USAGE"
       exit 1
     fi
+    arg="$1=$2"
+    shift
+    ;;
+  esac
+
+  case $arg in
+  --prefix=*)
+    PREFIX=${arg#--prefix=}
+    ;;
+  --debug-dir=*)
+    DEBUGDIR=${arg#--debug-dir=}
+    ;;
+  --with-bin=*)
+    WITH_BIN=${arg#--with-bin=}
+    case $WITH_BIN in
+    zoi | zoi-mini | zoid | both | all) ;;
+    *)
+      echo "Error: --with-bin must be 'zoi', 'zoi-mini', 'zoid', 'both' (zoi and zoi-mini) or 'all'."
+      exit 1
+      ;;
+    esac
+    ;;
+  -h | --help)
+    echo "$USAGE"
+    exit 0
     ;;
   *)
     echo "Unknown option: $arg"
-    echo "Usage: ./configure [--prefix=/path/to/install] [--debug-dir=dist] [--with-bin=zoi|zoi-mini|zoid|all]"
+    echo "$USAGE"
     exit 1
     ;;
   esac
+  shift
 done
 
 OS_NAME=$(uname -s)
@@ -105,6 +129,7 @@ echo "Zoi configured successfully:"
 echo "  Installation prefix:  $PREFIX"
 echo "  Binary directory:     \$PREFIX/bin"
 echo "  Debug directory:      $DEBUGDIR"
+echo "  Binaries:             $WITH_BIN"
 echo "  Operating System:     $OS_NAME"
 echo "  Architecture:         $ARCH_NAME"
 echo ""
