@@ -27,12 +27,13 @@ stages:
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: "clang"
   RUSTFLAGS: "-Dwarnings -C link-arg=-fuse-ld=mold"
 
+# libgit2 stays vendored: libgit2-sys needs libgit2 >= 1.9.7 and Debian
+# ships 1.9.0.
 .system_libs: &system_libs
-  - apt-get install -y libgit2-dev libsqlite3-dev
+  - apt-get install -y libsqlite3-dev
 
 .system_libs_vars: &system_libs_vars
   OPENSSL_NO_VENDOR: "1"
-  LIBGIT2_NO_VENDOR: "1"
   LIBSQLITE3_SYS_USE_PKG_CONFIG: "1"
 
 .rust_setup:

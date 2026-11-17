@@ -168,9 +168,9 @@ export LIBGIT2_NO_VENDOR=1
 export LIBSQLITE3_SYS_USE_PKG_CONFIG=1
 ```
 
-libgit2 must be a 1.9.x release to match the `git2` crate. Don't set these for release builds.
+libgit2 must be 1.9.7 or a newer 1.9.x release to match the `git2` crate. Debian 13 ships 1.9.0, so leave `LIBGIT2_NO_VENDOR` unset there. Don't set these for release builds.
 
-CI links its test, lint and Linux release builds with mold too, and its lint and test jobs use the system libraries. Release builds still compile the libraries in. Windows and macOS builds keep their default linkers, since mold only produces Linux binaries.
+CI links its test, lint and Linux release builds with mold too, and its lint and test jobs use the system OpenSSL and SQLite (libgit2 stays vendored, since Debian's is too old). Release builds still compile the libraries in. Windows and macOS builds keep their default linkers, since mold only produces Linux binaries.
 
 ### Development with Docker
 
