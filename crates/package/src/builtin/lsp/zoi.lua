@@ -299,7 +299,7 @@ function zln(target, link) end
 
 --- Sets permissions of a staged file or directory.
 ---@param path string
----@param mode integer Octal mode (e.g. 493 for 0755).
+---@param mode string|integer Octal string ("0755") or integer (493 for 0755). An unquoted 755 is decimal, not 0755.
 function zchmod(path, mode) end
 
 --- Sets ownership of a staged file or directory.

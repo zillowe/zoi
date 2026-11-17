@@ -188,7 +188,7 @@ Creates a symbolic link in the package.
 Sets the permissions of a file or directory in the package.
 
 - **path**: Path to the file or directory (e.g. `${pkgstore}/bin/my-app`).
-- **mode**: Octal permission mode (e.g. `493` for `0755`).
+- **mode**: The permission mode, as an octal string (`"0755"`, `"1777"`) or an integer (`493` for `0755`). A string is always read as octal. A bare Lua number is read as written, so `755` (unquoted) is decimal 755, not `0755`.
 
 ### `zchown(path, owner, group)`
 

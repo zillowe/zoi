@@ -138,3 +138,38 @@ fn sysroot_builds_get_no_host_devices_and_read_only_sys() {
             if flag == "--dev-bind" && src == "/dev" && dst == "/dev"
     )));
 }
+
+/// A root whose /var/run is a symlink (to /run, as Parlex's filesystem
+/// package makes it) must not get a tmpfs mounted onto it: bwrap refuses to
+/// mount on a symlink, which stopped every hook and chroot in such a root.
+#[test]
+#[cfg(target_os = "linux")]
+fn var_run_symlink_is_not_mounted_over() {
+    if !zoi_core::utils::command_exists("bwrap") {
+        eprintln!("skipping: bwrap not installed");
+        return;
+    }
+    let root = tempfile::tempdir().expect("tempdir");
+    std::fs::create_dir_all(root.path().join("var")).expect("mkdir");
+    std::fs::create_dir_all(root.path().join("run")).expect("mkdir");
+    std::os::unix::fs::symlink("../run", root.path().join("var/run"))
+        .expect("symlink");
+
+    let command = zoi_sandbox::wrap_command_in_root(
+        root.path(),
+        std::path::Path::new("/bin/true"),
+        &[],
+        &std::collections::HashMap::<String, String>::new(),
+        &[],
+        false
+    )
+    .expect("command");
+    let args: Vec<String> = command
+        .get_args()
+        .map(|a| a.to_string_lossy().to_string())
+        .collect();
+    let mounts_var_run = args.windows(2).any(|w| {
+        matches!(w, [flag, dest] if flag == "--tmpfs" && dest == "/var/run")
+    });
+    assert!(!mounts_var_run, "{args:?}");
+}

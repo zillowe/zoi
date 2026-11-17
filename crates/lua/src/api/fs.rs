@@ -357,7 +357,8 @@ pub fn add_zln(lua: &Lua) -> Result<(), mlua::Error> {
 /// environment.
 pub fn add_zchmod(lua: &Lua) -> Result<(), mlua::Error> {
     let zchmod_fn =
-        lua.create_function(|lua, (path, mode): (String, u32)| {
+        lua.create_function(|lua, (path, mode): (String, mlua::Value)| {
+            let mode = parse_mode(&mode).map_err(mlua::Error::RuntimeError)?;
             let ops_table: Table =
                 if let Ok(t) = lua.globals().get("__ZoiBuildOperations") {
                     t
@@ -375,6 +376,40 @@ pub fn add_zchmod(lua: &Lua) -> Result<(), mlua::Error> {
         })?;
     lua.globals().set("zchmod", zchmod_fn)?;
     Ok(())
+}
+
+/// Parses a `zchmod` mode.
+///
+/// An integer is used as is (`493` is `0755`). A string is octal, as modes
+/// are written everywhere else: `"0755"`, `"755"` and `"0o755"` all mean
+/// `0755`. Lua would otherwise turn the string `"0755"` into the decimal
+/// number 755 (octal 1363), which silently produced broken permissions.
+///
+/// # Errors
+///
+/// Returns an error for a non-octal string, a fractional or negative number,
+/// or a mode above `0o7777`.
+pub fn parse_mode(mode: &mlua::Value) -> Result<u32, String> {
+    let parsed = match mode {
+        mlua::Value::Integer(n) => u32::try_from(*n).ok(),
+        mlua::Value::Number(n) if n.fract() == 0.0 && n.abs() < 1e9 => {
+            u32::try_from(*n as i64).ok()
+        }
+        mlua::Value::String(s) => {
+            let text = s.to_string_lossy();
+            let digits = text.trim();
+            let digits = digits.strip_prefix("0o").unwrap_or(digits);
+            u32::from_str_radix(digits, 8).ok()
+        }
+        _ => None
+    };
+    match parsed {
+        Some(mode) if mode <= 0o7777 => Ok(mode),
+        _ => Err(format!(
+            "zchmod: invalid mode {mode:?}: use an octal string such as \
+             \"0755\" or an integer such as 493"
+        ))
+    }
 }
 
 /// Adds the `zchown` function to the Lua environment for changing file
