@@ -24,6 +24,11 @@ fi
 
 rustup target add "$TARGET"
 
+if command -v mold &>/dev/null; then
+  export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS="${CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS:-} -C link-arg=-fuse-ld=mold"
+  echo -e "${CYAN}🔗 Linking with $(mold --version | head -n 1)${NC}"
+fi
+
 export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
 export PKG_CONFIG_ALLOW_CROSS=1
 export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig

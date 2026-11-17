@@ -20,6 +20,21 @@ stages:
   - apt-get update -yq
   - apt-get install -y build-essential gcc libssl-dev pkg-config liblzma-dev git clang libclang-dev
 
+.mold: &mold
+  - apt-get install -y mold
+
+.mold_vars: &mold_vars
+  CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: "clang"
+  RUSTFLAGS: "-Dwarnings -C link-arg=-fuse-ld=mold"
+
+.system_libs: &system_libs
+  - apt-get install -y libgit2-dev libsqlite3-dev
+
+.system_libs_vars: &system_libs_vars
+  OPENSSL_NO_VENDOR: "1"
+  LIBGIT2_NO_VENDOR: "1"
+  LIBSQLITE3_SYS_USE_PKG_CONFIG: "1"
+
 .rust_setup:
   image: rust:latest
   variables:
@@ -62,9 +77,11 @@ lint:
   extends:
     - .rust_setup
   variables:
-    RUSTFLAGS: "-Dwarnings"
+    <<: [*mold_vars, *system_libs_vars]
   before_script:
     - *base_apt
+    - *mold
+    - *system_libs
     - rustup component add clippy
   script:
     - cargo clippy --workspace --all-targets --all-features
@@ -81,7 +98,12 @@ test:
   extends:
     - .rust_setup
   variables:
-    RUSTFLAGS: "-Dwarnings"
+    <<: [*mold_vars, *system_libs_vars]
+  before_script:
+    - *base_apt
+    - apt-get install -y bubblewrap
+    - *mold
+    - *system_libs
   script:
     - cargo test --workspace --all-targets --all-features
   rules:
@@ -135,6 +157,7 @@ audit:
     SENTRY_ENVIRONMENT: "production"
   before_script:
     - *base_apt
+    - *mold
   rules:
     - if: $CI_COMMIT_TAG
 
@@ -159,6 +182,7 @@ build:linux-arm64:
     - dpkg --add-architecture arm64
     - apt-get update -yq
     - apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64 pkg-config liblzma-dev:arm64 git clang libclang-dev
+    - *mold
   script:
     - chmod +x ./scripts/linux-arm64.sh
     - ./scripts/linux-arm64.sh

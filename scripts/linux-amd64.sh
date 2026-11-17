@@ -24,6 +24,11 @@ fi
 
 rustup target add "$TARGET"
 
+if command -v mold &>/dev/null; then
+  export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS:-} -C link-arg=-fuse-ld=mold"
+  echo -e "${CYAN}🔗 Linking with $(mold --version | head -n 1)${NC}"
+fi
+
 if ! ZOI_COMMIT_HASH="$COMMIT" cargo build -p zoi-rs -p zoi-mini -p zoi-daemon --target "$TARGET" --release; then
   echo -e "${RED}❌ Build failed for ${TARGET}${NC}"
   exit 1

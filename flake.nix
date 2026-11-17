@@ -34,6 +34,20 @@
 
         nightlyRustfmt = pkgs.rust-bin.nightly.latest.rustfmt;
 
+        moldLinker = pkgs.writeShellScriptBin "zoi-cc-mold" ''
+          exec ${pkgs.clang}/bin/clang --ld-path=${pkgs.mold}/bin/ld.mold "$@"
+        '';
+        devSpeedupEnv = {
+          RUSTC_WRAPPER = "${pkgs.kache}/bin/kache";
+          OPENSSL_NO_VENDOR = "1";
+          LIBGIT2_NO_VENDOR = "1";
+          LIBSQLITE3_SYS_USE_PKG_CONFIG = "1";
+        }
+        // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+          "CARGO_TARGET_${pkgs.stdenv.hostPlatform.rust.cargoEnvVarTarget}_LINKER" =
+            "${moldLinker}/bin/zoi-cc-mold";
+        };
+
         cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
         version = cargoToml.workspace.package.version;
 
@@ -105,28 +119,38 @@
 
         devShells.default = pkgs.mkShell (
           commonEnv
+          // devSpeedupEnv
           // {
             name = "zoi-dev";
 
-            nativeBuildInputs = with pkgs; [
-              nightlyRustfmt
-              rustToolchain
+            nativeBuildInputs =
+              with pkgs;
+              [
+                nightlyRustfmt
+                rustToolchain
 
-              just
-              pkg-config
-              git
-              gnupg
-              asciidoctor
+                just
+                pkg-config
+                git
+                gnupg
+                asciidoctor
 
-              clang
-              lld
-              llvm
-            ];
+                clang
+                lld
+                llvm
+
+                kache
+              ]
+              ++ lib.optionals stdenv.hostPlatform.isLinux [
+                mold
+              ];
 
             buildInputs =
               with pkgs;
               [
                 openssl
+                libgit2
+                sqlite
                 xz
                 llvmPackages.libclang
               ]
@@ -148,6 +172,8 @@
               echo "   Clippy:  $(cargo-clippy --version 2>/dev/null || clippy-driver --version 2>/dev/null)"
               echo "   Rustfmt: $(rustfmt --version)"
               echo "   LIBCLANG_PATH: $LIBCLANG_PATH"
+              echo "   Cache:   $(kache --version 2>/dev/null) (RUSTC_WRAPPER)"
+              echo "   Linker:  $(ld.mold --version 2>/dev/null | head -n 1)"
             '';
           }
         );

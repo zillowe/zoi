@@ -14,6 +14,7 @@ making our project better. Every contribution, no matter how small, is valuable 
   - [Prerequisites](#prerequisites)
   - [Installation locally](#installation-locally)
   - [Development with Nix](#development-with-nix)
+  - [Faster builds](#faster-builds)
   - [Development with Docker](#development-with-docker)
   - [Development Commands](#development-commands)
 - [Crash Reports](#crash-reports)
@@ -96,6 +97,14 @@ To test Zoi locally you must first build and install it manually using
 
 If you use [Nix](https://nixos.org) with flakes enabled, a fully configured development shell is provided with all required compilers, tools, and libraries (pinned Rust toolchain, nightly rustfmt, LLVM/Clang, `libclang`, `pkg-config`, `just`, OpenSSL, and runtime dependencies).
 
+The shell also sets up some build speedups (see [Faster builds](#faster-builds)):
+
+- **[kache](https://github.com/kunobi-ninja/kache)** caches compiled crates (`RUSTC_WRAPPER`), so clean builds, new worktrees and switching between `just dev`, `just lint` and `just test` reuse earlier work.
+- **[mold](https://github.com/rui314/mold)** links on Linux, set as the host target's linker.
+- **System libraries:** OpenSSL, libgit2 and SQLite are linked from the shell instead of being compiled from source.
+
+These only apply inside the shell. `nix build` is unaffected.
+
 #### Using `direnv` (Recommended)
 
 If you have [`direnv`](https://direnv.net) and [`nix-direnv`](https://github.com/nix-community/nix-direnv) installed, entering the repository directory will automatically load the environment via `.envrc`:
@@ -127,6 +136,41 @@ just nix cargo check
 # or:
 nix develop --command just build
 ```
+
+### Faster builds
+
+Two tools make local builds faster. The Nix shell sets both up; elsewhere they are optional.
+
+**kache** (compiler cache). Install it from [its installation guide](https://ninja.kunobi.com/docs/kache/getting-started/installation) and point Cargo at it:
+
+```sh
+export RUSTC_WRAPPER=kache
+```
+
+`kache stats --last-build` and `kache explain` show what was reused and why something was rebuilt. It does not speed up recompiling the crate you just edited; that is always a cache miss.
+
+**mold** (linker, Linux only). Install `mold` from your distribution and set it as the linker for your target, for example in `~/.cargo/config.toml`:
+
+```toml
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+```
+
+The Justfile exports `RUSTFLAGS`, which overrides `rustflags` from Cargo config. Under `just`, use a wrapper set as `linker` instead (that is what the Nix shell does), or run `cargo` directly.
+
+**System libraries.** By default OpenSSL, libgit2 and SQLite are compiled from source (vendored/bundled), so release binaries don't depend on the libraries installed on a user's machine. OpenSSL alone takes a large share of a clean build. For development, link the installed libraries instead:
+
+```sh
+# Debian/Ubuntu: apt install libssl-dev libgit2-dev libsqlite3-dev pkg-config
+export OPENSSL_NO_VENDOR=1
+export LIBGIT2_NO_VENDOR=1
+export LIBSQLITE3_SYS_USE_PKG_CONFIG=1
+```
+
+libgit2 must be a 1.9.x release to match the `git2` crate. Don't set these for release builds.
+
+CI links its test, lint and Linux release builds with mold too, and its lint and test jobs use the system libraries. Release builds still compile the libraries in. Windows and macOS builds keep their default linkers, since mold only produces Linux binaries.
 
 ### Development with Docker
 
