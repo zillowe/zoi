@@ -350,10 +350,9 @@ pub fn wrap_command_in_root_with_profile<S: std::hash::BuildHasher>(
     // package does), which then already points at the tmpfs above.
     // bwrap refuses to mount onto a symlink, and that failure used to stop
     // every command in such a root before it started.
-    let var_run_is_link = std::fs::symlink_metadata(
-        actual_sysroot.join("var/run")
-    )
-    .is_ok_and(|m| m.file_type().is_symlink());
+    let var_run_is_link =
+        std::fs::symlink_metadata(actual_sysroot.join("var/run"))
+            .is_ok_and(|m| m.file_type().is_symlink());
     if !var_run_is_link {
         bwrap.arg("--tmpfs").arg("/var/run");
     }

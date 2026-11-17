@@ -168,8 +168,8 @@ fn var_run_symlink_is_not_mounted_over() {
         .get_args()
         .map(|a| a.to_string_lossy().to_string())
         .collect();
-    let mounts_var_run = args.windows(2).any(|w| {
-        matches!(w, [flag, dest] if flag == "--tmpfs" && dest == "/var/run")
-    });
+    let mounts_var_run = args.windows(2).any(
+        |w| matches!(w, [flag, dest] if flag == "--tmpfs" && dest == "/var/run")
+    );
     assert!(!mounts_var_run, "{args:?}");
 }
