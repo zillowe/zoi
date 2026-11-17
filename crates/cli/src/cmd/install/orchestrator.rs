@@ -1157,14 +1157,15 @@ impl<'a> Orchestrator<'a> {
                             }
                         }
                         Err(e) => {
+                            let label = node.sub_package.as_ref().map_or_else(
+                                || node.pkg.name.clone(),
+                                |sub| format!("{}:{sub}", node.pkg.name)
+                            );
                             failed_packages
                                 .lock()
                                 .expect("Failed packages mutex poisoned")
-                                .push(node.pkg.name.clone());
-                            eprintln!(
-                                "Error installing {}: {}",
-                                node.pkg.name, e
-                            );
+                                .push(label.clone());
+                            eprintln!("Error installing {label}: {e}");
                         }
                     }
                     Ok(())
@@ -1268,14 +1269,18 @@ impl<'a> Orchestrator<'a> {
                                 Ok(())
                             }
                             Err(e) => {
+                                let label =
+                                    node.sub_package.as_ref().map_or_else(
+                                        || node.pkg.name.clone(),
+                                        |sub| {
+                                            format!("{}:{sub}", node.pkg.name)
+                                        }
+                                    );
                                 failed_packages
                                     .lock()
                                     .expect("Failed packages mutex poisoned")
-                                    .push(node.pkg.name.clone());
-                                eprintln!(
-                                    "Error installing {}: {}",
-                                    node.pkg.name, e
-                                );
+                                    .push(label.clone());
+                                eprintln!("Error installing {label}: {e}");
                                 Err(e)
                             }
                         }
