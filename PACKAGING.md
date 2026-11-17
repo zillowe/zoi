@@ -50,9 +50,10 @@ do).
 
 #### Runtime Dependencies
 
-Zoi's release binaries have no required runtime dependencies besides the C
-library.
-
+- **Required:** the shared libraries the release binaries link: the C library
+(glibc), `libstdc++` and `libgcc_s` (the embedded Luau VM is C++), zlib
+(`libz.so.1`) and liblzma (`liblzma.so.5`). OpenSSL, libgit2 and SQLite are
+compiled in (see [Bundled libraries](#bundled-libraries)).
 - **Optional:**
   - `git`: Used by `zoi clone`, git-based project imports and dependencies,
   external git repositories, and `zoi sync -v`. Registry sync itself uses the
