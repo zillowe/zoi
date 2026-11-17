@@ -1323,11 +1323,23 @@ pub fn install_prepared_node(
         None
     };
 
+    // `gcc:libgcc`, not just `gcc`, so sub-packages are told apart.
+    let label = match &node.sub_package {
+        Some(sub) => format!("{}:{sub}", pkg.name),
+        None => pkg.name.clone()
+    };
+
     if let Some(hooks) = &pkg.hooks {
         if let Some(pb) = &step_pb {
             pb.set_message("Running pre-install hooks...");
         }
-        hooks::run_hooks(hooks, hooks::HookType::PreInstall, pkg.scope)?;
+        hooks::run_hooks_for(
+            hooks,
+            hooks::HookType::PreInstall,
+            pkg.scope,
+            &label,
+            step_pb.as_ref().or(main_pb.as_ref())
+        )?;
     }
 
     let sub_package_to_install = node.sub_package.clone();
@@ -1400,7 +1412,7 @@ pub fn install_prepared_node(
         local::read_store_manifest(&manifest_path)?
     } else {
         if let Some(pb) = step_pb.as_ref().or(main_pb.as_ref()) {
-            pb.set_message(format!("Installing {}...", pkg.name.cyan()));
+            pb.set_message(format!("Installing {}...", label.cyan()));
         }
 
         let (installed_files, file_digests) = crate::pkg_install::run(
@@ -1501,7 +1513,13 @@ pub fn install_prepared_node(
         if let Some(pb) = &step_pb {
             pb.set_message("Running post-install hooks...");
         }
-        hooks::run_hooks(hooks, hooks::HookType::PostInstall, pkg.scope)?;
+        hooks::run_hooks_for(
+            hooks,
+            hooks::HookType::PostInstall,
+            pkg.scope,
+            &label,
+            step_pb.as_ref().or(main_pb.as_ref())
+        )?;
     }
 
     if let Some(pb) = main_pb {

@@ -588,10 +588,14 @@ pub fn run(
 
     let data_dir = temp_dir.path().join("data");
     if data_dir.exists() {
+        let label = match own_subs.as_slice() {
+            [Some(sub)] => format!("{}:{sub}", metadata.name),
+            _ => metadata.name.clone()
+        };
         if let Some(p) = pb {
-            p.set_message(format!("Installing {}...", metadata.name.cyan()));
+            p.set_message(format!("Installing {}...", label.cyan()));
         } else {
-            println!("Installing {}...", metadata.name.cyan());
+            println!("Installing {}...", label.cyan());
         }
 
         let subs_to_install = if let Some(subs) = sub_packages {
