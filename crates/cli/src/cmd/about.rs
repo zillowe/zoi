@@ -7,8 +7,13 @@ use crate::utils;
 const DESCRIPTION: &str = "Zoi - Advanced Package Manager & Environment \
                            Orchestrator.\n  Part of the Zillowe Development \
                            Suite (ZDS)";
-/// The author of the application.
-const AUTHOR: &str = "Zusty < Zillowe Foundation";
+/// The creator and lead developer of the application.
+const AUTHOR: &str = "Zaid Al Shareef (@zillowez)";
+/// Where everyone who contributed to the application is listed.
+const CONTRIBUTORS: &str =
+    "https://gitlab.com/zillowe/zillwen/zusty/zoi/-/graphs/main";
+/// The team and organization the application belongs to.
+const ORGANIZATION: &str = "Zusty < Zillowe Foundation";
 /// The homepage of the application.
 const HOMEPAGE: &str = "https://zillowe.qzz.io/zds/zoi";
 /// The documentation URL for the application.
@@ -27,13 +32,15 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
 
     println!("\n  {}\n", DESCRIPTION.green());
 
-    println!("  {:<12}{}", "Version:".cyan(), full_version_string);
-    println!("  {:<12}{}", "Author:".cyan(), AUTHOR);
-    println!("  {:<12}{}", "Homepage:".cyan(), HOMEPAGE);
-    println!("  {:<12}{}", "Docs:".cyan(), DOCS);
-    println!("  {:<12}{}", "Email:".cyan(), EMAIL);
-    println!("  {:<12}{}", "GitLab:".cyan(), GITREPO);
-    println!("  {:<12}{}", "License:".cyan(), LICENSE);
+    println!("  {:<14}{}", "Version:".cyan(), full_version_string);
+    println!("  {:<14}{}", "Author:".cyan(), AUTHOR);
+    println!("  {:<14}{}", "Contributors:".cyan(), CONTRIBUTORS);
+    println!("  {:<14}{}", "Organization:".cyan(), ORGANIZATION);
+    println!("  {:<14}{}", "Homepage:".cyan(), HOMEPAGE);
+    println!("  {:<14}{}", "Docs:".cyan(), DOCS);
+    println!("  {:<14}{}", "Email:".cyan(), EMAIL);
+    println!("  {:<14}{}", "GitLab:".cyan(), GITREPO);
+    println!("  {:<14}{}", "License:".cyan(), LICENSE);
 
     let posthog_host = option_env!("POSTHOG_API_HOST");
     let zoi_registry = option_env!("ZOI_DEFAULT_REGISTRY");
