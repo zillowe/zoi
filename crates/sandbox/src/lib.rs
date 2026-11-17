@@ -275,8 +275,20 @@ pub fn wrap_command_in_root_with_profile<S: std::hash::BuildHasher>(
 
     let mut bwrap = Command::new("bwrap");
 
-    // Standard isolation flags
-    bwrap.arg("--unshare-all");
+    // Standard isolation flags. As real root, everything except a user
+    // namespace: inside one, root loses its override of file permissions for
+    // host users it does not map, so a target under a private home
+    // (`/home/<user>` is often 0700) could not even be reached
+    // ("Can't find source path ...: Permission denied"). Root can create the
+    // other namespaces and mounts without one.
+    if zoi_core::utils::is_effective_root() {
+        bwrap.arg("--unshare-ipc");
+        bwrap.arg("--unshare-pid");
+        bwrap.arg("--unshare-uts");
+        bwrap.arg("--unshare-cgroup-try");
+    } else {
+        bwrap.arg("--unshare-all");
+    }
     bwrap.arg("--new-session");
     bwrap.arg("--share-net");
 
