@@ -303,11 +303,56 @@ fn install_source_for_manifest(manifest: &types::InstallManifest) -> String {
     local::installed_manifest_source(manifest)
 }
 
+/// `name` or `name:sub`, for messages.
+fn manifest_label(manifest: &types::InstallManifest) -> String {
+    match &manifest.sub_package {
+        Some(sub) => format!("{}:{sub}", manifest.name),
+        None => manifest.name.clone()
+    }
+}
+
+/// Removes the dependent links that packages installed by `transaction`
+/// recorded on each other.
+///
+/// Those links describe the state being rolled back. Removing them up front
+/// means no package directory that survives the rollback (one holding other
+/// versions or sub-packages) keeps a link to a package that no longer
+/// exists. Links to packages installed before the transaction are left to
+/// each package's own removal, which drops them.
+fn unlink_transaction_packages(transaction: &types::Transaction) {
+    let installed: Vec<&types::InstallManifest> = transaction
+        .operations
+        .iter()
+        .filter_map(|op| match op {
+            types::TransactionOperation::Install { manifest } => Some(manifest),
+            _ => None
+        })
+        .collect();
+    let ids: Vec<String> =
+        installed.iter().map(|m| local::installed_manifest_source(m)).collect();
+    for manifest in &installed {
+        let Ok(dir) = local::get_package_dir(
+            manifest.scope,
+            &manifest.registry_handle,
+            &manifest.repo,
+            &manifest.name
+        ) else {
+            continue;
+        };
+        for id in &ids {
+            let _ = local::remove_dependent(&dir, id);
+        }
+    }
+}
+
 /// Reverts all operations recorded in a transaction.
 ///
 /// This is the "Atomic Rollback" mechanism. It processes operations in reverse
 /// order:
-/// - Installs are uninstalled.
+/// - Installs are uninstalled. Dependents never block this (see
+///   [`uninstall::rollback_install`]), collections do not cascade into their
+///   dependencies, and a package that is already gone counts as rolled back,
+///   so an incomplete rollback can simply be run again.
 /// - Uninstalls are re-installed (either from local store or registry).
 /// - Upgrades are reverted to the previous version.
 ///
@@ -326,6 +371,8 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
     println!("\n{} Starting Rollback...", "::".bold().blue());
     let mut rollback_failed = false;
 
+    unlink_transaction_packages(&transaction);
+
     for operation in transaction.operations.iter().rev() {
         match operation {
             types::TransactionOperation::Install { manifest } => {
@@ -334,18 +381,11 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     manifest.name.cyan(),
                     manifest.version.yellow()
                 );
-                let source = install_source_for_manifest(manifest);
-                if let Err(e) = uninstall::run(
-                    &source,
-                    Some(manifest.scope),
-                    true,
-                    false,
-                    false
-                ) {
+                if let Err(e) = uninstall::rollback_install(manifest, false) {
                     eprintln!(
                         "{} Failed to rollback install of '{}': {}",
                         "Error:".red().bold(),
-                        manifest.name,
+                        manifest_label(manifest),
                         e
                     );
                     rollback_failed = true;
@@ -505,14 +545,9 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     new_manifest.version.yellow(),
                     old_manifest.version.green()
                 );
-                let source = install_source_for_manifest(new_manifest);
-                if let Err(e) = uninstall::run(
-                    &source,
-                    Some(new_manifest.scope),
-                    true,
-                    false,
-                    false
-                ) {
+                if let Err(e) =
+                    uninstall::rollback_upgrade_removal(new_manifest, false)
+                {
                     eprintln!(
                         "{} Failed to uninstall new version during \
                          upgrade-rollback for '{}': {}",

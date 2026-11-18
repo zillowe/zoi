@@ -928,7 +928,7 @@ Inspect recorded transactions.
 - `list` (alias: `ls`): List available transaction logs with their start time and operation count.
 - `show <id>`: Show the ordered operations recorded in a transaction.
 - `files <id>`: List the unique files modified by a transaction.
-- `undo [id]`: Revert all operations recorded in a transaction (installs are uninstalled, uninstalls are restored, upgrades are downgraded). Defaults to the most recent transaction when no ID is given (aliases: `rollback`).
+- `undo [id]`: Revert all operations recorded in a transaction (installs are uninstalled, uninstalls are restored, upgrades are downgraded). Defaults to the most recent transaction when no ID is given (aliases: `rollback`). Packages the transaction installed are removed even if they depend on each other, a collection only removes itself (each package it pulled in is its own step), and packages installed before the transaction are never touched. If a rollback is incomplete, its log is kept and running it again picks up where it stopped.
 
 ---
 

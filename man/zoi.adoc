@@ -299,6 +299,9 @@ to a file. *--ndjson*:: Export in NDJSON format (requires *--export*).
 *list*, *ls*:: List known transaction logs. *show* _ID_:: Show transaction
 details. *files* _ID_:: List files modified by a transaction. *undo*,
 *rollback* [_ID_] [*--yes*]:: Undo a transaction (default: the last one).
+Packages it installed are removed regardless of dependencies among them,
+packages installed before it are left alone, and an incomplete rollback can
+be run again to finish it.
 
 == Maintenance and health
 

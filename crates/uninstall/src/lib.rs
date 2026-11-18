@@ -222,7 +222,13 @@ fn unversioned_manifest_source(manifest: &types::InstallManifest) -> String {
     }
 }
 
-/// Uninstalls a collection and its associated dependencies.
+/// Uninstalls a collection and, with `cascade`, its dependencies.
+///
+/// The collection's own dependent links are always dropped from its
+/// dependencies. Without `cascade` (transaction rollback) the dependencies
+/// themselves are left alone: rollback removes exactly the packages the
+/// transaction installed, each as its own step, and must never remove one
+/// that was installed before it.
 fn uninstall_collection(
     pkg: &types::Package,
     manifest: &types::InstallManifest,
@@ -230,7 +236,8 @@ fn uninstall_collection(
     registry_handle: Option<&str>,
     yes: bool,
     quiet: bool,
-    dry_run: bool
+    dry_run: bool,
+    cascade: bool
 ) -> anyhow::Result<types::InstallManifest> {
     if !quiet {
         println!("Uninstalling collection '{}'...", pkg.name.bold());
@@ -242,7 +249,9 @@ fn uninstall_collection(
 
     let dependencies_to_uninstall = &manifest.installed_dependencies;
 
-    if dependencies_to_uninstall.is_empty() {
+    if !cascade {
+        drop_collection_links(manifest, scope, quiet);
+    } else if dependencies_to_uninstall.is_empty() {
         if !quiet {
             println!("Collection has no dependencies to uninstall.");
         }
@@ -366,6 +375,106 @@ fn uninstall_collection(
     }
 
     Ok(manifest.clone())
+}
+
+/// Removes the dependent links a collection holds on its `zoi:`
+/// dependencies, without uninstalling them.
+fn drop_collection_links(
+    manifest: &types::InstallManifest,
+    scope: types::Scope,
+    quiet: bool
+) {
+    let collection_id = local::installed_manifest_source(manifest);
+    for dep_str in &manifest.installed_dependencies {
+        let Some(dep_source) = zoi_dependency_source(dep_str) else {
+            continue;
+        };
+        let Some(dep_manifest) = find_dependency_manifest(dep_source, scope)
+        else {
+            continue;
+        };
+        if let Err(e) = local::get_package_dir(
+            dep_manifest.scope,
+            &dep_manifest.registry_handle,
+            &dep_manifest.repo,
+            &dep_manifest.name
+        )
+        .and_then(|dep_dir| local::remove_dependent(&dep_dir, &collection_id))
+            && !quiet
+        {
+            eprintln!(
+                "{} failed to remove dependent link for {}: {}",
+                "Warning:".yellow(),
+                dep_source,
+                e
+            );
+        }
+    }
+}
+
+/// Removes a package that a transaction installed, as part of rolling that
+/// transaction back.
+///
+/// Unlike a normal uninstall:
+/// - Dependents do not block it. The package did not exist before the
+///   transaction, so anything depending on it was installed by the same
+///   transaction (and is being removed too) or was already broken.
+/// - A collection does not uninstall its dependencies; the transaction log
+///   lists every package it installed, and rollback removes each one.
+/// - It is idempotent: a package that is no longer installed, or now active
+///   at another version, counts as already rolled back. Re-running an
+///   incomplete rollback therefore converges instead of failing again.
+///
+/// # Errors
+///
+/// Returns an error if the package is still installed at this version and
+/// cannot be removed.
+pub fn rollback_install(
+    manifest: &types::InstallManifest,
+    quiet: bool
+) -> anyhow::Result<()> {
+    let request =
+        resolve::parse_source_string(&unversioned_manifest_source(manifest))?;
+    let Ok((active, _)) = find_active_manifest(&request, Some(manifest.scope))
+    else {
+        return Ok(());
+    };
+    if active.version != manifest.version
+        || active.sub_package != manifest.sub_package
+    {
+        return Ok(());
+    }
+
+    run_with_options(
+        &local::installed_manifest_source(manifest),
+        Some(manifest.scope),
+        true,
+        quiet,
+        false,
+        &RunOptions {
+            keep_dependents: true,
+            activate_version: None
+        }
+    )
+    .map(|_| ())
+}
+
+/// Removes the version an upgrade installed, as the first half of rolling
+/// the upgrade back; the caller then restores the previous version.
+///
+/// Dependents do not block it: they depended on the package before the
+/// upgrade too and are served again once the old version is restored.
+/// Idempotent like [`rollback_install`].
+///
+/// # Errors
+///
+/// Returns an error if the new version is still active and cannot be
+/// removed.
+pub fn rollback_upgrade_removal(
+    new_manifest: &types::InstallManifest,
+    quiet: bool
+) -> anyhow::Result<()> {
+    rollback_install(new_manifest, quiet)
 }
 
 /// Finds the active installed manifest, ignoring any version pin in the
@@ -1386,7 +1495,8 @@ fn run_with_options(
             registry_handle.as_deref(),
             yes,
             quiet,
-            dry_run
+            dry_run,
+            !opts.keep_dependents
         );
     }
 
