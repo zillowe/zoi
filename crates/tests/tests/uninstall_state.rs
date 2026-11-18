@@ -328,3 +328,29 @@ fn test_collection_uninstall_removes_its_zoi_dependencies_only() {
         "only the collection's link should be dropped"
     );
 }
+
+#[test]
+fn test_collection_uninstall_keeps_its_other_sub_packages() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("unwrap failed");
+    let root = tmp.path().to_path_buf();
+    isolate(&mut ctx, &root);
+
+    // Like @core/base: two sub-packages of one collection, both installed.
+    let mut main = manifest("my-base", "1.0.0", types::Scope::User);
+    main.package_type = types::PackageType::Collection;
+    main.sub_package = Some("main".to_string());
+    let mut dev = main.clone();
+    dev.sub_package = Some("dev".to_string());
+    local::write_manifest(&main).expect("unwrap failed");
+    local::write_manifest(&dev).expect("unwrap failed");
+
+    uninstall::run("my-base:main", Some(types::Scope::User), true, true, false)
+        .expect("unwrap failed");
+
+    assert!(!is_installed("my-base:main", types::Scope::User));
+    assert!(
+        is_installed("my-base:dev", types::Scope::User),
+        "uninstalling one sub-package removed the other"
+    );
+}

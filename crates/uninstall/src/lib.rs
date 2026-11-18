@@ -222,31 +222,24 @@ fn unversioned_manifest_source(manifest: &types::InstallManifest) -> String {
     }
 }
 
-/// Uninstalls a collection and, with `cascade`, its dependencies.
+/// Handles a collection's dependencies before the collection itself is
+/// removed.
 ///
-/// The collection's own dependent links are always dropped from its
-/// dependencies. Without `cascade` (transaction rollback) the dependencies
-/// themselves are left alone: rollback removes exactly the packages the
-/// transaction installed, each as its own step, and must never remove one
-/// that was installed before it.
-fn uninstall_collection(
-    pkg: &types::Package,
+/// With `cascade` (a normal uninstall) the collection's `zoi:` dependencies
+/// are uninstalled, except those other packages still need. Without it
+/// (transaction rollback) only the collection's own dependent links are
+/// dropped: rollback removes exactly the packages the transaction installed,
+/// each as its own step, and must never remove one installed before it.
+///
+/// The collection itself is then removed like any other package, so its
+/// other sub-packages and stored versions are left alone.
+fn remove_collection_dependencies(
     manifest: &types::InstallManifest,
     scope: types::Scope,
-    registry_handle: Option<&str>,
     yes: bool,
     quiet: bool,
-    dry_run: bool,
     cascade: bool
-) -> anyhow::Result<types::InstallManifest> {
-    if !quiet {
-        println!("Uninstalling collection '{}'...", pkg.name.bold());
-    }
-
-    if dry_run {
-        return Ok(manifest.clone());
-    }
-
+) {
     let dependencies_to_uninstall = &manifest.installed_dependencies;
 
     if !cascade {
@@ -261,7 +254,9 @@ fn uninstall_collection(
         }
         let collection_id = local::installed_manifest_source(manifest);
         for dep_str in dependencies_to_uninstall {
-            let dep = dependencies::parse_dependency_string(dep_str)?;
+            let Ok(dep) = dependencies::parse_dependency_string(dep_str) else {
+                continue;
+            };
 
             if dep.manager != "zoi" {
                 // The install manifest does not record whether Zoi installed
@@ -324,7 +319,7 @@ fn uninstall_collection(
                 || dep_source.to_string(),
                 unversioned_manifest_source
             );
-            if let Err(e) = run(&target, Some(scope), yes, quiet, dry_run)
+            if let Err(e) = run(&target, Some(scope), yes, quiet, false)
                 && !quiet
             {
                 eprintln!(
@@ -334,47 +329,6 @@ fn uninstall_collection(
             }
         }
     }
-
-    let handle = registry_handle.unwrap_or("local");
-    let package_dir =
-        local::get_package_dir(scope, handle, &pkg.repo, &pkg.name)?;
-    if package_dir.exists() {
-        let _ = cleanup_service(&pkg.name, scope);
-        fs::remove_dir_all(&package_dir)?;
-    }
-    if let Err(e) = recorder::remove_package_from_record(manifest)
-        && !quiet
-    {
-        eprintln!(
-            "{} Failed to remove package from lockfile: {}",
-            "Warning:".yellow(),
-            e
-        );
-    }
-
-    if let Ok(conn) = db::open_connection("local") {
-        let _ = db::delete_package(
-            &conn,
-            &pkg.name,
-            manifest.sub_package.as_deref(),
-            &pkg.repo,
-            Some(scope),
-            Some(&manifest.registry_handle)
-        );
-    }
-
-    if let Ok(true) = telemetry::posthog_capture_event(
-        "uninstall",
-        pkg,
-        env!("CARGO_PKG_VERSION"),
-        registry_handle.unwrap_or("local"),
-        None
-    ) && !quiet
-    {
-        println!("{} telemetry queued", "Info:".green());
-    }
-
-    Ok(manifest.clone())
 }
 
 /// Removes the dependent links a collection holds on its `zoi:`
@@ -1480,24 +1434,15 @@ fn run_with_options(
         ));
     }
     let sub_package_to_uninstall = manifest.sub_package.clone();
-    let registry_handle = Some(manifest.registry_handle.clone());
     let LoadedPackage {
         pkg,
         lua_path: pkg_lua_path,
         from_store: lua_from_store
     } = load_installed_package(&manifest, yes, quiet)?;
 
-    if pkg.package_type == types::PackageType::Collection {
-        return uninstall_collection(
-            &pkg,
-            &manifest,
-            scope,
-            registry_handle.as_deref(),
-            yes,
-            quiet,
-            dry_run,
-            !opts.keep_dependents
-        );
+    let is_collection = pkg.package_type == types::PackageType::Collection;
+    if is_collection && !quiet {
+        println!("Uninstalling collection '{}'...", pkg.name.bold());
     }
 
     if dry_run {
@@ -1509,6 +1454,8 @@ fn run_with_options(
         local::get_package_dir(scope, handle, &pkg.repo, &pkg.name)?;
     let version_dir = package_dir.join(&manifest.version);
 
+    // Checked before a collection touches its dependencies, so a refused
+    // uninstall leaves everything as it was.
     let dependents = local::get_dependents(&package_dir)?;
     if !opts.keep_dependents && !dependents.is_empty() {
         return Err(anyhow::anyhow!(
@@ -1517,6 +1464,20 @@ fn run_with_options(
             pkg.name,
             dependents.join("\n  - ")
         ));
+    }
+
+    // A collection installs no files of its own. After its dependencies are
+    // handled it goes through the same removal as any package, which keeps
+    // its other sub-packages and stored versions (it used to delete the
+    // whole package directory).
+    if is_collection {
+        remove_collection_dependencies(
+            &manifest,
+            scope,
+            yes,
+            quiet,
+            !opts.keep_dependents
+        );
     }
 
     let needs_escalation =
