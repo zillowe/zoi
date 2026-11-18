@@ -110,6 +110,8 @@ fn is_elf(path: &Path) -> Result<bool> {
 
 /// Relocates a single ELF file by rewriting its RUNPATH.
 fn relocate_file(path: &Path, staging_dir: &Path) -> Result<bool> {
+    // Kept to undo a patch that produces an invalid file (see below).
+    let original = fs::read(path)?;
     let mut file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -157,7 +159,72 @@ fn relocate_file(path: &Path, staging_dir: &Path) -> Result<bool> {
         .finish()
         .map_err(|e| anyhow!("Failed to write relocated ELF: {e}"))?;
 
+    // The patcher can lay out a new segment whose file offset and address
+    // disagree modulo its alignment. Every Linux loader rejects such a file
+    // ("ELF load command address/offset not page-aligned"), so a binary
+    // relocated that way could not run at all. Keep the original instead.
+    if !load_segments_aligned(&fs::read(path)?) {
+        fs::write(path, &original)?;
+        return Err(anyhow!(
+            "relocation produced a misaligned load segment; left unchanged"
+        ));
+    }
+
     Ok(true)
+}
+
+/// Whether every `PT_LOAD` segment of an ELF image satisfies
+/// `p_offset % p_align == p_vaddr % p_align`, which the kernel and the
+/// dynamic loader require. A file whose headers cannot be read counts as
+/// invalid.
+fn load_segments_aligned(data: &[u8]) -> bool {
+    /// Program header type of a loadable segment.
+    const PT_LOAD: u32 = 1;
+    let read = |at: usize, len: usize| -> Option<u64> {
+        let bytes = data.get(at..at.checked_add(len)?)?;
+        let big_endian = data.get(5) == Some(&2);
+        let mut value = 0u64;
+        for i in 0..len {
+            let byte = if big_endian {
+                bytes.get(i)
+            } else {
+                bytes.get(len - 1 - i)
+            };
+            value = (value << 8) | u64::from(*byte?);
+        }
+        Some(value)
+    };
+    let check = || -> Option<bool> {
+        let is_64 = match data.get(4)? {
+            1 => false,
+            2 => true,
+            _ => return None
+        };
+        let (ph_offset, base) = if is_64 {
+            (read(32, 8)?, 54)
+        } else {
+            (read(28, 4)?, 42)
+        };
+        let entry_size = usize::try_from(read(base, 2)?).ok()?;
+        let count = usize::try_from(read(base + 2, 2)?).ok()?;
+        let ph_offset = usize::try_from(ph_offset).ok()?;
+        for i in 0..count {
+            let at = ph_offset.checked_add(i.checked_mul(entry_size)?)?;
+            if read(at, 4)? != u64::from(PT_LOAD) {
+                continue;
+            }
+            let (offset, vaddr, align) = if is_64 {
+                (read(at + 8, 8)?, read(at + 16, 8)?, read(at + 48, 8)?)
+            } else {
+                (read(at + 4, 4)?, read(at + 8, 4)?, read(at + 28, 4)?)
+            };
+            if align > 1 && offset % align != vaddr % align {
+                return Some(false);
+            }
+        }
+        Some(true)
+    };
+    check().unwrap_or(false)
 }
 
 /// Returns the file's current RUNPATH (or legacy RPATH), or an empty string.
@@ -235,6 +302,43 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+
+    /// A little-endian ELF64 image with one `PT_LOAD` segment at `offset`
+    /// mapped to `vaddr`, page-aligned.
+    fn elf_with_load(offset: u64, vaddr: u64) -> Vec<u8> {
+        let mut header = Vec::with_capacity(64);
+        header.extend_from_slice(b"\x7fELF");
+        header.extend_from_slice(&[2, 1, 1, 0]);
+        header.resize(32, 0);
+        header.extend_from_slice(&64u64.to_le_bytes()); // e_phoff
+        header.resize(54, 0);
+        header.extend_from_slice(&56u16.to_le_bytes()); // e_phentsize
+        header.extend_from_slice(&1u16.to_le_bytes()); // e_phnum
+        header.resize(64, 0);
+
+        header.extend_from_slice(&1u32.to_le_bytes()); // PT_LOAD
+        header.extend_from_slice(&0u32.to_le_bytes()); // p_flags
+        header.extend_from_slice(&offset.to_le_bytes());
+        header.extend_from_slice(&vaddr.to_le_bytes());
+        header.extend_from_slice(&vaddr.to_le_bytes()); // p_paddr
+        header.extend_from_slice(&0u64.to_le_bytes()); // p_filesz
+        header.extend_from_slice(&0u64.to_le_bytes()); // p_memsz
+        header.extend_from_slice(&0x1000u64.to_le_bytes()); // p_align
+        header
+    }
+
+    #[test]
+    fn aligned_load_segments_are_accepted() {
+        assert!(load_segments_aligned(&elf_with_load(0x2000, 0x5000)));
+        assert!(load_segments_aligned(&elf_with_load(0x1220, 0x4220)));
+    }
+
+    #[test]
+    fn misaligned_load_segments_are_rejected() {
+        // The layout the patcher produced for Zoidberg's `xz`.
+        assert!(!load_segments_aligned(&elf_with_load(0x1b1c0, 0x21000)));
+        assert!(!load_segments_aligned(b"\x7fELF"));
+    }
 
     #[test]
     fn test_calculate_rpaths_root() {
