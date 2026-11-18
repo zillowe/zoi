@@ -207,3 +207,37 @@ end
     }
     assert!(checked > 0, "should have verified at least one pooled file");
 }
+
+/// Files staged for the system root are never rewritten: they already find
+/// their libraries through the system's search paths, and patching glibc's
+/// dynamic loader made every program in a target crash on start.
+#[test]
+fn system_root_elfs_are_left_untouched() {
+    let _ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("tempdir");
+    let staging = tmp.path().join("staging");
+    let usr_bin = staging.join("usrroot/usr/bin");
+    let store_bin = staging.join("pkgstore/bin");
+    fs::create_dir_all(&usr_bin).expect("mkdir");
+    fs::create_dir_all(&store_bin).expect("mkdir");
+
+    let exe = std::env::current_exe().expect("test binary");
+    let system_copy = usr_bin.join("tool");
+    let store_copy = store_bin.join("tool");
+    fs::copy(&exe, &system_copy).expect("copy");
+    fs::copy(&exe, &store_copy).expect("copy");
+    let original = fs::read(&exe).expect("read");
+
+    relocate::relocate_elfs(&staging, true).expect("relocate");
+
+    assert_eq!(
+        fs::read(&system_copy).expect("read"),
+        original,
+        "usrroot ELF was modified"
+    );
+    assert_ne!(
+        fs::read(&store_copy).expect("read"),
+        original,
+        "pkgstore ELF was not relocated"
+    );
+}

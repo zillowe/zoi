@@ -39,6 +39,9 @@ pub fn relocate_elfs(staging_dir: &Path, quiet: bool) -> Result<()> {
         }
 
         let path = entry.path();
+        if !in_package_store(path, staging_dir) {
+            continue;
+        }
         if is_elf(path)? {
             match relocate_file(path, staging_dir) {
                 Ok(true) => {
@@ -72,6 +75,28 @@ pub fn relocate_elfs(staging_dir: &Path, quiet: bool) -> Result<()> {
     Ok(())
 }
 
+/// Whether a staged file installs into the package store, the only place
+/// `$ORIGIN` RUNPATHs are for.
+///
+/// Files staged for the system root (`usrroot`), a home (`usrhome`) or a
+/// template directory land in standard locations such as `/usr/lib` and
+/// already find their libraries through the system's search paths.
+/// Rewriting them gained nothing and could break them: a new dynamic entry
+/// moves the dynamic section into a fresh segment, which the dynamic loader
+/// (`ld-linux-*.so`) cannot survive, so glibc's loader crashed on start and
+/// took every program in the system with it.
+fn in_package_store(path: &Path, staging_dir: &Path) -> bool {
+    let Ok(rel) = path.strip_prefix(staging_dir) else {
+        return false;
+    };
+    !rel.components().any(|c| {
+        matches!(
+            c.as_os_str().to_str(),
+            Some("usrroot" | "usrhome" | "createpkgdir")
+        )
+    })
+}
+
 /// Checks if a file is an ELF binary by looking for the `\x7fELF` magic bytes.
 fn is_elf(path: &Path) -> Result<bool> {
     let mut file = fs::File::open(path)?;
@@ -96,7 +121,29 @@ fn relocate_file(path: &Path, staging_dir: &Path) -> Result<bool> {
         .map_err(|e| anyhow!("Failed to read ELF: {e}"))?;
     let mut patcher = ElfPatcher::new(elf, file);
 
-    let rpaths = calculate_rpaths(path, staging_dir);
+    // Without DT_NEEDED entries the file loads no libraries, so a RUNPATH
+    // has nothing to do. That covers the dynamic loader itself and static
+    // PIE executables, whose layout must not be touched.
+    let Some(table) = patcher
+        .read_dynamic_table()
+        .map_err(|e| anyhow!("Failed to read dynamic table: {e}"))?
+    else {
+        return Ok(false);
+    };
+    if !table.iter().any(|(tag, _)| *tag == DynamicTag::Needed) {
+        return Ok(false);
+    }
+
+    // Keep any RUNPATH/RPATH the package's build set, after ours: replacing
+    // it broke programs that rely on a specific library directory.
+    let existing = existing_runpath(&mut patcher, &table);
+
+    let mut rpaths = calculate_rpaths(path, staging_dir);
+    for entry in existing.split(':').filter(|e| !e.is_empty()) {
+        if !rpaths.iter().any(|r| r == entry) {
+            rpaths.push(entry.to_string());
+        }
+    }
     let rpath_string = rpaths.join(":");
     let c_rpath = CString::new(rpath_string)
         .map_err(|e| anyhow!("Invalid RPATH string: {e}"))?;
@@ -111,6 +158,27 @@ fn relocate_file(path: &Path, staging_dir: &Path) -> Result<bool> {
         .map_err(|e| anyhow!("Failed to write relocated ELF: {e}"))?;
 
     Ok(true)
+}
+
+/// Returns the file's current RUNPATH (or legacy RPATH), or an empty string.
+fn existing_runpath(
+    patcher: &mut ElfPatcher<fs::File>,
+    table: &elb::DynamicTable
+) -> String {
+    let Some(offset) = table
+        .get(DynamicTag::Runpath)
+        .or_else(|| table.get(DynamicTag::Rpath))
+    else {
+        return String::new();
+    };
+    let Ok(Some(strings)) = patcher.read_dynamic_string_table() else {
+        return String::new();
+    };
+    usize::try_from(offset)
+        .ok()
+        .and_then(|offset| strings.get_string(offset))
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_default()
 }
 
 /// Calculates the appropriate relative RPATHs for an ELF file based on its
