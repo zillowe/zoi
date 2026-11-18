@@ -129,7 +129,7 @@ fn rollback_removes_the_transactions_packages_and_keeps_older_ones() {
         transaction::record_operation(
             &mut tx,
             types::TransactionOperation::Install {
-                manifest: m.clone()
+                manifest: Box::new(m.clone())
             }
         )
         .expect("record");

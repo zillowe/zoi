@@ -324,7 +324,9 @@ fn unlink_transaction_packages(transaction: &types::Transaction) {
         .operations
         .iter()
         .filter_map(|op| match op {
-            types::TransactionOperation::Install { manifest } => Some(manifest),
+            types::TransactionOperation::Install { manifest } => {
+                Some(manifest.as_ref())
+            }
             _ => None
         })
         .collect();
@@ -343,6 +345,123 @@ fn unlink_transaction_packages(transaction: &types::Transaction) {
             let _ = local::remove_dependent(&dir, id);
         }
     }
+}
+
+/// Identity of a package for matching dependencies:
+/// `(handle, repo, name, sub-package)`.
+type PackageKey = (String, String, String, Option<String>);
+
+/// Returns the identity of an installed manifest.
+fn manifest_key(manifest: &types::InstallManifest) -> PackageKey {
+    (
+        manifest.registry_handle.clone(),
+        manifest.repo.clone(),
+        manifest.name.clone(),
+        manifest.sub_package.clone()
+    )
+}
+
+/// Parses a recorded `zoi:#handle@repo/name[:sub]@version` dependency into a
+/// package identity, ignoring the version.
+fn dependency_key(dep: &str) -> Option<PackageKey> {
+    let source = dep.strip_prefix("zoi:")?.trim().strip_prefix('#')?;
+    let (handle, rest) = source.split_once('@')?;
+    let (repo_name, _version) = rest.rsplit_once('@')?;
+    let (repo, name_sub) = repo_name.rsplit_once('/')?;
+    let (name, sub) = match name_sub.split_once(':') {
+        Some((name, sub)) => (name, Some(sub.to_string())),
+        None => (name_sub, None)
+    };
+    Some((handle.into(), repo.into(), name.into(), sub))
+}
+
+/// Whether the dependency `dep` names the package `key`. A dependency
+/// without a sub-package matches every sub-package of that package.
+fn dependency_matches(dep: &PackageKey, key: &PackageKey) -> bool {
+    dep.0 == key.0
+        && dep.1 == key.1
+        && dep.2 == key.2
+        && (dep.3.is_none() || dep.3 == key.3)
+}
+
+/// Orders a transaction's operations for rollback.
+///
+/// Operations are undone newest first. When every operation is an install
+/// (an `install` transaction, the common case), they are additionally
+/// ordered by the dependencies the manifests recorded: a package is removed
+/// before the packages it depends on, so its pre-remove hooks still find
+/// them. Packages that do not depend on each other, and any dependency
+/// cycle, keep newest-first order.
+fn rollback_order(
+    operations: &[types::TransactionOperation]
+) -> Vec<&types::TransactionOperation> {
+    let newest_first: Vec<&types::TransactionOperation> =
+        operations.iter().rev().collect();
+    let installs: Option<Vec<&types::InstallManifest>> = newest_first
+        .iter()
+        .map(|op| match op {
+            types::TransactionOperation::Install { manifest } => {
+                Some(manifest.as_ref())
+            }
+            _ => None
+        })
+        .collect();
+    let Some(installs) = installs else {
+        return newest_first;
+    };
+
+    let keys: Vec<PackageKey> =
+        installs.iter().map(|m| manifest_key(m)).collect();
+    // depends_on[i] lists the installs that install i depends on.
+    let depends_on: Vec<Vec<usize>> = installs
+        .iter()
+        .enumerate()
+        .map(|(i, manifest)| {
+            let deps: Vec<PackageKey> = manifest
+                .installed_dependencies
+                .iter()
+                .filter_map(|d| dependency_key(d))
+                .collect();
+            keys.iter()
+                .enumerate()
+                .filter(|(j, key)| {
+                    *j != i && deps.iter().any(|d| dependency_matches(d, key))
+                })
+                .map(|(j, _)| j)
+                .collect()
+        })
+        .collect();
+
+    // Remove a package only once nothing remaining depends on it.
+    let mut dependents = vec![0usize; installs.len()];
+    for deps in &depends_on {
+        for &j in deps {
+            if let Some(count) = dependents.get_mut(j) {
+                *count += 1;
+            }
+        }
+    }
+    let mut done = vec![false; installs.len()];
+    let mut order = Vec::with_capacity(installs.len());
+    let pending = |done: &[bool], i: usize| done.get(i) == Some(&false);
+    while order.len() < installs.len() {
+        // The newest package nothing remaining depends on; with a cycle,
+        // the newest remaining package.
+        let next = (0..installs.len())
+            .find(|&i| pending(&done, i) && dependents.get(i) == Some(&0))
+            .or_else(|| (0..installs.len()).find(|&i| pending(&done, i)));
+        let Some(i) = next else { break };
+        if let Some(flag) = done.get_mut(i) {
+            *flag = true;
+        }
+        order.push(i);
+        for &j in depends_on.get(i).map_or(&[][..], Vec::as_slice) {
+            if let Some(count) = dependents.get_mut(j) {
+                *count = count.saturating_sub(1);
+            }
+        }
+    }
+    order.into_iter().filter_map(|i| newest_first.get(i).copied()).collect()
 }
 
 /// Reverts all operations recorded in a transaction.
@@ -373,7 +492,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
 
     unlink_transaction_packages(&transaction);
 
-    for operation in transaction.operations.iter().rev() {
+    for operation in rollback_order(&transaction.operations) {
         match operation {
             types::TransactionOperation::Install { manifest } => {
                 println!(
@@ -742,4 +861,102 @@ pub fn get_last_transaction_id() -> Result<Option<String>> {
     }
 
     Ok(last_transaction_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An install of `name[:sub]` that depends on `deps`
+    /// (`name` or `name:sub`).
+    fn install(name: &str, deps: &[&str]) -> types::TransactionOperation {
+        let (name, sub) = match name.split_once(':') {
+            Some((name, sub)) => (name, Some(sub.to_string())),
+            None => (name, None)
+        };
+        types::TransactionOperation::Install {
+            manifest: Box::new(types::InstallManifest {
+                name: name.to_string(),
+                version: "1.0.0".to_string(),
+                epoch: 0,
+                revision: "1".to_string(),
+                sub_package: sub,
+                repo: "core".to_string(),
+                repo_type: "official".to_string(),
+                registry_handle: "zoidberg".to_string(),
+                package_type: types::PackageType::Package,
+                description: String::new(),
+                reason: types::InstallReason::Direct,
+                scope: types::Scope::System,
+                bins: None,
+                alternatives: None,
+                conflicts: None,
+                replaces: None,
+                provides: None,
+                backup: None,
+                installed_dependencies: deps
+                    .iter()
+                    .map(|d| format!("zoi:#zoidberg@core/{d}@1.0.0"))
+                    .collect(),
+                dependencies_v2: None,
+                chosen_options: vec![],
+                chosen_optionals: vec![],
+                install_method: None,
+                platform: String::new(),
+                service: None,
+                installed_files: vec![],
+                file_digests: None,
+                installed_size: None,
+                sandbox: None,
+                completions: None
+            })
+        }
+    }
+
+    /// The rollback order as `name[:sub]` labels.
+    fn order(ops: &[types::TransactionOperation]) -> Vec<String> {
+        rollback_order(ops)
+            .into_iter()
+            .filter_map(|op| match op {
+                types::TransactionOperation::Install { manifest } => {
+                    Some(manifest_label(manifest))
+                }
+                _ => None
+            })
+            .collect()
+    }
+
+    #[test]
+    fn dependents_are_removed_before_their_dependencies() {
+        // Recorded out of dependency order, as parallel installs can be.
+        let ops = [
+            install("app", &["lib"]),
+            install("lib", &["glibc"]),
+            install("glibc", &[]),
+            install("tool", &["glibc"])
+        ];
+        let order = order(&ops);
+        let pos = |name: &str| {
+            order.iter().position(|n| n == name).expect("in order")
+        };
+        assert!(pos("app") < pos("lib"), "{order:?}");
+        assert!(pos("lib") < pos("glibc"), "{order:?}");
+        assert!(pos("tool") < pos("glibc"), "{order:?}");
+    }
+
+    #[test]
+    fn sub_packages_and_cycles_are_handled() {
+        let ops = [
+            install("gcc:libgcc", &[]),
+            install("gcc:libstdc++", &["gcc:libgcc"]),
+            install("a", &["b"]),
+            install("b", &["a"])
+        ];
+        let order = order(&ops);
+        assert_eq!(order.len(), 4, "{order:?}");
+        let pos = |name: &str| {
+            order.iter().position(|n| n == name).expect("in order")
+        };
+        assert!(pos("gcc:libstdc++") < pos("gcc:libgcc"), "{order:?}");
+    }
 }
