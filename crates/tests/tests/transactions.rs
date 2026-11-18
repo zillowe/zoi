@@ -229,12 +229,16 @@ fn rollback_should_retain_log_when_an_operation_fails() {
     let tmp = tempdir().expect("unwrap failed");
     ctx.set_env_var("HOME", tmp.path());
 
+    // Undoing this uninstall means restoring a package that is neither in
+    // the store nor in any synced registry, which cannot succeed. (Undoing
+    // the install of a package that is already gone is not a failure:
+    // rollback is idempotent so an incomplete one can be run again.)
     let mut transaction = transaction::begin().expect("unwrap failed");
     let id = transaction.id.clone();
     transaction::record_operation(
         &mut transaction,
-        TransactionOperation::Install {
-            manifest: Box::new(sample_manifest("not-installed", vec![]))
+        TransactionOperation::Uninstall {
+            manifest: Box::new(sample_manifest("not-in-any-registry", vec![]))
         }
     )
     .expect("unwrap failed");
