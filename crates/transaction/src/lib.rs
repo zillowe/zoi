@@ -330,8 +330,10 @@ fn unlink_transaction_packages(transaction: &types::Transaction) {
             _ => None
         })
         .collect();
-    let ids: Vec<String> =
-        installed.iter().map(|m| local::installed_manifest_source(m)).collect();
+    let ids: Vec<String> = installed
+        .iter()
+        .map(|m| local::installed_manifest_source(m))
+        .collect();
     for manifest in &installed {
         let Ok(dir) = local::get_package_dir(
             manifest.scope,
@@ -461,7 +463,10 @@ fn rollback_order(
             }
         }
     }
-    order.into_iter().filter_map(|i| newest_first.get(i).copied()).collect()
+    order
+        .into_iter()
+        .filter_map(|i| newest_first.get(i).copied())
+        .collect()
 }
 
 /// Reverts all operations recorded in a transaction.
@@ -470,8 +475,8 @@ fn rollback_order(
 /// order:
 /// - Installs are uninstalled. Dependents never block this (see
 ///   [`uninstall::rollback_install`]), collections do not cascade into their
-///   dependencies, and a package that is already gone counts as rolled back,
-///   so an incomplete rollback can simply be run again.
+///   dependencies, and a package that is already gone counts as rolled back, so
+///   an incomplete rollback can simply be run again.
 /// - Uninstalls are re-installed (either from local store or registry).
 /// - Upgrades are reverted to the previous version.
 ///

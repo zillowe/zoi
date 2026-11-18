@@ -421,9 +421,9 @@ fn drop_collection_links(
 ///   transaction (and is being removed too) or was already broken.
 /// - A collection does not uninstall its dependencies; the transaction log
 ///   lists every package it installed, and rollback removes each one.
-/// - It is idempotent: a package that is no longer installed, or now active
-///   at another version, counts as already rolled back. Re-running an
-///   incomplete rollback therefore converges instead of failing again.
+/// - It is idempotent: a package that is no longer installed, or now active at
+///   another version, counts as already rolled back. Re-running an incomplete
+///   rollback therefore converges instead of failing again.
 ///
 /// # Errors
 ///
