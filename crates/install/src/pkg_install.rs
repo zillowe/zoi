@@ -126,11 +126,93 @@ struct InstallingPackage<'a> {
 /// An incoming file destination, in both the placeholder form recorded in
 /// manifests and the `package_files` index (e.g. `${usrroot}/usr/bin/zoi`)
 /// and the absolute path it expands to.
+#[derive(Clone)]
 struct IncomingFile {
     /// Placeholder form, as recorded in `installed_files`.
     tracked: String,
     /// Absolute filesystem path the file is written to.
     path: PathBuf
+}
+
+/// Returns where `path` really lands: its directory with every symlink
+/// resolved (as far as it exists), plus its own file name.
+///
+/// Only the directory is resolved. The entry itself may legitimately be a
+/// symlink, and resolving it would make `libfoo.so -> libfoo.so.1` look like
+/// the same path as `libfoo.so.1`.
+fn real_location(path: &Path) -> PathBuf {
+    let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+        return path.to_path_buf();
+    };
+    let mut existing = parent;
+    let mut missing = Vec::new();
+    loop {
+        if let Ok(resolved) = fs::canonicalize(existing) {
+            let mut out = resolved;
+            for part in missing.iter().rev() {
+                out.push(part);
+            }
+            out.push(name);
+            return out;
+        }
+        match (existing.parent(), existing.file_name()) {
+            (Some(up), Some(part)) => {
+                missing.push(part.to_os_string());
+                existing = up;
+            }
+            _ => return path.to_path_buf()
+        }
+    }
+}
+
+/// The placeholder form of `file`'s real location, when a symlinked
+/// directory makes it differ from `file.tracked` (for example
+/// `${usrroot}/usr/sbin/vipw` really being `${usrroot}/usr/bin/vipw`).
+fn real_tracked(file: &IncomingFile) -> Option<String> {
+    let (root, rel) = file.tracked.split_once("}/")?;
+    let base = file.path.to_string_lossy();
+    let base = base.strip_suffix(rel)?.trim_end_matches('/');
+    let real_base = fs::canonicalize(base).ok()?;
+    let real_rel = real_location(&file.path)
+        .strip_prefix(&real_base)
+        .ok()?
+        .to_string_lossy()
+        .replace('\\', "/");
+    (real_rel != rel).then(|| format!("{root}}}/{real_rel}"))
+}
+
+/// Refuses an install whose entries land on the same path.
+///
+/// A package that ships both `usr/lib/foo` and `lib64/foo`, on a system where
+/// `/lib64` is a symlink to `usr/lib`, would otherwise write one over the
+/// other. That is how glibc's `lib64/ld-linux-x86-64.so.2` symlink replaced
+/// the dynamic loader it pointed at, and every program stopped working.
+///
+/// # Errors
+///
+/// Returns an error naming both entries when two of them collide.
+fn check_alias_collisions(
+    entries: &[IncomingFile],
+    package: &str
+) -> Result<()> {
+    let mut seen: std::collections::HashMap<PathBuf, &str> =
+        std::collections::HashMap::new();
+    for entry in entries {
+        let real = real_location(&entry.path);
+        if let Some(first) = seen.insert(real.clone(), &entry.tracked)
+            && first != entry.tracked
+        {
+            return Err(anyhow!(
+                "Package '{package}' installs both '{first}' and '{}', which \
+                 are the same path here ({}): a directory along the way is a \
+                 symlink. Installing it would overwrite one with the other, \
+                 so the package needs fixing.",
+                entry.tracked,
+                real.display()
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Lists the files under `source_dir` as they would land under `dest_dir`,
@@ -248,9 +330,13 @@ fn check_and_handle_file_conflicts(
         }
 
         let absolute = file.path.to_string_lossy().to_string();
+        // The same file may be recorded under another path when a directory
+        // on the way is a symlink (usr/sbin -> bin, lib64 -> usr/lib).
+        let alias = real_tracked(file);
         let is_self_owned = owned_files.contains(&file.tracked)
             || owned_files.contains(&absolute)
-            || owned_expanded.contains(&absolute);
+            || owned_expanded.contains(&absolute)
+            || alias.as_ref().is_some_and(|a| owned_files.contains(a));
         if is_self_owned {
             continue;
         }
@@ -265,6 +351,12 @@ fn check_and_handle_file_conflicts(
                         .unwrap_or_default();
                 if owners.is_empty() {
                     owners = db::get_other_owners(c, &absolute, current_pkg_id)
+                        .unwrap_or_default();
+                }
+                if owners.is_empty()
+                    && let Some(alias) = &alias
+                {
+                    owners = db::get_other_owners(c, alias, current_pkg_id)
                         .unwrap_or_default();
                 }
                 owners
@@ -1059,6 +1151,8 @@ fn extract_pooled_zpa(
 
     let mut owned_files = HashSet::new();
     let mut incoming = Vec::new();
+    // Symlinks are only used for the collision check below.
+    let mut links = Vec::new();
     let mut writes_usrroot = false;
 
     // ${createpkgdir} resolves to the invocation directory, so its absolute
@@ -1113,6 +1207,19 @@ fn extract_pooled_zpa(
                     )?
                 });
             }
+            for link in &scope_mapping.symlinks {
+                if link.link.starts_with("${pkgstore}") {
+                    continue;
+                }
+                links.push(IncomingFile {
+                    tracked: track_dest(&link.link)?,
+                    path: expand_pooled_path(
+                        &link.link,
+                        staging_dir.path(),
+                        scope
+                    )?
+                });
+            }
         }
     }
 
@@ -1121,6 +1228,9 @@ fn extract_pooled_zpa(
     if writes_usrroot {
         ensure_can_write_usrroot()?;
     }
+    let mut all_entries = incoming.clone();
+    all_entries.append(&mut links);
+    check_alias_collisions(&all_entries, &metadata.name)?;
     check_and_handle_file_conflicts(
         &incoming,
         &owned_files,
@@ -1523,6 +1633,72 @@ fn expand_pooled_path(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A root laid out like Parlex: `lib64 -> usr/lib`, `usr/sbin -> bin`.
+    #[cfg(unix)]
+    fn merged_usr_root() -> tempfile::TempDir {
+        let root = tempfile::tempdir().expect("tempdir");
+        fs::create_dir_all(root.path().join("usr/lib")).expect("mkdir");
+        fs::create_dir_all(root.path().join("usr/bin")).expect("mkdir");
+        std::os::unix::fs::symlink("usr/lib", root.path().join("lib64"))
+            .expect("symlink");
+        std::os::unix::fs::symlink("bin", root.path().join("usr/sbin"))
+            .expect("symlink");
+        root
+    }
+
+    /// An entry tracked as `${usrroot}/<rel>` under `root`.
+    #[cfg(unix)]
+    fn entry(root: &Path, rel: &str) -> IncomingFile {
+        IncomingFile {
+            tracked: format!("${{usrroot}}/{rel}"),
+            path: root.join(rel)
+        }
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn entries_landing_on_the_same_path_are_refused() {
+        let root = merged_usr_root();
+        let entries = [
+            entry(root.path(), "usr/lib/ld-linux-x86-64.so.2"),
+            entry(root.path(), "lib64/ld-linux-x86-64.so.2")
+        ];
+        let err = check_alias_collisions(&entries, "glibc")
+            .expect_err("lib64 and usr/lib are the same directory");
+        assert!(err.to_string().contains("glibc"), "{err}");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn distinct_entries_and_library_links_are_accepted() {
+        let root = merged_usr_root();
+        // An existing link must not be followed: libfoo.so and libfoo.so.1
+        // are two entries even though one points at the other.
+        fs::write(root.path().join("usr/lib/libfoo.so.1"), "").expect("w");
+        std::os::unix::fs::symlink(
+            "libfoo.so.1",
+            root.path().join("usr/lib/libfoo.so")
+        )
+        .expect("symlink");
+        let entries = [
+            entry(root.path(), "usr/lib/libfoo.so.1"),
+            entry(root.path(), "usr/lib/libfoo.so"),
+            entry(root.path(), "usr/bin/tool")
+        ];
+        check_alias_collisions(&entries, "foo").expect("no collision");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn files_behind_a_symlinked_directory_have_a_real_tracked_path() {
+        let root = merged_usr_root();
+        assert_eq!(
+            real_tracked(&entry(root.path(), "usr/sbin/vipw")).as_deref(),
+            Some("${usrroot}/usr/bin/vipw")
+        );
+        assert_eq!(real_tracked(&entry(root.path(), "usr/bin/vipw")), None);
+    }
 
     #[test]
     fn pooled_paths_should_not_escape_their_roots() {
