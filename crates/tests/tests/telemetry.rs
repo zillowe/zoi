@@ -394,8 +394,10 @@ fn test_posthog_events_are_queued_without_network() {
     assert_eq!(names, ["dau", "test"]);
 }
 
-/// Minimal stub `PostHog` server: accepts `expected` connections, answers each
-/// with `200 {}`, and counts them. Panics (failing the test on join) if the
+/// Minimal stub `PostHog` server: accepts `expected` connections and counts
+/// them. Each is answered the way the v1 capture endpoint does, marking every
+/// event in the batch `ok` by its `uuid` (the client only counts an event as
+/// delivered when it is listed). Panics (failing the test on join) if the
 /// requests never arrive.
 fn start_stub_posthog(
     expected: usize
@@ -442,15 +444,35 @@ fn start_stub_posthog(
                             content_length = value.trim().parse().unwrap_or(0);
                         }
                     }
-                    if content_length > 0 {
-                        let mut body = vec![0u8; content_length];
-                        reader.read_exact(&mut body).ok();
-                    }
+                    let mut body = vec![0u8; content_length];
+                    reader.read_exact(&mut body).ok();
+                    let results: serde_json::Map<String, serde_json::Value> =
+                        serde_json::from_slice::<serde_json::Value>(&body)
+                            .ok()
+                            .and_then(|request| {
+                                request.get("batch")?.as_array().cloned()
+                            })
+                            .unwrap_or_default()
+                            .iter()
+                            .filter_map(|event| {
+                                let uuid = event.get("uuid")?.as_str()?;
+                                Some((
+                                    uuid.to_string(),
+                                    serde_json::json!({ "result": "ok" })
+                                ))
+                            })
+                            .collect();
+                    let reply =
+                        serde_json::json!({ "results": results }).to_string();
                     let mut stream = reader.into_inner();
-                    let response = b"HTTP/1.1 200 OK\r\ncontent-type: \
-                                     application/json\r\ncontent-length: \
-                                     2\r\nconnection: close\r\n\r\n{}";
-                    let ok = stream.write_all(response).is_ok()
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\n\
+                         content-type: application/json\r\n\
+                         content-length: {}\r\n\
+                         connection: close\r\n\r\n{reply}",
+                        reply.len()
+                    );
+                    let ok = stream.write_all(response.as_bytes()).is_ok()
                         && stream.flush().is_ok();
                     if ok {
                         hits_child.fetch_add(1, Ordering::SeqCst);
