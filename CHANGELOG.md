@@ -4,6 +4,60 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](./INSTALL.md).
 
+## [Prod. Release 1.29.14](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.14) - 2026-11-18
+
+### ✨ Features
+
+- [`931fc84b`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/931fc84b0306ca77fa3e00afbb7a7a411a1a2048) *(cli)* Credit the author and contributors in zoi about
+- [`5473802f`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/5473802f2ea93d7fcd6beebacc298b01e21a9472) *(install)* Show sub-packages and hook progress during installation
+- [`3ec1a814`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/3ec1a8142121c6c01682a92e680849c908cadcfb) *(cli)* Show and clear the system archive cache in zoi cache as root
+- [`0819e573`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/0819e57325d0658023580e9aeb53e42f075a0dfd) *(install)* Keep downloaded archives on the host when installing into a sysroot
+
+### 🎨 Styling
+
+- [`532b676a`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/532b676a457df1e11cd8d5965ae308a97033e39d) Fix formating
+
+### 💼 Other
+
+- [`6b70d9bb`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/6b70d9bba296140630b09513d44e845f168d328f) *(cli)* Fix clippy warning in cache list
+
+### 🛠️ Build
+
+- [`ffda4f00`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/ffda4f00cd6ed4a38290aa9e4c9c8c9bffeb533a) Fix WITH_BIN builds of zoi-mini and zoid, and accept 'both' and space-separated options in configure
+- [`d935298a`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/d935298a5dbf252ab876e257836d6c0e3dfa018e) Use kache, mold and system libraries to speed up builds
+
+### 🛡️ Dependencies
+
+- [`b3e6af1f`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/b3e6af1f8ebdfee8d359a4677556df1eec354acc) Update posthog-rs to v1
+- [`53fcc6c1`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/53fcc6c13e2b1e15a15994b37c15d7ff98127dbc) Remove unused dependencies reported by cargo
+- [`ca8e94f6`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/ca8e94f6f68665f151114970d25d8bc638590600) Update cargo
+- [`23508269`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/235082695451e3f0841a80597aece8ad5a1ebf37) Update nix flake
+
+### 🩹 Bug Fixes
+
+- [`6dc126d5`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/6dc126d55d745931663798e31a37297778a0cf37) *(tests)* Answer the stub PostHog server with v1 per-event capture results
+- [`cce56a43`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/cce56a43897d66bb70214cdb508b7490b4b1a945) *(tests)* Fail the retained-log rollback test with an uninstall that cannot be restored
+- [`39fb804b`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/39fb804bacad138ad55a3baede12f572b7eb4136) *(uninstall)* Remove a collection like any package so its other sub-packages and versions survive
+- [`2a5e4487`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/2a5e44871abe7911436eac7ba4262a623deeb4ca) *(install)* Refuse entries that collide through symlinked directories and find owners under the real path
+- [`588ceea1`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/588ceea19e48d6d5da923942977ad3817b717c5e) *(package)* Keep the original ELF when relocation produces a misaligned segment
+- [`a8596d48`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/a8596d48eaec1c6db3b0f0e2dbb44d2e545ab671) *(transaction)* Undo installs in reverse dependency order
+- [`c7d062ba`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/c7d062ba384044c4170cd271e2c190473d0bf105) *(transaction)* Roll back installs without dependent checks or collection cascades
+- [`9a93a1bc`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/9a93a1bcbf86b0f5aba3be5f9c608ce63331f64e) *(package)* Only relocate package-store ELFs that load libraries, keeping existing RUNPATHs
+- [`922b8f72`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/922b8f72c08bbece3d3fd22cc1128288d1357f69) *(cli)* Name the sub-package when an install fails
+- [`6776b36c`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/6776b36cd6e541c3cc2306a7a959b901028a2cae) *(sandbox)* Skip the user namespace when running as root
+- [`cb637160`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/cb6371602278ca606655e868ac0af72336f03664) *(package)* Read string zchmod modes as octal and allow a /var/run symlink in sandboxed roots
+- [`85d47413`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/85d47413ad2d8bd8ead86c96218957548838f0b2) *(install)* Replace stale cached archives and report what was verified
+- [`9a8dc1e0`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/9a8dc1e027ec5cb06230a1783d3f8a066b5cbea0) *(ci)* Keep libgit2 vendored in CI and ignore the chrono advisory
+- [`76d9f2ad`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/76d9f2ad1dd37cc5e8e73a34b1e68fade5b830fc) *(cli)* Exit 0 when zoi is run without arguments
+- [`03c8b637`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/03c8b637dbf5d6b062a277adb1c218efb660a829) *(install)* Pause progress bars while reporting file conflicts
+- [`38636c40`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/38636c400145a89711fa96e8e4a70e389fc11cbc) *(hooks)* Run package hooks inside the sysroot instead of on the host
+- [`06525ea5`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/06525ea51241f604fd9f4add2e8c65c5e9034225) *(install)* Keep '+' in cached archive names and make the fallback unique
+- [`4f1d04c6`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/4f1d04c6c9f03d9f68ab05c6bfb1d591e1f8f036) *(system)* Install builtin PGP keys into distro build targets
+- [`be389831`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/be38983144cf1c5bffef2acf7d6c40ee20e589ba) *(install)* Size sub-packages by their own archive in the install plan
+- [`719b324e`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/719b324e88cbe4ffac03d4af43aa88a0d2d4fe96) *(system)* Write a valid os-release marker that doesn't collide with packages
+- [`579a0a66`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/579a0a661cc091a13f35e42682761e4f4c79063f) *(system)* Bootstrap distro build targets from the host's synced registries
+- [`a95bde23`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/a95bde238685efe6864309c69175e85606f908db) *(install)* Resolve snapshot versions and main_subs dependencies
+
 ## [Prod. Release 1.29.13](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.13) - 2026-11-13
 
 ### 🔀 Merge Requests
@@ -23,6 +77,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 ### 💼 Other
 
+- [`6277a515`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/6277a515a26f2ed7d0ff7802e03c0d8484aa6049) *(changelog)* List merge requests first in each release
 - [`1f8488a3`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/1f8488a3ef47362dd7b8684f619308e0ef5dfea8) *(changelog)* Show merge requests and issue links in git-cliff output
 - [`b5fe0061`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/b5fe00611e3f09a00ea498294d6bbfc15976b1c1) *(package)* Fix clippy warnings in strip and build
 - [`de6fd799`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/de6fd7997ef6897968b070d081b00b58fa9dbb1b) *(tests)* Rename regression test files by topic
