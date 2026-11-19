@@ -153,10 +153,32 @@ end
 
 ### 5.4. Chain of Trust (GPG)
 
-For packages in the `core` tier, maintainers **MUST** verify OpenPGP signatures of upstream sources whenever upstream publishes them.
+For packages in the `core` tier, maintainers **MUST** verify OpenPGP signatures of upstream sources whenever upstream publishes them. Signature verification complements the hash: the hash pins the exact file, and the signature shows that upstream released it.
 
-- **Method:** Use `addPgpKey()` to import the upstream key and `verifySignature()` to validate the downloaded archive before extraction.
-- **Key Source:** The key **MUST** come from upstream's own published location (project website, release announcement, or keyring), not from the same server as the archive when an alternative exists.
+- **Committed Keys:** The upstream signing key **MUST** be committed to the package directory as `keys/pgp/<FINGERPRINT>.asc` (the full fingerprint, uppercase, no spaces). It is reviewed once when added, never downloaded at build time, and travels with the source bundle.
+- **Key Source:** The committed key **MUST** be obtained from upstream's own published location (project website, release announcement, or keyring) and its fingerprint checked against one published by upstream.
+- **Method:** Download the detached signature next to the archive and pass the committed key file to `verifySignature()`. It verifies against that key alone and does not modify any keyring. `verifySignature()` returns `false` on a bad signature, so the recipe **MUST** raise an error in that case.
+- **No Keyring Changes:** Recipes **MUST NOT** call `addPgpKey()` to verify sources. It imports the key into the Zoi keyring of whoever builds the package, which is a side effect a build must not have.
+
+```lua
+function prepare()
+	local tarball = "patch-" .. version .. ".tar.xz"
+	sh([[
+		curl -sSfL --retry 3 \
+			"https://ftpmirror.gnu.org/gnu/patch/patch-$VER.tar.xz" \
+			-o "patch-$VER.tar.xz"
+		curl -sSfL --retry 3 \
+			"https://ftpmirror.gnu.org/gnu/patch/patch-$VER.tar.xz.sig" \
+			-o "patch-$VER.tar.xz.sig"
+		echo "<sha512 hex>  patch-$VER.tar.xz" | sha512sum -c -
+	]])
+	local key = LOCATION.PKGLUADIR .. "/keys/pgp/<FINGERPRINT>.asc"
+	if not verifySignature(tarball, tarball .. ".sig", key) then
+		error("bad upstream signature on " .. tarball)
+	end
+	sh([[tar -xf "patch-$VER.tar.xz"]])
+end
+```
 
 ### 5.5. Patches
 
