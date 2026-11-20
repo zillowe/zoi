@@ -9,6 +9,30 @@ use zoi_core::types::{
     MappedDir, MappedFile, MappedSymlink, PoolFileEntry, ScopeMapping
 };
 
+/// The mode recorded for a packaged file: its permission bits, including
+/// setuid and setgid, without group or other write permission.
+///
+/// A package never ships a file others may modify. Files copied from a
+/// checkout made with `umask 0000` (as CI runners do) would otherwise be
+/// installed world-writable, `/etc/pam.d` included.
+#[must_use]
+pub fn packaged_file_mode(mode: u32) -> u32 {
+    mode & 0o7777 & !0o022
+}
+
+/// The mode recorded for a packaged directory: its permission bits,
+/// including setgid and sticky, without other write permission unless the
+/// directory is sticky (like `/tmp`, `1777`).
+#[must_use]
+pub fn packaged_dir_mode(mode: u32) -> u32 {
+    let mode = mode & 0o7777;
+    if mode & 0o1000 == 0 {
+        mode & !0o002
+    } else {
+        mode
+    }
+}
+
 /// Deduplicates and pools files from a staging directory into a central pool.
 ///
 /// This function walks the `virtual_staging_dir`, calculates hashes for all
@@ -104,7 +128,7 @@ pub fn pool_files(
             #[cfg(unix)]
             let mode = {
                 use std::os::unix::fs::PermissionsExt;
-                Some(metadata.permissions().mode() & 0o777)
+                Some(packaged_dir_mode(metadata.permissions().mode()))
             };
             #[cfg(not(unix))]
             let mode = None;
@@ -162,7 +186,7 @@ pub fn pool_files(
             #[cfg(unix)]
             let mode = {
                 use std::os::unix::fs::PermissionsExt;
-                metadata.permissions().mode() & 0o777
+                packaged_file_mode(metadata.permissions().mode())
             };
             #[cfg(not(unix))]
             let mode = 0o644;

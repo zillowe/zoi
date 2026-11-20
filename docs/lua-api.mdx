@@ -190,6 +190,11 @@ Sets the permissions of a file or directory in the package.
 - **path**: Path to the file or directory (e.g. `${pkgstore}/bin/my-app`).
 - **mode**: The permission mode, as an octal string (`"0755"`, `"1777"`) or an integer (`493` for `0755`). A string is always read as octal. A bare Lua number is read as written, so `755` (unquoted) is decimal 755, not `0755`.
 
+How modes are packaged and installed:
+
+- **Never shared-writable files:** Files are packaged without group or other write permission, whatever their mode in the build directory. A directory loses other write permission unless it is sticky (`"1777"`, like `/tmp`).
+- **Special bits:** setuid, setgid, and sticky bits (`"4755"`, `"2755"`, `"1777"`) are kept for system-scope installs, which need them for programs such as `passwd` and `su`. User-scope installs drop them.
+
 ### `zchown(path, owner, group)`
 
 Sets the ownership of a file or directory in the package.

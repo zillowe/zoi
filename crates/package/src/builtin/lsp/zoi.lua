@@ -301,6 +301,8 @@ function zpatch(patch_file, strip) end
 function zln(target, link) end
 
 --- Sets permissions of a staged file or directory.
+--- Files are never packaged group- or world-writable; setuid/setgid/sticky
+--- bits are kept for system-scope installs only.
 ---@param path string
 ---@param mode string|integer Octal string ("0755") or integer (493 for 0755). An unquoted 755 is decimal, not 0755.
 function zchmod(path, mode) end

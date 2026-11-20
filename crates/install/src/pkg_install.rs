@@ -134,6 +134,20 @@ struct IncomingFile {
     path: PathBuf
 }
 
+/// The mode an archive's recorded `mode` is installed with.
+///
+/// System-scope installs keep setuid, setgid and sticky bits: a distribution
+/// needs setuid `passwd`, `su` and `mount` and a sticky `/tmp`, and a
+/// system-scope package already installs root-owned files and runs hooks as
+/// root, so the bits grant nothing new. User-scope installs drop them.
+fn installed_mode(mode: u32, scope: types::Scope) -> u32 {
+    if scope == types::Scope::System {
+        mode & 0o7777
+    } else {
+        mode & 0o777
+    }
+}
+
 /// Returns where `path` really lands: its directory with every symlink
 /// resolved (as far as it exists), plus its own file name.
 ///
@@ -1284,19 +1298,20 @@ fn extract_pooled_zpa(
             #[cfg(unix)]
             {
                 if !existed {
-                    if let Some(mode) = mapped_dir.mode {
-                        use std::os::unix::fs::PermissionsExt;
-                        // setuid/setgid/sticky bits are never taken from an
-                        // archive.
-                        fs::set_permissions(
-                            &dest_path,
-                            fs::Permissions::from_mode(mode & 0o777)
-                        )?;
-                    }
+                    // Ownership first: changing it clears setuid/setgid.
                     if let (Some(owner), Some(group)) =
                         (&mapped_dir.owner, &mapped_dir.group)
                     {
                         let _ = utils::set_path_owner(&dest_path, owner, group);
+                    }
+                    if let Some(mode) = mapped_dir.mode {
+                        use std::os::unix::fs::PermissionsExt;
+                        fs::set_permissions(
+                            &dest_path,
+                            fs::Permissions::from_mode(installed_mode(
+                                mode, scope
+                            ))
+                        )?;
                     }
                 }
             }
@@ -1360,18 +1375,19 @@ fn extract_pooled_zpa(
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                // Builds record `mode & 0o777`; masking again here keeps a
-                // crafted manifest from installing setuid/setgid/sticky
-                // files, which Zoi packages have no way to request.
-                fs::set_permissions(
-                    &dest_path,
-                    fs::Permissions::from_mode(mapped_file.mode & 0o777)
-                )?;
+                // Ownership first: changing it clears setuid/setgid.
                 if let (Some(owner), Some(group)) =
                     (&mapped_file.owner, &mapped_file.group)
                 {
                     let _ = utils::set_path_owner(&dest_path, owner, group);
                 }
+                fs::set_permissions(
+                    &dest_path,
+                    fs::Permissions::from_mode(installed_mode(
+                        mapped_file.mode,
+                        scope
+                    ))
+                )?;
             }
 
             let tracked = track_dest(&mapped_file.dest)?;

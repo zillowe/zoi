@@ -246,7 +246,10 @@ immediately.
 
 *zchmod*(_path_, _mode_)::
   Set file permissions. _mode_ is an octal string such as `"0755"` or an
-  integer such as `493`; an unquoted `755` is decimal, not `0755`.
+  integer such as `493`; an unquoted `755` is decimal, not `0755`. Files
+  are never packaged group- or world-writable, and directories never
+  world-writable unless sticky. setuid, setgid and sticky bits are kept
+  for system-scope installs and dropped for user-scope ones.
 
 *zchown*(_path_, _owner_, _group_)::
   Set file ownership.

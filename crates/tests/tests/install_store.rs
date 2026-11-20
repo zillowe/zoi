@@ -441,3 +441,142 @@ fn every_parent_is_recorded_as_a_dependent() {
         ]
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn pool_keeps_special_bits_and_drops_shared_write_access() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let tmp = tempdir().expect("tempdir");
+    let staging = tmp.path().join("staging");
+    let pool_dir = tmp.path().join("pool");
+    fs::create_dir_all(&pool_dir).expect("pool dir");
+    let etc = staging.join("usrroot/etc");
+    let bin = staging.join("usrroot/usr/bin");
+    fs::create_dir_all(&etc).expect("etc");
+    fs::create_dir_all(&bin).expect("bin");
+    let chmod = |path: &Path, mode: u32| {
+        fs::set_permissions(path, fs::Permissions::from_mode(mode))
+            .expect("chmod");
+    };
+
+    // As copied from a checkout made with `umask 0000`.
+    fs::write(etc.join("system-auth"), "auth").expect("write");
+    chmod(&etc.join("system-auth"), 0o666);
+    fs::write(bin.join("passwd"), "passwd").expect("write");
+    chmod(&bin.join("passwd"), 0o4755);
+    for (dir, mode) in [("usrroot/tmp", 0o1777), ("usrroot/open", 0o777)] {
+        fs::create_dir_all(staging.join(dir)).expect("dir");
+        chmod(&staging.join(dir), mode);
+    }
+
+    let mut pool = BTreeMap::new();
+    let mut mapping = ScopeMapping::default();
+    zoi_package::pool::pool_files(
+        &staging,
+        &pool_dir,
+        &mut pool,
+        &mut mapping,
+        false
+    )
+    .expect("pool files");
+
+    let file_mode = |dest: &str| {
+        mapping
+            .files
+            .iter()
+            .find(|f| f.dest == dest)
+            .map(|f| f.mode)
+            .expect("file recorded")
+    };
+    let dir_mode = |path: &str| {
+        mapping
+            .dirs
+            .iter()
+            .find(|d| d.path == path)
+            .and_then(|d| d.mode)
+            .expect("dir recorded")
+    };
+    assert_eq!(file_mode("${usrroot}/etc/system-auth"), 0o644);
+    assert_eq!(file_mode("${usrroot}/usr/bin/passwd"), 0o4755);
+    assert_eq!(dir_mode("${usrroot}/tmp"), 0o1777);
+    assert_eq!(dir_mode("${usrroot}/open"), 0o775);
+}
+
+#[cfg(unix)]
+#[test]
+fn system_installs_keep_setuid_and_sticky_bits() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("tempdir");
+    let root = tmp.path().to_path_buf();
+    ctx.set_env_var("HOME", root.join("home"));
+    common::TestContextGuard::set_sysroot(root.clone());
+
+    let content = b"#!/bin/sh\necho passwd\n";
+    let hash = format!(
+        "sha256-{}",
+        archive_trust::sha256_hex(content).expect("hash")
+    );
+    let mut pool = BTreeMap::new();
+    pool.insert(
+        hash.clone(),
+        PoolFileEntry {
+            size: content.len() as u64
+        }
+    );
+    let scope_mapping = ScopeMapping {
+        files: vec![MappedFile {
+            dest: "${usrroot}/usr/bin/suid-test".to_string(),
+            hash: hash.clone(),
+            mode: 0o4755,
+            owner: None,
+            group: None
+        }],
+        symlinks: Vec::new(),
+        dirs: vec![MappedDir {
+            path: "${usrroot}/suid-tmp".to_string(),
+            mode: Some(0o1777),
+            owner: None,
+            group: None
+        }]
+    };
+    let mut scopes = BTreeMap::new();
+    scopes.insert(Scope::System, scope_mapping);
+    let mut mappings = BTreeMap::new();
+    mappings.insert(String::new(), SubPackageMapping { scopes });
+    let manifest = PooledZpaManifest {
+        version: "2".to_string(),
+        pool,
+        mappings
+    };
+    let manifest_json = serde_json::to_vec(&manifest).expect("manifest json");
+    let definition = pkg_lua("suid-test", "1.0.0").replace(
+        "types = {",
+        "scope = \"system\",\n    scopes = { \"system\" },\n    types = {"
+    );
+    let pool_entry = format!("pool/{hash}");
+    let archive = root.join("suid-test.zpa");
+    write_archive(
+        &archive,
+        &[
+            ("suid-test.pkg.lua", definition.as_bytes()),
+            ("manifest.json", manifest_json.as_slice()),
+            (pool_entry.as_str(), content.as_slice())
+        ]
+    );
+
+    zoi_install::pkg_install::run(
+        &archive,
+        Some(Scope::System),
+        "local",
+        Some("1.0.0"),
+        true,
+        None,
+        false,
+        None
+    )
+    .expect("system install should succeed");
+
+    assert_eq!(mode_of(&root.join("usr/bin/suid-test")), 0o4755);
+    assert_eq!(mode_of(&root.join("suid-tmp")), 0o1777);
+}
