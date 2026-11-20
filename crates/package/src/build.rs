@@ -892,26 +892,6 @@ fn build_for_platform(
             )?;
 
             sub_mapping.scopes.insert(*scope, scope_mapping);
-
-            if *scope == pkg_for_meta.scope {
-                // Run verify and test only for default scope to ensure sanity
-                if let Ok(verify_fn) =
-                    lua.globals().get::<mlua::Function>("verify")
-                {
-                    let verification_passed: bool = match verify_fn
-                        .call::<mlua::Value>(args.clone())
-                    {
-                        Ok(mlua::Value::Boolean(b)) => b,
-                        Ok(_) => true, // Legacy behavior
-                        Err(e) => {
-                            return Err(anyhow!("Verification failed: {e}"));
-                        }
-                    };
-                    if !verification_passed {
-                        return Err(anyhow!("Package verification failed."));
-                    }
-                }
-            }
         }
         mappings.insert(sub_package.clone(), sub_mapping);
     }

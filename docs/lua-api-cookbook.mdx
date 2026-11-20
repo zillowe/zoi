@@ -117,20 +117,22 @@ end
 When a project provides a central `checksums.txt` file, you can use `UTILS.PARSE.checksumFile` to extract the relevant hash for your specific platform archive.
 
 ```lua
-function verify()
+function prepare()
     if BUILD_TYPE == "pre-compiled" then
-        local checksum_url = "https://example.com/releases/download/v" .. PKG.version .. "/checksums.txt"
-        local content = UTILS.FETCH.url(checksum_url)
+        local base = "https://example.com/releases/download/v" .. PKG.version
+        local content = UTILS.FETCH.url(base .. "/checksums.txt")
 
         -- Zoi platform archives follow a pattern
         local filename = string.format("my-app-%s-%s.tar.gz", SYSTEM.OS, SYSTEM.ARCH)
         local hash = UTILS.PARSE.checksumFile(content, filename)
+        if not hash then
+            error("no checksum published for " .. filename)
+        end
 
-        if not hash then return false end
-
-        return verifyHash(BUILD_DIR .. "/" .. filename, "sha256-" .. hash)
+        -- Verified before it is extracted; a mismatch stops the build.
+        local file = UTILS.DOWNLOAD(base .. "/" .. filename, filename, "sha256-" .. hash)
+        UTILS.EXTRACT(file, "precompiled")
     end
-    return true
 end
 ```
 

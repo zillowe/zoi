@@ -273,11 +273,6 @@ function package()
   -- Example: zcp("src/{name}", "${{pkgstore}}/bin/{name}")
 end
 
--- function verify()
---   -- Security verification
---   -- return verifyHash("release.tar.gz", "sha256-...")
--- end
-
 -- function test()
 --   -- Integration tests (run via zoi package test)
 --   -- local _, _, code = cmd(STAGING_DIR .. "/data/pkgstore/bin/{name} --version")

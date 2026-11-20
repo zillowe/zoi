@@ -208,10 +208,6 @@ Zoi calls these in order when building a package. Each takes an optional
   Stage files into *STAGING_DIR* using the staging functions below. Runs
   once per sub-package and scope combination.
 
-*verify*([_args_])::
-  Verify the integrity of the fetched files; return `true` or `false`.
-  Runs after pooling, before the archive is written.
-
 *test*([_args_])::
   Validate the staged files during *zoi package test*. Must return a
   boolean explicitly.
@@ -273,10 +269,15 @@ immediately.
 
 *cmd*(_command_, [_opts_])::
   Execute a shell command in a persistent session shared across calls in
-  the same phase. An optional boolean or `{quiet = true}` table may be
-  passed to control live output streaming. Returns *stdout*, *stderr*,
-  and *exit_code*; a nonzero exit does not abort the script, so check
-  *exit_code*.
+  the same phase. _opts_ is a boolean (quiet) or a table with *quiet*
+  (no live output), *check* (run with `set -e` and raise a Lua error on
+  failure) and *env* (environment variables for this call only). With
+  *check* or *env* the command runs in a subshell, so its `cd` and
+  variables do not carry over. `$ROOT` is set to *LOCATION.ROOT* (not
+  exported). A command that exits the shell is not run again; the next
+  call starts a fresh session. Returns *stdout*, *stderr*, and
+  *exit_code*; without *check*, a nonzero exit does not abort the
+  script, so check *exit_code*.
 
 *set_quiet*(_boolean_)::
   Dynamically enable or disable command output streaming for the current

@@ -102,7 +102,7 @@ Most packaging systems split the process into metadata definition, dependency de
 | **Metadata**             | `pkgname`, `version`, `desc`, `license`, `url` | The `metadata{...}` block.                                                                     |
 | **Dependencies**         | `depends`, `makedepends`, `BuildRequires`      | The `dependencies{...}` block, with `runtime` and `build` sections.                            |
 | **Source Fetching**      | `source` array, `Source0` URL                  | The `prepare()` function, often using `UTILS.EXTRACT` or `cmd("git clone ...")`.               |
-| **Source Verification**  | `sha256sums`, `validpgpkeys`                   | The `verify()` function, using `verifyHash()` and `verifySignature()`.                         |
+| **Source Verification**  | `sha256sums`, `validpgpkeys`                   | In `prepare()`, using `UTILS.DOWNLOAD` with a hash, `verifyHash()` and `verifySignature()`.    |
 | **Build/Compile**        | `build()` function, `%build` section           | The `package()` function (or sometimes `prepare()`), using `cmd("...")` to run build commands. |
 | **Staging/Installation** | `package()` function, `%install` section       | The `package()` function, using `zcp()` to copy files to the staging area.                     |
 | **Testing**              | `check()` function, `%check` section           | The `test()` function, run via `zoi package test`.                                             |
@@ -213,12 +213,9 @@ dependencies({
 
 function prepare()
   local url = "https://example.com/dist/my-cli-" .. PKG.version .. ".tar.gz"
-  UTILS.EXTRACT(url, "source")
-end
-
-function verify()
-  -- verifyHash("source.tar.gz", "sha256-...")
-  return true
+  -- Verified against its hash before it is extracted
+  local file = UTILS.DOWNLOAD(url, nil, "sha512-...")
+  UTILS.EXTRACT(file, "source")
 end
 
 function package()

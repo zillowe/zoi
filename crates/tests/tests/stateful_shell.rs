@@ -157,9 +157,7 @@ fn test_shell_recovers_if_killed() {
         .exec()
         .expect("unwrap failed");
 
-    // Call 2: Kill the shell
-    // We expect this to return an error because the sentinel will never be
-    // printed as the shell dies
+    // Call 2: Kill the shell. Its exit status is the command's result.
     let _ = lua.load(r#"cmd("exit 0")"#).exec();
 
     // Call 3: Should auto-respawn and work again
@@ -268,4 +266,130 @@ fn test_package_metadata_quiet_stage_resolution() {
     assert!(pkg_map.is_stage_quiet("build", false));
     assert!(!pkg_map.is_stage_quiet("prepare", false));
     assert!(!pkg_map.is_stage_quiet("package", false));
+}
+
+/// A Lua environment whose `cmd` runs in `<tmp>/build`, with a staging
+/// directory at `<tmp>/staging`.
+#[cfg(unix)]
+fn shell_env(tmp: &std::path::Path) -> Lua {
+    let build_dir = tmp.join("build");
+    let staging_dir = tmp.join("staging");
+    fs::create_dir(&build_dir).expect("build dir");
+    fs::create_dir(&staging_dir).expect("staging dir");
+    let lua = Lua::new();
+    functions::setup_lua_environment(
+        &lua,
+        "linux-amd64",
+        None,
+        None,
+        None,
+        Some(build_dir.to_str().expect("utf-8 path")),
+        Some(staging_dir.to_str().expect("utf-8 path")),
+        None,
+        None,
+        None,
+        true
+    )
+    .expect("lua environment");
+    lua
+}
+
+#[test]
+#[cfg(unix)]
+fn checked_cmd_stops_at_the_first_failure_and_raises() {
+    let _ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("tempdir");
+    let lua = shell_env(tmp.path());
+
+    let err = lua
+        .load(
+            r#"cmd("echo before > log; false; echo after >> log",
+                { check = true })"#
+        )
+        .exec()
+        .expect_err("a failing checked command must raise");
+    assert!(err.to_string().contains("exit code 1"), "{err}");
+    let log = fs::read_to_string(tmp.path().join("build/log")).expect("log");
+    assert_eq!(log, "before\n", "set -e must stop at the failing line");
+
+    // The session survives a failed checked command.
+    let out = lua
+        .load(r#"return cmd("echo ok", { check = true })"#)
+        .eval::<String>()
+        .expect("checked command");
+    assert_eq!(out, "ok");
+}
+
+#[test]
+#[cfg(unix)]
+fn cmd_env_applies_to_one_call_only() {
+    let _ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("tempdir");
+    let lua = shell_env(tmp.path());
+
+    let out = lua
+        .load(
+            r#"return cmd("echo $VER-$(sh -c 'echo $VER')",
+                { env = { VER = "1.2.3" } })"#
+        )
+        .eval::<String>()
+        .expect("cmd with env");
+    assert_eq!(
+        out, "1.2.3-1.2.3",
+        "env must be exported to child processes"
+    );
+
+    let out = lua
+        .load(r#"return cmd("echo ${VER:-unset}")"#)
+        .eval::<String>()
+        .expect("cmd");
+    assert_eq!(out, "unset", "env must not leak into later calls");
+
+    assert!(
+        lua.load(r#"cmd("true", { env = { ["BAD-NAME"] = "x" } })"#)
+            .exec()
+            .is_err(),
+        "invalid variable names must be refused"
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn cmd_root_is_the_staging_root_and_not_exported() {
+    let _ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("tempdir");
+    let lua = shell_env(tmp.path());
+
+    let out = lua
+        .load(r#"return cmd("echo $ROOT; sh -c 'echo ${ROOT:-unset}'")"#)
+        .eval::<String>()
+        .expect("cmd");
+    let root = tmp.path().join("staging/usrroot");
+    let expected = format!("{}\nunset", root.display());
+    assert_eq!(out, expected);
+}
+
+#[test]
+#[cfg(unix)]
+fn a_command_that_ends_the_shell_runs_once() {
+    let _ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("tempdir");
+    let lua = shell_env(tmp.path());
+
+    let code = lua
+        .load(
+            r#"local _, _, code = cmd("echo run >> runs; exit 3")
+            return code"#
+        )
+        .eval::<i32>()
+        .expect("cmd");
+    assert_eq!(code, 3, "the shell's exit status is the command's result");
+    let runs = fs::read_to_string(tmp.path().join("build/runs")).expect("runs");
+    assert_eq!(runs, "run\n", "the command must not be run again");
+
+    let err = lua
+        .load(r#"cmd("exit 4", { check = true })"#)
+        .exec()
+        .expect_err("checked exit must raise");
+    assert!(err.to_string().contains("exit code 4"), "{err}");
 }

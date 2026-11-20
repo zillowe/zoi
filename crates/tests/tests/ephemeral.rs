@@ -51,10 +51,6 @@ metadata({{
     bins = {{ "{bin_name}" }},
     types = {{ "pre-compiled" }}
 }})
-
-function verify()
-    return true
-end
 "#
     );
 

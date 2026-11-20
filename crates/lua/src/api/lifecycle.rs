@@ -199,8 +199,6 @@ pub fn add_package_lifecycle_functions(lua: &Lua) -> Result<(), mlua::Error> {
     lua.globals().set("prepare", prepare_fn)?;
     let package_fn = lua.create_function(|_, _: mlua::MultiValue| Ok(()))?;
     lua.globals().set("package", package_fn)?;
-    let verify_fn = lua.create_function(|_, _: mlua::MultiValue| Ok(true))?;
-    lua.globals().set("verify", verify_fn)?;
     let test_fn = lua.create_function(|_, _: mlua::MultiValue| Ok(true))?;
     lua.globals().set("test", test_fn)?;
     let uninstall_fn = lua.create_function(|_, _: mlua::MultiValue| Ok(()))?;

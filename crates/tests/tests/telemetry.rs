@@ -466,10 +466,9 @@ fn start_stub_posthog(
                         serde_json::json!({ "results": results }).to_string();
                     let mut stream = reader.into_inner();
                     let response = format!(
-                        "HTTP/1.1 200 OK\r\n\
-                         content-type: application/json\r\n\
-                         content-length: {}\r\n\
-                         connection: close\r\n\r\n{reply}",
+                        "HTTP/1.1 200 OK\r\ncontent-type: \
+                         application/json\r\ncontent-length: \
+                         {}\r\nconnection: close\r\n\r\n{reply}",
                         reply.len()
                     );
                     let ok = stream.write_all(response.as_bytes()).is_ok()

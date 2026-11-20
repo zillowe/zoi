@@ -75,10 +75,6 @@ function prepare()
   cmd("DESTDIR=" .. BUILD_DIR .. "/install cmake --install build")
 end
 
-function verify()
-  return true
-end
-
 function package(args)
   local sub = args.sub or "lib"
   local root = "install/usr"

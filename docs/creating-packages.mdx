@@ -13,7 +13,7 @@ A typical `.pkg.lua` file is structured around a few key global functions:
 
 1. **`metadata{...}`**: **(Required)** A function call that declares all the static information about your package, like its name, version, and description.
 2. **`dependencies{...}`**: A function call that defines the package's build-time and runtime dependencies.
-3. **Lifecycle Functions**: A set of functions (`prepare`, `build`, `package`, `verify`, `uninstall`) that contain the logic for fetching, building, and installing the software.
+3. **Lifecycle Functions**: A set of functions (`prepare`, `build`, `package`, `uninstall`) that contain the logic for fetching, building, and installing the software.
 4. **`service{...}`**: A function call that defines a background service associated with the package.
 
 Let's look at the core components in detail.
@@ -140,7 +140,7 @@ Local package definitions may be declared relative to the current `.pkg.lua`, fo
 
 ## 3. Lifecycle Functions
 
-These functions define the imperative steps for building your package. Zoi calls them in a specific order: `prepare` -> `build` -> `package` -> `verify`.
+These functions define the imperative steps for building your package. Zoi calls them in a specific order: `prepare` -> `build` -> `package`.
 
 <Callout title="API Reference">
   For a full list of available helper functions and global variables, see the
@@ -164,13 +164,6 @@ This optional function runs after `prepare()` and before `package()`. Its purpos
 This function runs after `build()` (or `prepare()` if no `build()` is defined). It takes the prepared files from the `BUILD_DIR` and copies only the final, distributable files into the `STAGING_DIR`. The contents of the staging directory are what will be included in the final `.zpa` archive.
 
 - **Common tasks:** Running `make install`, copying binaries, libraries, and documentation.
-
-### `verify()`
-
-This function runs after `package()`. It's a security step where you can verify the integrity and authenticity of the files you downloaded in the `prepare` step.
-
-- **Common tasks:** Checking checksums with `verifyHash()`, verifying PGP signatures with `verifySignature()`.
-- **Return value:** Must explicitly return a boolean (`true` or `false`). If this function returns `false` or `nil`, the build process is aborted.
 
 ### `test()`
 
@@ -404,7 +397,7 @@ Split packages build an independent `.zpa` archive for each sub-package:
 
 ### Lifecycle Functions in Split Packages
 
-The `prepare`, `build`, `package`, `verify`, and `uninstall` functions receive a table containing the name of the sub-package being processed.
+The `prepare`, `build`, `package`, and `uninstall` functions receive a table containing the name of the sub-package being processed.
 
 ```lua
 function package(args)
@@ -819,13 +812,6 @@ function package()
 
   -- Stage the manual page
   zman("hello.md")
-end
-
-function verify()
-  if BUILD_TYPE == "pre-compiled" then
-    -- (Checksum and signature verification logic would go here)
-  end
-  return true
 end
 
 function uninstall() end

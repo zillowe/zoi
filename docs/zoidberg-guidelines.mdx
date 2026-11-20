@@ -134,20 +134,20 @@ Every file downloaded in `prepare()` **MUST** be verified before it is extracted
 
 - **Algorithm:** `sha512` is **REQUIRED** for all new and updated packages. `sha256` is only accepted in existing recipes until their next version update.
 - **Pinned in the Recipe:** The hash **MUST** be written in the recipe itself. It **MUST NOT** be fetched from the same server as the archive at build time.
-- **Method:** Use `UTILS.DOWNLOAD(url, filename, "sha512-<hex>")`, `verifyHash()`, or `sha512sum -c` inside a shell step that runs with `set -e`. A failed check **MUST** stop the build.
+- **Method:** Use `UTILS.DOWNLOAD(url, filename, "sha512-<hex>")`, `verifyHash()`, or `sha512sum -c` in a `cmd()` call with `check = true`. A failed check **MUST** stop the build.
 - **Updates:** When the `version` changes, the maintainer downloads the new archive, checks its signature where available, and records its new hash. A hash mismatch on an unchanged version **MUST** be investigated before the hash is replaced.
 
 ```lua
 local version = ZOI.VERSION or "2.8.1"
 
 function prepare()
-	sh([[
+	cmd([[
 		curl -sSfL --retry 3 \
 			"https://ftpmirror.gnu.org/gnu/patch/patch-$VER.tar.xz" \
 			-o "patch-$VER.tar.xz"
 		echo "<sha512 hex>  patch-$VER.tar.xz" | sha512sum -c -
 		tar -xf "patch-$VER.tar.xz"
-	]])
+	]], { check = true, env = { VER = version } })
 end
 ```
 
@@ -163,7 +163,8 @@ For packages in the `core` tier, maintainers **MUST** verify OpenPGP signatures 
 ```lua
 function prepare()
 	local tarball = "patch-" .. version .. ".tar.xz"
-	sh([[
+	local opts = { check = true, env = { VER = version } }
+	cmd([[
 		curl -sSfL --retry 3 \
 			"https://ftpmirror.gnu.org/gnu/patch/patch-$VER.tar.xz" \
 			-o "patch-$VER.tar.xz"
@@ -171,12 +172,12 @@ function prepare()
 			"https://ftpmirror.gnu.org/gnu/patch/patch-$VER.tar.xz.sig" \
 			-o "patch-$VER.tar.xz.sig"
 		echo "<sha512 hex>  patch-$VER.tar.xz" | sha512sum -c -
-	]])
+	]], opts)
 	local key = LOCATION.PKGLUADIR .. "/keys/pgp/<FINGERPRINT>.asc"
 	if not verifySignature(tarball, tarball .. ".sig", key) then
 		error("bad upstream signature on " .. tarball)
 	end
-	sh([[tar -xf "patch-$VER.tar.xz"]])
+	cmd([[tar -xf "patch-$VER.tar.xz"]], opts)
 end
 ```
 
@@ -193,7 +194,7 @@ Changes to the upstream source are made with patch files, never by downloading a
 ### 5.6. Preparing the Source
 
 - **Generated Files:** When the release tarball already ships `configure` and other generated build files, recipes **SHOULD NOT** regenerate them. Run `autoreconf` or `./bootstrap` only when a patch changes the build system or upstream requires it.
-- **Fail Fast:** Shell steps in `prepare()` **MUST** run with `set -e` (as the `sh()` helper used throughout Zoidberg does), so a failed download, hash check, extraction, or patch stops the build instead of producing a partial source tree.
+- **Fail Fast:** Shell steps **MUST** run with `cmd(script, { check = true })`, which runs them with `set -e` and raises an error on failure, so a failed download, hash check, extraction, or patch stops the build instead of producing a partial source tree. Values the script needs (such as the version) are passed with `env`, not concatenated into the script.
 
 ---
 

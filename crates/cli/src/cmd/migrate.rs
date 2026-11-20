@@ -916,12 +916,6 @@ fn render_pkg_lua(g: &Generated) -> String {
     out.push_str("  return \"sha256\", hash\n");
     out.push_str("end\n\n");
 
-    out.push_str("local function sanitize_url_file_name(url)\n");
-    out.push_str("  if not url then return nil end\n");
-    out.push_str("  local cleaned = url:gsub(\"#.*$\", \"\")\n");
-    out.push_str("  return cleaned:match(\"([^/]+)$\")\n");
-    out.push_str("end\n\n");
-
     out.push_str("local function source_roots_for_download(dl)\n");
     out.push_str("  local roots = {}\n");
     out.push_str("  local base_roots = {}\n");
@@ -1022,7 +1016,13 @@ fn render_pkg_lua(g: &Generated) -> String {
     out.push_str("    else\n");
     out.push_str("      out_dir = \"source_\" .. i\n");
     out.push_str("    end\n");
-    out.push_str("    UTILS.EXTRACT(url, out_dir)\n");
+    // The download is checked against its hash before it is extracted.
+    out.push_str("    local algo, digest = split_hash((dl.hashes or {})[i])\n");
+    out.push_str(
+        "    local hash = algo and (algo .. \"-\" .. digest) or nil\n"
+    );
+    out.push_str("    local file = UTILS.DOWNLOAD(url, nil, hash)\n");
+    out.push_str("    UTILS.EXTRACT(file, out_dir)\n");
     out.push_str("  end\n");
     out.push_str("end\n\n");
 
@@ -1046,38 +1046,6 @@ fn render_pkg_lua(g: &Generated) -> String {
     out.push_str("    zcp(source_path, \"${pkgstore}/bin/\" .. bin.target)\n");
     out.push_str("  end\n");
     out.push_str("end\n\n");
-
-    out.push_str("function verify()\n");
-    out.push_str("  local dl = active_download()\n");
-    out.push_str("  if not dl then return true end\n");
-    out.push_str("  local roots = source_roots_for_download(dl)\n");
-    out.push_str("  for i, hash in ipairs(dl.hashes or {}) do\n");
-    out.push_str("    local algo, digest = split_hash(hash)\n");
-    out.push_str("    if algo and digest then\n");
-    out.push_str("      local url = dl.urls[i] or dl.urls[1]\n");
-    out.push_str("      local file_name = sanitize_url_file_name(url)\n");
-    out.push_str("      local file_path = nil\n");
-    out.push_str("      if file_name then\n");
-    out.push_str("        for _, root in ipairs(roots) do\n");
-    out.push_str("          local candidate = root .. \"/\" .. file_name\n");
-    out.push_str("          if UTILS.FS.exists(candidate) then\n");
-    out.push_str("            file_path = candidate\n");
-    out.push_str("            break\n");
-    out.push_str("          end\n");
-    out.push_str("          local found = UTILS.FIND.file(root, file_name)\n");
-    out.push_str("          if found and UTILS.FS.exists(found) then\n");
-    out.push_str("            file_path = found\n");
-    out.push_str("            break\n");
-    out.push_str("          end\n");
-    out.push_str("        end\n");
-    out.push_str("      end\n");
-    out.push_str("      if file_path then\n");
-    out.push_str("        verifyHash(file_path, algo .. \"-\" .. digest)\n");
-    out.push_str("      end\n");
-    out.push_str("    end\n");
-    out.push_str("  end\n");
-    out.push_str("  return true\n");
-    out.push_str("end\n");
 
     out
 }

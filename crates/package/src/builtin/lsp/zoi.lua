@@ -230,11 +230,6 @@ function build(args) end
 ---@param args { sub: string? }?
 function package(args) end
 
---- Lifecycle: Verify integrity and authenticity of downloaded files.
----@param args { sub: string? }?
----@return boolean
-function verify(args) end
-
 --- Lifecycle: Optional function to run integration tests.
 ---@param args { sub: string? }?
 ---@return boolean
@@ -243,9 +238,17 @@ function test(args) end
 --- Lifecycle: Cleanup tasks outside the package store.
 function uninstall() end
 
+---@class CmdOptions
+---@field quiet boolean? Suppress live output for this call.
+---@field check boolean? Run with `set -e` and raise an error if the command fails.
+---@field env table<string, string|number|boolean>? Environment variables for this call only.
+
 --- Executes a shell command within BUILD_DIR.
+--- Calls share one shell session, so `cd` and `export` carry over, except with
+--- `check` or `env`, which run the command in a subshell. `$ROOT` is the
+--- staging path of the system root (LOCATION.ROOT).
 ---@param command string The shell command to execute.
----@param opts? boolean|{quiet?: boolean} Optional execution options or boolean flag to silence command output.
+---@param opts? boolean|CmdOptions `true` to silence output, or an options table.
 ---@return string stdout, string stderr, integer exit_code
 function cmd(command, opts) end
 

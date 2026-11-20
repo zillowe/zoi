@@ -214,8 +214,14 @@ Executes a shell command within the `BUILD_DIR`.
 
 - **Persistence**: Unlike standard shell wrappers, `cmd()` in Zoi uses a **persistent shell session**. This means state changes like directory changes (`cd`), environment variable exports (`export`), and shell function definitions **persist** across multiple `cmd()` calls within the same lifecycle phase (e.g. within `build()` or `package()`).
 - **Robustness**: The shell session uses piped standard streams and unique sentinels to ensure reliable command completion detection and accurate capture of both `stdout` and `stderr` without deadlocks.
-- **Quiet Mode**: Pass a boolean `cmd(command, true)` or table `cmd(command, { quiet = true })` to suppress live stdout/stderr streaming for a specific command execution.
-- **Returns**: Three values: `stdout` (string), `stderr` (string), and `exit_code` (integer).
+- **Options**: The second argument is a boolean (`cmd(command, true)` is quiet) or a table:
+  - `quiet` (boolean): Suppress live stdout/stderr streaming for this call.
+  - `check` (boolean): Run the command with `set -e` and raise a Lua error (with the exit code and stderr) if it fails. The first failing line stops it, so a failed download or patch can never be followed by the rest of the script.
+  - `env` (table): Environment variables for this call only, e.g. `{ VER = version }`. Values may be strings, numbers, or booleans.
+- **Isolation**: With `check` or `env`, the command runs in a subshell: `set -e`, the variables, and any `cd` stay inside that call, and a failure cannot end the session.
+- **Exiting the shell**: A command that ends the shell (such as `exit 3`) is not run again. Its exit status is returned (or raised with `check`), and the next call starts a fresh session.
+- **`$ROOT`**: Every command can use `$ROOT`, the staging path of the system root (`LOCATION.ROOT`). It is a shell variable and is not exported, so build systems such as `make` don't see it.
+- **Returns**: Three values: `stdout` (string), `stderr` (string), and `exit_code` (integer). Without `check`, a nonzero exit does not raise, so check `exit_code` yourself.
 
 ```lua
 function build()
@@ -226,6 +232,14 @@ function build()
     if code ~= 0 then
         error("Build failed: " .. err)
     end
+end
+
+-- The same as a checked script: stops and raises at the first failure.
+function package()
+    cmd([[
+        cd "source-$VER"
+        make DESTDIR="$ROOT" install
+    ]], { check = true, env = { VER = PKG.version } })
 end
 ```
 
@@ -316,10 +330,6 @@ Optional function that runs after `prepare` and before `package`. Use it for com
 ### `package(args)`
 
 Runs after `build` (or `prepare` if no `build` is defined) to compile and stage files into `STAGING_DIR`.
-
-### `verify(args)`
-
-Runs after `package` to ensure the integrity of the downloaded files. Should return `true` or `false`.
 
 ### `test(args)`
 
