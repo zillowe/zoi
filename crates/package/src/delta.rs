@@ -116,8 +116,8 @@ fn read_zpa(path: &Path) -> Result<ZpaContents> {
             // Pool objects are keyed by their full digest, `sha512-<hex>`
             // (or `sha256-<hex>` in archives built before), exactly as the
             // manifest names them.
-            if let Some(key) = file_name
-                .filter(|f| zoi_core::hash::parse_digest(f).is_some())
+            if let Some(key) =
+                file_name.filter(|f| zoi_core::hash::parse_digest(f).is_some())
             {
                 pool.insert(key, data);
                 continue;
@@ -268,8 +268,7 @@ pub fn create_zpa_delta(
     }
     for (name, data) in &new.extras {
         // Compute hash of root entry for integrity verification.
-        root_hashes
-            .insert(name.clone(), zoi_core::hash::bytes_digest(data));
+        root_hashes.insert(name.clone(), zoi_core::hash::bytes_digest(data));
         files.push((format!("root/{name}"), data.clone()));
     }
 
@@ -499,7 +498,9 @@ pub fn apply_zpa_delta(
     for key in rebuilt.manifest.pool.keys() {
         let Some(content) = rebuilt.pool.get(key) else {
             std::fs::remove_file(output).ok();
-            return Err(anyhow!("Rebuilt archive is missing pool object {key}"));
+            return Err(anyhow!(
+                "Rebuilt archive is missing pool object {key}"
+            ));
         };
         let expected_size =
             rebuilt.manifest.pool.get(key).map_or(0, |e| e.size);
