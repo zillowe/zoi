@@ -621,6 +621,33 @@ pub fn set_package_hash(
     Ok(())
 }
 
+/// Returns the `version` and `revision` the registry index lists for a
+/// package, if it lists the package at all.
+///
+/// # Errors
+///
+/// Returns an error if the database connection cannot be opened.
+pub fn get_package_version_from_db(
+    registry_handle: &str,
+    name: &str,
+    sub_package: Option<&str>,
+    repo: &str
+) -> Result<Option<(Option<String>, Option<String>)>> {
+    let conn = open_connection(registry_handle)?;
+    let Ok(pkg_id) =
+        get_package_id(&conn, name, sub_package, repo, registry_handle)
+    else {
+        return Ok(None);
+    };
+    Ok(conn
+        .query_row(
+            "SELECT version, revision FROM packages WHERE id = ?1",
+            params![pkg_id],
+            |row| Ok((row.get(0)?, row.get(1)?))
+        )
+        .ok())
+}
+
 /// Retrieves the archive hash for a package from the database.
 ///
 /// # Errors

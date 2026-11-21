@@ -192,7 +192,7 @@ fn test_registry_zrepo_builds_a_publishable_snapshot() -> Result<()> {
     // the same way it does for .zpa and .zdelta.
     let hash =
         fs::read_to_string(temp_dir.path().join("snapshotreg.zrepo.hash"))?;
-    assert_eq!(hash.trim(), stats.sha256);
+    assert_eq!(hash.trim(), stats.sha512);
     assert!(temp_dir.path().join("snapshotreg.zrepo.size").exists());
 
     // The payload must be a real zstd-compressed tar of the tree, since that is

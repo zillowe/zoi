@@ -182,7 +182,7 @@ When `enable` is `true`:
 
 ### What a signature covers
 
-- **Archives (`.zpa`):** an embedded signature (`manifest.sig`) signs the archive's root `manifest.json`, which lists the hash of every installed file and, for archives built by Zoi 1.30.0 or later, the SHA-256 of the bundled `.pkg.lua` (`pkg_lua_sha256`). Zoi checks the `.pkg.lua` against that hash before running it. Archives that contain more than one `manifest.json` or `manifest.sig`, or put them anywhere but the archive root, are rejected.
+- **Archives (`.zpa`):** an embedded signature (`manifest.sig`) signs the archive's root `manifest.json`, which lists the hash of every installed file and the digest of the bundled `.pkg.lua` (`pkg_lua_digest`, `sha512-<hex>`; archives built by Zoi 1.29.x record `pkg_lua_sha256` instead). Zoi checks the `.pkg.lua` against that digest before running it. Archives that contain more than one `manifest.json` or `manifest.sig`, or put them anywhere but the archive root, are rejected.
 - **Delta updates (`.zdelta`):** when trusted keys apply, a delta's signature is required; a missing or invalid one makes Zoi fall back to downloading the full archive. The archive rebuilt from a delta must pass the same embedded-signature check as a full download before it is installed or cached.
 - **Source bundles (`.zsa`):** the embedded signature covers the bundled `.pkg.lua` and is verified when trusted keys apply. Unsigned bundles install with a warning.
 

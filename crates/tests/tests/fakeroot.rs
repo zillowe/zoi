@@ -129,7 +129,7 @@ end
         let path_str = path.to_string_lossy();
 
         // Pool files are named after their manifest hash key
-        // ("sha256-<hex>").
+        // ("sha512-<hex>").
         if path_str.ends_with(&format!("/{}", mapped.hash)) {
             assert_eq!(
                 entry.header().uid().expect("unwrap failed"),

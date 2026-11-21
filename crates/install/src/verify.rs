@@ -83,8 +83,8 @@ pub fn verify_archive(archive_path: &Path) -> Result<ArchiveReport> {
 
     let mut manifest_json: Option<String> = None;
     let mut signed_embed = false;
-    // Pool file name ("sha256-<hex>") to (size, sha256 hex) observed on disk
-    // inside the archive.
+    // Pool file name ("sha512-<hex>") to (size, hex digest) observed inside
+    // the archive.
     let mut observed: BTreeMap<String, (u64, String)> = BTreeMap::new();
 
     for entry in archive.entries()? {
@@ -117,23 +117,22 @@ pub fn verify_archive(archive_path: &Path) -> Result<ArchiveReport> {
             continue;
         }
 
-        let Some(expected_hash) = file_name.strip_prefix("sha256-") else {
+        // Pool entries are named by their digest (`sha512-<hex>`, or
+        // `sha256-<hex>` in archives built before).
+        let Some((algo, _)) = zoi_core::hash::parse_digest(&file_name) else {
             continue;
         };
         // Only canonical top-level pool entries are content-addressed.
-        // Reject nested paths like pool/subdir/sha256-<hex> because
-        // installation reads only pool/sha256-<hex> and would reject
-        // the archive if the canonical entry is missing.
+        // Reject nested paths like pool/subdir/<digest> because
+        // installation reads only pool/<digest> and would reject the
+        // archive if the canonical entry is missing.
         let trimmed = name.trim_start_matches("./");
-        let canonical = format!("pool/sha256-{expected_hash}");
-        if trimmed != canonical {
+        if trimmed != format!("pool/{file_name}") {
             continue;
         }
-        let (len, hash) = zoi_core::hash::calculate_reader_hash(
-            &mut entry,
-            HashAlgorithm::Sha256
-        )?;
-        observed.insert(expected_hash.to_string(), (len, hash));
+        let (len, hash) =
+            zoi_core::hash::calculate_reader_hash(&mut entry, algo)?;
+        observed.insert(file_name.clone(), (len, hash));
     }
 
     let manifest_json = manifest_json.ok_or_else(|| {
@@ -149,10 +148,9 @@ pub fn verify_archive(archive_path: &Path) -> Result<ArchiveReport> {
     let mut checked = 0usize;
 
     for (key, entry) in &manifest.pool {
-        let expected_hash = key
-            .strip_prefix("sha256-")
+        let (_, expected_hash) = zoi_core::hash::parse_digest(key)
             .ok_or_else(|| anyhow!("Unsupported pool hash format: {key}"))?;
-        let Some((size, hash)) = observed.get(expected_hash) else {
+        let Some((size, hash)) = observed.get(key) else {
             issues.push(format!("{key}: missing from archive"));
             continue;
         };
@@ -164,7 +162,7 @@ pub fn verify_archive(archive_path: &Path) -> Result<ArchiveReport> {
             ));
             continue;
         }
-        if hash != expected_hash {
+        if !hash.eq_ignore_ascii_case(expected_hash) {
             issues.push(format!("{key}: content hash mismatch"));
         }
     }
@@ -234,11 +232,14 @@ pub fn verify_installed(manifest: &InstallManifest) -> Result<Vec<FileStatus>> {
             continue;
         }
 
-        let actual = calculate_file_hash(&fs_path, HashAlgorithm::Sha256)?;
-        let expected_hex = expected.strip_prefix("sha256-").unwrap_or(expected);
+        // Digests are `sha512-<hex>`; older installs recorded `sha256-<hex>`
+        // (or a bare SHA-256 hex digest).
+        let (algo, expected_hex) = zoi_core::hash::parse_digest(expected)
+            .unwrap_or((HashAlgorithm::Sha256, expected.as_str()));
+        let actual = calculate_file_hash(&fs_path, algo)?;
         statuses.push(FileStatus {
             path: path.clone(),
-            status: if actual == expected_hex {
+            status: if actual.eq_ignore_ascii_case(expected_hex) {
                 VerifyStatus::Ok
             } else {
                 VerifyStatus::Modified

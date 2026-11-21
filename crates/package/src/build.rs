@@ -30,15 +30,19 @@ use zoi_resolver::resolve;
 use zstd::stream::read::Decoder as ZstdDecoder;
 use zstd::stream::write::Encoder as ZstdEncoder;
 
-/// Top-level key of a pooled `manifest.json` that records the SHA-256 of the
-/// `.pkg.lua` bundled next to it, as `sha256-<hex>`.
+/// Top-level key of a pooled `manifest.json` that records the digest of the
+/// `.pkg.lua` bundled next to it, as `sha512-<hex>`.
 ///
 /// The installer parses (and so executes) that `.pkg.lua`, but the embedded
 /// `manifest.sig` only covers `manifest.json`. Recording the definition's
 /// digest inside the signed manifest extends the signature to it. It is an
 /// extra JSON key rather than a `PooledZpaManifest` field so that existing
 /// readers, which ignore unknown keys, keep parsing new archives unchanged.
-pub const PKG_LUA_HASH_KEY: &str = "pkg_lua_sha256";
+pub const PKG_LUA_HASH_KEY: &str = "pkg_lua_digest";
+
+/// The key archives built by Zoi 1.29.x used for the same digest, as
+/// `sha256-<hex>`. Still read so those archives keep verifying.
+pub const LEGACY_PKG_LUA_HASH_KEY: &str = "pkg_lua_sha256";
 
 /// Serializes a pooled manifest for an archive whose bundled package
 /// definition is `package_file`, recording the definition's digest under
@@ -53,16 +57,13 @@ fn pooled_manifest_json(
     package_file: &Path
 ) -> Result<String> {
     let mut value = serde_json::to_value(manifest)?;
-    let hash = zoi_core::hash::calculate_file_hash(
-        package_file,
-        zoi_core::hash::HashAlgorithm::Sha256
-    )?;
+    let digest = zoi_core::hash::file_digest(package_file)?;
     let object = value
         .as_object_mut()
         .ok_or_else(|| anyhow!("pooled manifest did not serialize to a map"))?;
     object.insert(
         PKG_LUA_HASH_KEY.to_string(),
-        serde_json::Value::String(format!("sha256-{hash}"))
+        serde_json::Value::String(digest)
     );
     Ok(serde_json::to_string_pretty(&value)?)
 }

@@ -276,7 +276,7 @@ zrepo:
     url: https://packages.example.com/zoidberg/main.zrepo
     control: https://packages.example.com/zoidberg/main.zrepo.zsync
     pgp: https://packages.example.com/zoidberg/main.zrepo.sig
-    hash: https://packages.example.com/zoidberg/main.zrepo.sha256
+    hash: https://packages.example.com/zoidberg/main.zrepo.hash
   - type: mirror
     url: https://mirror.example.com/zoidberg/main.zrepo
 ```
@@ -490,7 +490,7 @@ Delta patches are configured explicitly in the `delta` section of `repo.yaml`. E
 **Required fields for secure delta upgrades:**
 
 - `url`: The delta patch URL template (must contain `{version}` placeholder for the target version).
-- `hash`: URL to the delta patch's SHA-256 hash file (mandatory for integrity).
+- `hash`: URL to the delta patch's SHA-512 hash file (mandatory for integrity).
 - `pgp`: URL to the delta patch's detached PGP signature (recommended for authenticity).
 - `size`: URL to the delta patch's size file (for progress reporting).
 

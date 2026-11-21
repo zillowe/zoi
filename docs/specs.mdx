@@ -67,7 +67,7 @@ zrepo:
     url: "https://packages.zillowe.qzz.io/zoidberg/main.zrepo"
     control: "https://packages.zillowe.qzz.io/zoidberg/main.zrepo.zsync"
     pgp: "https://packages.zillowe.qzz.io/zoidberg/main.zrepo.sig"
-    hash: "https://packages.zillowe.qzz.io/zoidberg/main.zrepo.sha256"
+    hash: "https://packages.zillowe.qzz.io/zoidberg/main.zrepo.hash"
   - type: "mirror"
     url: "https://mirror.example.com/zoidberg/main.zrepo"
 pkg:
@@ -115,7 +115,7 @@ Delta patches are configured explicitly in the `delta` section of `repo.yaml` (n
 **Required fields for secure delta upgrades:**
 
 - `url`: The delta patch URL template (must contain `{version}` placeholder for the target version).
-- `hash`: URL to the delta patch's SHA-256 hash file (mandatory for integrity).
+- `hash`: URL to the delta patch's SHA-512 hash file (mandatory for integrity).
 - `pgp`: URL to the delta patch's detached PGP signature (recommended for authenticity).
 - `size`: URL to the delta patch's size file (for progress reporting).
 
@@ -154,7 +154,7 @@ Snapshots are configured in the `zrepo` section of `repo.yaml`, using the same `
 - `url`: The `.zrepo` snapshot URL.
 - `control`: (Optional) URL of the zsync control file. Defaults to `<url>.zsync`.
 - `pgp`: (Optional) URL of the snapshot's detached PGP signature.
-- `hash`: (Optional) URL of the snapshot's SHA-256 checksum.
+- `hash`: (Optional) URL of the snapshot's SHA-512 checksum.
 - `size`: (Optional) URL of the snapshot's size information.
 
 **Control files:** a registry publishes a `.zsync` control file beside the snapshot, written by [`zync`](https://crates.io/crates/zync-rs). It carries the snapshot's length, its SHA-1, and a table of per-block checksums, plus a `URL` naming where the snapshot itself can be fetched.
@@ -169,7 +169,7 @@ The `URL` Zoi writes is the bare file name rather than an absolute address, beca
 - Entry paths inside the snapshot are validated on extraction. Absolute paths and `..` components are rejected, so a crafted archive cannot write outside the registry directory.
 - A new tree is staged and swapped into place, and the previous tree is only removed once the new one is installed. An interrupted sync leaves the previous registry intact.
 - When `authorities` are configured and the snapshot publishes a `pgp` signature, the signature is verified before the snapshot is installed. The registry's PGP keys are imported from `repo.yaml` first so they are available in the keyring.
-- The SHA-256 of the installed snapshot is recorded in the registry index. A later sync that installs a byte-identical snapshot skips re-parsing every `.pkg.lua`.
+- The SHA-512 of the installed snapshot is recorded in the registry index. A later sync that installs a byte-identical snapshot skips re-parsing every `.pkg.lua`.
 
 ---
 

@@ -4,7 +4,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use walkdir::WalkDir;
-use zoi_core::hash::{HashAlgorithm, calculate_file_hash};
+use zoi_core::hash::file_digest;
 use zoi_core::types::{
     MappedDir, MappedFile, MappedSymlink, PoolFileEntry, ScopeMapping
 };
@@ -167,8 +167,7 @@ pub fn pool_files(
                 target: target_str.replace('\\', "/")
             });
         } else {
-            let hash = calculate_file_hash(path, HashAlgorithm::Sha256)?;
-            let hash_key = format!("sha256-{hash}");
+            let hash_key = file_digest(path)?;
 
             if !pool.contains_key(&hash_key) {
                 let pool_path = pool_dir.join(&hash_key);

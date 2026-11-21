@@ -64,7 +64,7 @@ pub fn download_and_cache_archive(
         "archive-{}.zpa",
         zoi_core::hash::calculate_string_hash(
             &details.info.final_url,
-            zoi_core::hash::HashAlgorithm::Sha256
+            zoi_core::hash::DEFAULT_ALGORITHM
         )
         .get(..16)
         .unwrap_or_default()

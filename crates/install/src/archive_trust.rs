@@ -22,7 +22,7 @@ use zoi_core::hash::{HashAlgorithm, calculate_reader_hash};
 use zoi_core::pgp;
 /// Key under which builds record the bundled `.pkg.lua` digest inside the
 /// pooled `manifest.json`.
-pub use zoi_package::build::PKG_LUA_HASH_KEY;
+pub use zoi_package::build::{LEGACY_PKG_LUA_HASH_KEY, PKG_LUA_HASH_KEY};
 
 /// The kind of a trust-relevant archive entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -246,6 +246,7 @@ pub fn recorded_pkg_lua_hash(manifest_bytes: &[u8]) -> Option<String> {
         serde_json::from_slice(manifest_bytes).ok()?;
     value
         .get(PKG_LUA_HASH_KEY)
+        .or_else(|| value.get(LEGACY_PKG_LUA_HASH_KEY))
         .and_then(serde_json::Value::as_str)
         .map(str::to_string)
 }
@@ -273,13 +274,17 @@ pub fn check_pkg_lua_binding(
              no top-level .pkg.lua"
         )
     })?;
-    let expected_hex = expected.strip_prefix("sha256-").unwrap_or(&expected);
-    let actual = sha256_hex(pkg_lua)?;
-    if !expected_hex.eq_ignore_ascii_case(&actual) {
+    // `sha512-<hex>`; 1.29.x archives recorded `sha256-<hex>`, and a bare
+    // hex digest is read as SHA-256 like those.
+    let expected = if zoi_core::hash::parse_digest(&expected).is_some() {
+        expected
+    } else {
+        format!("sha256-{expected}")
+    };
+    if !zoi_core::hash::bytes_match_digest(pkg_lua, &expected) {
         return Err(anyhow!(
             "Bundled .pkg.lua does not match the digest recorded in the \
-             archive manifest (expected sha256-{expected_hex}, got \
-             sha256-{actual})"
+             archive manifest (expected {expected})"
         ));
     }
     Ok(true)

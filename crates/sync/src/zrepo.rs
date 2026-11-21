@@ -43,7 +43,7 @@ use zync::{
 
 /// The `registry_meta` key holding the hash of the `.zrepo` snapshot the
 /// local index was last built from.
-pub const ZREPO_HASH_META_KEY: &str = "zrepo_sha256";
+pub const ZREPO_HASH_META_KEY: &str = "zrepo_sha512";
 
 /// Suffix appended to a `.zrepo` URL to locate its zsync control file when the
 /// `repo.yaml` entry does not spell one out.
@@ -94,8 +94,8 @@ pub struct ZrepoStats {
     pub tar_size: u64,
     /// The size of the `.zrepo` file in bytes.
     pub compressed_size: u64,
-    /// The SHA-256 of the `.zrepo` file.
-    pub sha256: String
+    /// The SHA-512 of the `.zrepo` file.
+    pub sha512: String
 }
 
 /// Returns true when a path inside a registry tree must not be published.
@@ -275,7 +275,7 @@ pub fn create_zrepo(
         file_count,
         tar_size,
         compressed_size: zrepo_bytes.len() as u64,
-        sha256: sha256_bytes(&zrepo_bytes)
+        sha512: hash_bytes(&zrepo_bytes)
     };
 
     write_sidecars(output, &zrepo_bytes, sign_key)?;
@@ -329,7 +329,7 @@ fn write_sidecars(
     bytes: &[u8],
     sign_key: Option<&str>
 ) -> Result<()> {
-    let hash = sha256_bytes(bytes);
+    let hash = hash_bytes(bytes);
 
     // Sidecars are named after the full artifact name, so a `.zrepo` gets
     // `.zrepo.hash`. This is the same convention `.zpa` and `.zdelta` use, so
@@ -349,11 +349,11 @@ fn write_sidecars(
     Ok(())
 }
 
-/// Hashes a byte buffer with SHA-256, returning the lowercase hex digest.
-fn sha256_bytes(data: &[u8]) -> String {
+/// Hashes a byte buffer with SHA-512, returning the lowercase hex digest.
+fn hash_bytes(data: &[u8]) -> String {
     zoi_core::hash::calculate_reader_hash(
         &mut Cursor::new(data),
-        zoi_core::hash::HashAlgorithm::Sha256
+        zoi_core::hash::DEFAULT_ALGORITHM
     )
     .map(|(_, digest)| digest)
     // Hashing an in-memory cursor cannot fail; keep the function infallible
@@ -614,7 +614,7 @@ fn full_download(
         anyhow!("Downloaded registry snapshot is not a valid zstd frame: {e}")
     })?;
 
-    let hash = sha256_bytes(&zrepo_bytes);
+    let hash = hash_bytes(&zrepo_bytes);
     install_snapshot(
         &tar_bytes,
         &zrepo_bytes,
@@ -637,7 +637,7 @@ fn full_download(
 /// normal outcome rather than a failure, so a registry that never ships patches
 /// syncs exactly as well as one that does - just without the bandwidth saving.
 ///
-/// Returns the SHA-256 of the snapshot that is now installed.
+/// Returns the SHA-512 of the snapshot that is now installed.
 ///
 /// # Errors
 ///
@@ -888,7 +888,7 @@ fn zync_transfer(
         ))
     })?;
 
-    let hash = sha256_bytes(&zrepo_bytes);
+    let hash = hash_bytes(&zrepo_bytes);
     install_snapshot(
         &tar_bytes,
         &zrepo_bytes,
@@ -1275,7 +1275,7 @@ mod tests {
             fs::read(&second).expect("read second"),
             "snapshotting the same tree twice must produce identical bytes"
         );
-        assert_eq!(a.sha256, b.sha256);
+        assert_eq!(a.sha512, b.sha512);
         assert_eq!(a.file_count, 3, "repo.yaml, packages.json, one pkg.lua");
     }
 
@@ -1322,7 +1322,7 @@ mod tests {
 
         let hash = fs::read_to_string(dir.path().join("testreg.zrepo.hash"))
             .expect("hash sidecar");
-        assert_eq!(hash.trim(), stats.sha256);
+        assert_eq!(hash.trim(), stats.sha512);
 
         let size = fs::read_to_string(dir.path().join("testreg.zrepo.size"))
             .expect("size sidecar");

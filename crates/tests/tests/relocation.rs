@@ -4,7 +4,7 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 
-use sha2::{Digest, Sha256};
+use sha2::{Digest, Sha512};
 use tar::Archive;
 use tempfile::tempdir;
 use zoi::pkg::package::{build, relocate};
@@ -172,15 +172,22 @@ end
             .to_string_lossy()
             .to_string();
 
-        // Pool files are named after their manifest key ("sha256-<hex>")
-        let Some(expected_hash) = file_name.strip_prefix("sha256-") else {
+        // Pool files are named after their manifest key ("sha512-<hex>")
+        let Some((algo, expected_hash)) =
+            zoi_core::hash::parse_digest(&file_name)
+        else {
             continue;
         };
+        assert_eq!(
+            algo,
+            zoi_core::hash::HashAlgorithm::Sha512,
+            "new archives name pool files by SHA-512"
+        );
         let Some(pool_entry) = manifest.pool.get(&file_name) else {
             continue;
         };
 
-        let mut hasher = Sha256::new();
+        let mut hasher = Sha512::new();
         let mut len: u64 = 0;
         let mut buf = [0u8; 8192];
         loop {

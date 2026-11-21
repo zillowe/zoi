@@ -258,13 +258,8 @@ fn built_manifest_binds_the_bundled_pkg_lua() {
 
     let recorded = archive_trust::recorded_pkg_lua_hash(manifest)
         .expect("manifest records the definition digest");
-    assert_eq!(
-        recorded,
-        format!(
-            "sha256-{}",
-            archive_trust::sha256_hex(pkg_lua).expect("hash")
-        )
-    );
+    assert_eq!(recorded, zoi_core::hash::bytes_digest(pkg_lua));
+    assert!(recorded.starts_with("sha512-"), "{recorded}");
     assert!(
         archive_trust::check_pkg_lua_binding(manifest, Some(pkg_lua))
             .expect("binding holds")
@@ -347,5 +342,36 @@ fn delta_rebuild_keeps_manifest_bytes_verbatim() {
     assert!(
         archive_trust::check_pkg_lua_binding(manifest, pkg_lua)
             .expect("binding survives the delta")
+    );
+}
+
+#[test]
+fn definitions_bound_by_older_archives_still_verify() {
+    // Zoi 1.29.x recorded the definition as `pkg_lua_sha256: sha256-<hex>`.
+    let pkg_lua = b"metadata({ name = \"old\" })";
+    let mut fields = serde_json::Map::new();
+    fields.insert(
+        archive_trust::LEGACY_PKG_LUA_HASH_KEY.to_string(),
+        serde_json::Value::String(format!(
+            "sha256-{}",
+            archive_trust::sha256_hex(pkg_lua).expect("hash")
+        ))
+    );
+    let manifest = serde_json::Value::Object(fields).to_string();
+
+    assert!(
+        archive_trust::check_pkg_lua_binding(
+            manifest.as_bytes(),
+            Some(pkg_lua.as_slice())
+        )
+        .expect("binding holds")
+    );
+    assert!(
+        archive_trust::check_pkg_lua_binding(
+            manifest.as_bytes(),
+            Some(b"tampered".as_slice())
+        )
+        .is_err(),
+        "a definition that does not match must be refused"
     );
 }

@@ -307,10 +307,10 @@ fn update_task_cache(alias: &str, hash: &str) -> Result<()> {
     Ok(())
 }
 
-/// Calculates a SHA-256 hash of all files matching the provided glob patterns.
+/// Calculates a SHA-512 hash of all files matching the provided glob patterns.
 fn calculate_files_hash(files: &[String]) -> Result<String> {
     use sha2::Digest;
-    let mut hasher = sha2::Sha256::new();
+    let mut hasher = sha2::Sha512::new();
     let mut found_any = false;
     for file_glob in files {
         for entry in glob::glob(file_glob)? {

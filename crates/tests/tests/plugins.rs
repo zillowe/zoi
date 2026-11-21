@@ -260,6 +260,29 @@ end)
     let pm = plugin::PluginManager::new().expect("unwrap failed");
     pm.load_all(true).expect("unwrap failed");
 
+    // Trust recorded as SHA-256 (by an earlier version) still holds, and is
+    // rewritten as SHA-512.
+    let upgraded: std::collections::HashMap<String, String> =
+        serde_json::from_str(
+            &fs::read_to_string(plugin_dir.join("trusted_hashes.json"))
+                .expect("trust file")
+        )
+        .expect("trust json");
+    for file in &["a-first.lua", "z-last.lua"] {
+        let content =
+            fs::read_to_string(plugin_dir.join(file)).expect("unwrap failed");
+        assert_eq!(
+            upgraded.get(*file).map(String::as_str),
+            Some(
+                zoi_core::hash::calculate_string_hash(
+                    &content,
+                    zoi_core::hash::HashAlgorithm::Sha512
+                )
+                .as_str()
+            )
+        );
+    }
+
     let handled = pm.trigger_project_install_hook().expect("unwrap failed");
     assert!(
         handled,

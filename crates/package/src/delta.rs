@@ -113,10 +113,13 @@ fn read_zpa(path: &Path) -> Result<ZpaContents> {
             let file_name = Path::new(rest)
                 .file_name()
                 .map(|f| f.to_string_lossy().to_string());
-            if let Some(hash) = file_name.and_then(|f| {
-                f.strip_prefix("sha256-").map(ToString::to_string)
-            }) {
-                pool.insert(hash, data);
+            // Pool objects are keyed by their full digest, `sha512-<hex>`
+            // (or `sha256-<hex>` in archives built before), exactly as the
+            // manifest names them.
+            if let Some(key) = file_name
+                .filter(|f| zoi_core::hash::parse_digest(f).is_some())
+            {
+                pool.insert(key, data);
                 continue;
             }
         }
@@ -197,21 +200,20 @@ pub fn create_zpa_delta(
     // their hashes in the delta metadata.
     let mut root_hashes: BTreeMap<String, String> = BTreeMap::new();
 
-    // The destination map is keyed by the manifest's prefixed pool keys
-    // ("sha256-<hex>"), while pool contents are stored under the bare hex
-    // digest - normalize before matching.
+    // Destination maps and pools are both keyed by the manifest's full pool
+    // keys (`sha512-<hex>` or `sha256-<hex>`).
     for (key, dests) in &new_dests {
-        let Some(new_hash) = key.strip_prefix("sha256-") else {
+        if zoi_core::hash::parse_digest(key).is_none() {
             return Err(anyhow!("Unsupported pool hash format: {key}"));
-        };
-        if old_hashes.contains(new_hash) {
+        }
+        if old_hashes.contains(key) {
             // Content unchanged: reuse the old pool object directly.
             continue;
         }
 
-        let Some(content) = new.pool.get(new_hash) else {
+        let Some(content) = new.pool.get(key) else {
             return Err(anyhow!(
-                "Pool content missing for sha256-{new_hash} in {}",
+                "Pool content missing for {key} in {}",
                 new_zpa.display()
             ));
         };
@@ -230,24 +232,24 @@ pub fn create_zpa_delta(
             }
         }
 
-        if let (Some(from_hash), Some(old_content)) =
+        if let (Some(from_key), Some(old_content)) =
             (from, from.and_then(|h| old.pool.get(h)))
         {
             let patch = delta::diff_bytes(old_content, content)?;
-            let patch_name = format!("patches/{new_hash}.bsdiff");
+            let patch_name = format!("patches/{key}.bsdiff");
             files.push((patch_name.clone(), patch));
             ops.push(json!({
                 "op": "patch",
-                "key": format!("sha256-{new_hash}"),
-                "from": format!("sha256-{from_hash}"),
+                "key": key,
+                "from": from_key,
                 "patch": patch_name
             }));
         } else {
-            let full_name = format!("full/{new_hash}");
+            let full_name = format!("full/{key}");
             files.push((full_name.clone(), content.clone()));
             ops.push(json!({
                 "op": "full",
-                "key": format!("sha256-{new_hash}"),
+                "key": key,
                 "data": full_name
             }));
         }
@@ -266,12 +268,8 @@ pub fn create_zpa_delta(
     }
     for (name, data) in &new.extras {
         // Compute hash of root entry for integrity verification.
-        let hash = zoi_core::hash::calculate_reader_hash(
-            &mut std::io::Cursor::new(data),
-            zoi_core::hash::HashAlgorithm::Sha256
-        )?
-        .1;
-        root_hashes.insert(name.clone(), format!("sha256-{hash}"));
+        root_hashes
+            .insert(name.clone(), zoi_core::hash::bytes_digest(data));
         files.push((format!("root/{name}"), data.clone()));
     }
 
@@ -289,7 +287,7 @@ pub fn create_zpa_delta(
     let delta_size = delta_bytes.len() as u64;
     let hash = zoi_core::hash::calculate_file_hash(
         output,
-        zoi_core::hash::HashAlgorithm::Sha256
+        zoi_core::hash::DEFAULT_ALGORITHM
     )?;
 
     // Write .hash file
@@ -365,20 +363,20 @@ pub fn apply_zpa_delta(
     for op in ops {
         let kind = op["op"].as_str().unwrap_or_default();
         let key = op["key"].as_str().unwrap_or_default();
-        let Some(new_hash) = key.strip_prefix("sha256-") else {
+        if zoi_core::hash::parse_digest(key).is_none() {
             return Err(anyhow!("Bad pool key in delta: {key}"));
-        };
+        }
 
         let content = match kind {
             "patch" => {
                 let from_key = op["from"].as_str().unwrap_or_default();
-                let Some(old_hash) = from_key.strip_prefix("sha256-") else {
+                if zoi_core::hash::parse_digest(from_key).is_none() {
                     return Err(anyhow!("Bad source key in delta: {from_key}"));
-                };
+                }
                 let patch_name = op["patch"].as_str().unwrap_or_default();
-                let Some(base_bytes) = base.pool.get(old_hash) else {
+                let Some(base_bytes) = base.pool.get(from_key) else {
                     return Err(anyhow!(
-                        "Base archive lacks required object sha256-{old_hash}"
+                        "Base archive lacks required object {from_key}"
                     ));
                 };
                 let Some(patch) = files.get(patch_name) else {
@@ -399,17 +397,12 @@ pub fn apply_zpa_delta(
 
         // Never trust a patch blindly: verify the produced content hashes to
         // exactly the key it claims.
-        let actual = zoi_core::hash::calculate_reader_hash(
-            &mut std::io::Cursor::new(&content),
-            zoi_core::hash::HashAlgorithm::Sha256
-        )?
-        .1;
-        if actual != new_hash {
+        if !zoi_core::hash::bytes_match_digest(&content, key) {
             return Err(anyhow!(
                 "Delta produced content that does not match {key}"
             ));
         }
-        new_pool.insert(new_hash.to_string(), content);
+        new_pool.insert(key.to_string(), content);
     }
 
     // Reassemble the target archive. The target manifest travels verbatim
@@ -422,12 +415,12 @@ pub fn apply_zpa_delta(
     // Sanity-check the rebuilt pool satisfies the target manifest before
     // anything touches disk.
     for key in manifest.pool.keys() {
-        let Some(hex) = key.strip_prefix("sha256-") else {
+        if zoi_core::hash::parse_digest(key).is_none() {
             return Err(anyhow!("Unsupported pool hash format: {key}"));
-        };
-        if !new_pool.contains_key(hex) {
+        }
+        if !new_pool.contains_key(key) {
             return Err(anyhow!(
-                "Rebuilt pool is missing sha256-{hex}; base archive may be \
+                "Rebuilt pool is missing {key}; base archive may be \
                  incompatible with this delta"
             ));
         }
@@ -444,18 +437,17 @@ pub fn apply_zpa_delta(
             let Some(data) = files.get(&format!("root/{name}")) else {
                 return Err(anyhow!("Delta missing root entry {name}"));
             };
-            let actual_hash = zoi_core::hash::calculate_reader_hash(
-                &mut std::io::Cursor::new(data),
-                zoi_core::hash::HashAlgorithm::Sha256
-            )?
-            .1;
-            let expected_hex = expected_hash
-                .strip_prefix("sha256-")
-                .unwrap_or(expected_hash);
-            if actual_hash != expected_hex {
+            // `sha512-<hex>`; older deltas recorded `sha256-<hex>` (or a
+            // bare SHA-256 hex digest).
+            let expected_hash =
+                if zoi_core::hash::parse_digest(expected_hash).is_some() {
+                    expected_hash.to_string()
+                } else {
+                    format!("sha256-{expected_hash}")
+                };
+            if !zoi_core::hash::bytes_match_digest(data, &expected_hash) {
                 return Err(anyhow!(
-                    "Root entry {name} hash mismatch: expected \
-                     {expected_hash}, got sha256-{actual_hash}"
+                    "Root entry {name} hash mismatch: expected {expected_hash}"
                 ));
             }
         }
@@ -496,8 +488,8 @@ pub fn apply_zpa_delta(
             append_entry(&mut builder, entry_name, data)?;
         }
     }
-    for (hex, content) in &new_pool {
-        append_entry(&mut builder, &format!("pool/sha256-{hex}"), content)?;
+    for (key, content) in &new_pool {
+        append_entry(&mut builder, &format!("pool/{key}"), content)?;
     }
     let tar_bytes = builder.into_inner()?;
     std::fs::write(output, delta::zstd_compress(&tar_bytes)?)?;
@@ -505,23 +497,15 @@ pub fn apply_zpa_delta(
     // Structural verification of what we just wrote.
     let rebuilt = read_zpa(output)?;
     for key in rebuilt.manifest.pool.keys() {
-        let Some(hex) = key.strip_prefix("sha256-") else {
-            return Err(anyhow!("Unsupported pool hash format: {key}"));
-        };
-        let Some(content) = rebuilt.pool.get(hex) else {
+        let Some(content) = rebuilt.pool.get(key) else {
             std::fs::remove_file(output).ok();
-            return Err(anyhow!(
-                "Rebuilt archive is missing pool object sha256-{hex}"
-            ));
+            return Err(anyhow!("Rebuilt archive is missing pool object {key}"));
         };
-        let actual = zoi_core::hash::calculate_reader_hash(
-            &mut std::io::Cursor::new(content),
-            zoi_core::hash::HashAlgorithm::Sha256
-        )?
-        .1;
         let expected_size =
             rebuilt.manifest.pool.get(key).map_or(0, |e| e.size);
-        if content.len() as u64 != expected_size || actual != hex {
+        if content.len() as u64 != expected_size
+            || !zoi_core::hash::bytes_match_digest(content, key)
+        {
             std::fs::remove_file(output).ok();
             return Err(anyhow!(
                 "Rebuilt archive failed integrity verification for {key}"

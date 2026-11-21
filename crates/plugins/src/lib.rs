@@ -18,7 +18,6 @@ use comfy_table::presets::UTF8_FULL;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Confirm, Select};
 use mlua::{Function, Lua, LuaSerdeExt, Table, Value};
-use sha2::{Digest, Sha256};
 use zoi_core::{types, utils};
 use zoi_project as project;
 use zoi_resolver::{local, resolve};
@@ -963,9 +962,10 @@ impl PluginManager {
         for path in plugin_paths {
             let script = fs::read_to_string(&path)?;
 
-            let mut hasher = Sha256::new();
-            hasher.update(script.as_bytes());
-            let hash = hex::encode(hasher.finalize());
+            let hash = zoi_core::hash::calculate_string_hash(
+                &script,
+                zoi_core::hash::DEFAULT_ALGORITHM
+            );
 
             let plugin_name = path
                 .file_name()
@@ -973,9 +973,16 @@ impl PluginManager {
                 .to_string_lossy()
                 .to_string();
 
-            let is_trusted = trusted
-                .get(&plugin_name)
-                .is_some_and(|known_hash| known_hash == &hash);
+            let known_hash = trusted.get(&plugin_name);
+            let is_trusted = known_hash.is_some_and(|known| {
+                zoi_core::hash::bytes_match_hex(script.as_bytes(), known)
+            });
+            // Trust recorded as SHA-256 by an earlier version: keep it and
+            // record the SHA-512 from now on.
+            if is_trusted && known_hash != Some(&hash) {
+                trusted.insert(plugin_name.clone(), hash.clone());
+                trusted_changed = true;
+            }
 
             if !is_trusted {
                 if yes {

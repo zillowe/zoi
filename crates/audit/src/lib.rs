@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use zoi_core::{config, types, utils};
 
 /// Manages Zoi's tamper-evident audit log.
@@ -73,7 +72,8 @@ pub struct AuditLogLine {
     /// SHA-256 hash of the previous entry.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prev_hash: Option<String>,
-    /// SHA-256 hash of the current entry (including `prev_hash`).
+    /// SHA-512 hash of the current entry (including `prev_hash`); entries
+    /// written by earlier versions carry SHA-256.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hash: Option<String>
 }
@@ -120,8 +120,8 @@ fn get_username() -> String {
     }
 }
 
-/// Calculates the SHA-256 hash for an audit entry.
-fn calculate_entry_hash(
+/// The bytes an audit entry's hash covers: the entry and the previous hash.
+fn entry_hash_payload(
     entry: &AuditEntry,
     prev_hash: Option<&str>
 ) -> Result<String> {
@@ -131,11 +131,18 @@ fn calculate_entry_hash(
         prev_hash: Option<&'a str>
     }
 
-    let payload = HashPayload { entry, prev_hash };
-    let json = serde_json::to_string(&payload)?;
-    let mut hasher = Sha256::new();
-    hasher.update(json.as_bytes());
-    Ok(hex::encode(hasher.finalize()))
+    Ok(serde_json::to_string(&HashPayload { entry, prev_hash })?)
+}
+
+/// Calculates the SHA-512 hash for an audit entry.
+fn calculate_entry_hash(
+    entry: &AuditEntry,
+    prev_hash: Option<&str>
+) -> Result<String> {
+    Ok(zoi_core::hash::calculate_string_hash(
+        &entry_hash_payload(entry, prev_hash)?,
+        zoi_core::hash::DEFAULT_ALGORITHM
+    ))
 }
 
 /// Reads the audit log from disk.
@@ -312,11 +319,11 @@ pub fn verify_chain() -> Result<AuditVerification> {
                 });
             }
 
-            let expected_hash = calculate_entry_hash(
-                &parsed.entry,
-                parsed.prev_hash.as_deref()
-            )?;
-            if stored_hash != expected_hash {
+            // SHA-512, or SHA-256 for entries written by earlier versions.
+            let payload =
+                entry_hash_payload(&parsed.entry, parsed.prev_hash.as_deref())?;
+            if !zoi_core::hash::bytes_match_hex(payload.as_bytes(), stored_hash)
+            {
                 return Ok(AuditVerification {
                     valid: false,
                     total_entries,

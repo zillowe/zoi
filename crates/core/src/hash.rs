@@ -33,6 +33,92 @@ impl HashAlgorithm {
             _ => None
         }
     }
+
+    /// The algorithm's name as written in a digest (`sha512`, `sha256`).
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            HashAlgorithm::Sha512 => "sha512",
+            HashAlgorithm::Sha256 => "sha256"
+        }
+    }
+
+    /// Length of the algorithm's hex digest.
+    #[must_use]
+    pub fn hex_len(self) -> usize {
+        match self {
+            HashAlgorithm::Sha512 => 128,
+            HashAlgorithm::Sha256 => 64
+        }
+    }
+}
+
+/// The algorithm for every hash Zoi records itself: pool objects, file
+/// digests, archive manifests, sidecars, trust records and caches. SHA-256
+/// stays accepted wherever a hash is read, for archives built before and for
+/// hashes users write themselves.
+pub const DEFAULT_ALGORITHM: HashAlgorithm = HashAlgorithm::Sha512;
+
+/// Splits a digest written as `<algo>-<hex>` (`sha512-...`, `sha256-...`).
+///
+/// Returns `None` for an unknown algorithm or a hex part of the wrong length
+/// or with non-hex characters.
+#[must_use]
+pub fn parse_digest(digest: &str) -> Option<(HashAlgorithm, &str)> {
+    let (name, hex) = digest.split_once('-')?;
+    let algo = HashAlgorithm::from_name(name)?;
+    (hex.len() == algo.hex_len() && hex.chars().all(|c| c.is_ascii_hexdigit()))
+        .then_some((algo, hex))
+}
+
+/// Writes a digest as `<algo>-<hex>`.
+#[must_use]
+pub fn format_digest(algo: HashAlgorithm, hex: &str) -> String {
+    format!("{}-{hex}", algo.name())
+}
+
+/// The `sha512-<hex>` digest of a file, as Zoi records it.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read.
+pub fn file_digest(path: &Path) -> Result<String> {
+    Ok(format_digest(
+        DEFAULT_ALGORITHM,
+        &calculate_file_hash(path, DEFAULT_ALGORITHM)?
+    ))
+}
+
+/// The `sha512-<hex>` digest of a byte buffer, as Zoi records it.
+#[must_use]
+pub fn bytes_digest(bytes: &[u8]) -> String {
+    format_digest(DEFAULT_ALGORITHM, &hex::encode(Sha512::digest(bytes)))
+}
+
+/// Whether `bytes` match a bare hex digest, whose algorithm is told by its
+/// length (128 characters for SHA-512, 64 for SHA-256).
+///
+/// For records that store bare digests (plugin and hook trust, the audit
+/// log): new ones are SHA-512, and SHA-256 ones written by earlier versions
+/// still match.
+#[must_use]
+pub fn bytes_match_hex(bytes: &[u8], hex: &str) -> bool {
+    HashAlgorithm::from_len(hex.len()).is_some_and(|algo| {
+        bytes_match_digest(bytes, &format_digest(algo, hex))
+    })
+}
+
+/// Whether `bytes` match `digest` (`<algo>-<hex>`, either algorithm).
+#[must_use]
+pub fn bytes_match_digest(bytes: &[u8], digest: &str) -> bool {
+    let Some((algo, hex)) = parse_digest(digest) else {
+        return false;
+    };
+    let actual = match algo {
+        HashAlgorithm::Sha512 => hex::encode(Sha512::digest(bytes)),
+        HashAlgorithm::Sha256 => hex::encode(Sha256::digest(bytes))
+    };
+    actual.eq_ignore_ascii_case(hex)
 }
 
 /// Calculates the cryptographic hash of a single file.

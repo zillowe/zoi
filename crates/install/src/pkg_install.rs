@@ -8,7 +8,7 @@ use colored::Colorize;
 use tar::Archive;
 use tempfile::Builder;
 use walkdir::WalkDir;
-use zoi_core::hash::{HashAlgorithm, calculate_file_hash};
+use zoi_core::hash::calculate_file_hash;
 use zoi_core::types;
 use zoi_core::utils::{self, copy_dir_all};
 use zoi_db as db;
@@ -1326,13 +1326,13 @@ fn extract_pooled_zpa(
             if !pool_file.exists() {
                 return Err(anyhow!("Pool file missing: {}", mapped_file.hash));
             }
-            let expected_hash =
-                mapped_file.hash.strip_prefix("sha256-").ok_or_else(|| {
-                    anyhow!(
-                        "Unsupported pool hash format: {}",
-                        mapped_file.hash
-                    )
-                })?;
+            // `sha512-` keys, or `sha256-` from archives built before.
+            let (algo, expected_hash) = zoi_core::hash::parse_digest(
+                &mapped_file.hash
+            )
+            .ok_or_else(|| {
+                anyhow!("Unsupported pool hash format: {}", mapped_file.hash)
+            })?;
             let pool_entry = pooled_manifest
                 .pool
                 .get(&mapped_file.hash)
@@ -1345,9 +1345,8 @@ fn extract_pooled_zpa(
                     mapped_file.hash
                 ));
             }
-            let actual_hash =
-                calculate_file_hash(&pool_file, HashAlgorithm::Sha256)?;
-            if actual_hash != expected_hash {
+            let actual_hash = calculate_file_hash(&pool_file, algo)?;
+            if !actual_hash.eq_ignore_ascii_case(expected_hash) {
                 return Err(anyhow!(
                     "Pool file hash does not match manifest: {}",
                     mapped_file.hash

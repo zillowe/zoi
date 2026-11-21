@@ -436,7 +436,10 @@ pub fn check_external_tools() -> ToolCheckResult {
     }
 }
 
-/// Checks for "Registry Drift" (local `.pkg.lua` differs from the database).
+/// Checks for "Registry Drift": an installed package whose definition
+/// differs from the registry's, although the registry still lists the same
+/// version and revision. (A newer version or revision is an update, not
+/// drift.)
 ///
 /// # Errors
 ///
@@ -444,39 +447,59 @@ pub fn check_external_tools() -> ToolCheckResult {
 /// a package source path cannot be determined.
 pub fn check_registry_drift() -> Result<Vec<String>> {
     let all_installed = local::get_installed_packages()?;
+    let db_root = zoi_resolver::resolve::get_db_root()?;
     let mut drifted = Vec::new();
 
     for manifest in all_installed {
         let pkg_lua_path = local::get_package_source_path(&manifest)?;
-        if !pkg_lua_path.exists() {
+        let registry_lua = db_root
+            .join(&manifest.registry_handle)
+            .join(&manifest.repo)
+            .join(&manifest.name)
+            .join(format!("{}.pkg.lua", manifest.name));
+        if !pkg_lua_path.exists() || !registry_lua.exists() {
             continue;
         }
 
-        let Ok(lua_content) = fs::read_to_string(&pkg_lua_path) else {
+        let Ok(Some((Some(version), revision))) =
+            zoi_db::get_package_version_from_db(
+                &manifest.registry_handle,
+                &manifest.name,
+                manifest.sub_package.as_deref(),
+                &manifest.repo
+            )
+        else {
             continue;
         };
-        let current_hash = zoi_core::hash::calculate_string_hash(
-            &lua_content,
-            zoi_core::hash::HashAlgorithm::Sha256
-        );
-
-        if let Ok(Some(db_hash)) = zoi_db::get_package_hash_from_db(
-            &manifest.registry_handle,
-            &manifest.name,
-            manifest.sub_package.as_deref(),
-            &manifest.repo
-        ) && current_hash != db_hash
+        if version != manifest.version
+            || revision.unwrap_or_else(|| "1".to_string()) != manifest.revision
         {
+            continue;
+        }
+
+        let (Ok(local_hash), Ok(registry_hash)) = (
+            zoi_core::hash::file_digest(&pkg_lua_path),
+            zoi_core::hash::file_digest(&registry_lua)
+        ) else {
+            continue;
+        };
+        if local_hash != registry_hash {
             let name = if let Some(sub) = manifest.sub_package {
                 format!("{}:{}", manifest.name, sub)
             } else {
                 manifest.name
             };
+            let short = |digest: &str| {
+                digest
+                    .strip_prefix("sha512-")
+                    .and_then(|hex| hex.get(..8))
+                    .unwrap_or_default()
+                    .to_string()
+            };
             drifted.push(format!(
-                "{} (Database: {}, Local: {})",
-                name,
-                &db_hash[..8],
-                &current_hash[..8]
+                "{name} (Registry: {}, Local: {})",
+                short(&registry_hash),
+                short(&local_hash)
             ));
         }
     }

@@ -127,7 +127,7 @@ fn build_zrepo(
         zoi_core::utils::format_bytes(stats.compressed_size),
         zoi_core::utils::format_bytes(stats.tar_size)
     );
-    println!("  SHA-256:     {}", stats.sha256);
+    println!("  SHA-512:     {}", stats.sha512);
     println!(
         "  Sidecars:    .hash, .size{}",
         if sign.is_some() { ", .sig" } else { "" }

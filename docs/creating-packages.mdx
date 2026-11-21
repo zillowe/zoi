@@ -269,7 +269,7 @@ function package()
 end
 ```
 
-Zoi hashes all staged files into a central `pool/` directory and generates a mapping manifest. This ensures that even if `package()` behaves differently across scopes, the archive remains compact and efficient.
+Zoi hashes all staged files into a central `pool/` directory, naming each by its SHA-512 digest (`pool/sha512-<hex>`), and generates a mapping manifest. Archives built by Zoi 1.29.x use SHA-256 names (`sha256-<hex>`) and still install. This ensures that even if `package()` behaves differently across scopes, the archive remains compact and efficient.
 
 #### Packaging for ZoiOS (System Scope)
 

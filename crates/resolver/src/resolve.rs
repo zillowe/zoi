@@ -776,9 +776,10 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
     let cache_dir = cache::get_pkgdef_cache_root()?;
     fs::create_dir_all(&cache_dir)?;
 
-    let mut hasher = Sha256::new();
-    hasher.update(base_url.as_bytes());
-    let url_hash = hex::encode(hasher.finalize());
+    let url_hash = zoi_core::hash::calculate_string_hash(
+        base_url,
+        zoi_core::hash::DEFAULT_ALGORITHM
+    );
     let cache_path = cache_dir.join(format!("{url_hash}.pkg.lua"));
 
     if cache_path.exists() {
@@ -1550,9 +1551,10 @@ fn resolve_source_recursive(
         let cache_dir = cache::get_pkgdef_cache_root()?;
         fs::create_dir_all(&cache_dir)?;
 
-        let mut hasher = Sha256::new();
-        hasher.update(pkg_lua_url.as_bytes());
-        let hash = hex::encode(hasher.finalize());
+        let hash = zoi_core::hash::calculate_string_hash(
+            &pkg_lua_url,
+            zoi_core::hash::DEFAULT_ALGORITHM
+        );
         let cache_path = cache_dir.join(format!("{hash}.pkg.lua"));
 
         fs::write(&cache_path, pkg_lua_content.as_bytes())?;
@@ -1754,9 +1756,10 @@ fn resolve_source_recursive(
             let cache_dir = cache::get_pkgdef_cache_root()?;
             fs::create_dir_all(&cache_dir)?;
 
-            let mut hasher = Sha256::new();
-            hasher.update(alt_source.as_bytes());
-            let hash = hex::encode(hasher.finalize());
+            let hash = zoi_core::hash::calculate_string_hash(
+                &alt_source,
+                zoi_core::hash::DEFAULT_ALGORITHM
+            );
             let cache_path = cache_dir.join(format!("{hash}.pkg.lua"));
 
             fs::write(&cache_path, content.as_bytes())?;

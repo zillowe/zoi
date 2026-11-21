@@ -45,6 +45,12 @@ To prevent naming collisions across different registries and repositories, Zoi i
    - Format: `{hash32}-{package-name}`
    - Example: `8f1a...-linux`
 
+### Integrity Hashes
+
+Every hash Zoi records itself uses **SHA-512**, written as a digest `sha512-<hex>`: archive pool objects (`pool/sha512-<hex>`) and the `file_digests` of installed files, the `.pkg.lua` digest in an archive manifest (`pkg_lua_digest`), `.hash` sidecars of archives, deltas and registry snapshots, plugin and hook trust records, and the audit log chain.
+
+SHA-256 is still accepted wherever a hash is read: in hashes users write (`UTILS.DOWNLOAD`, `verifyHash`, `#sha256-...` source fragments), and in records made by Zoi 1.29.x (`sha256-` pool keys, `pkg_lua_sha256`, existing trust records and audit entries). `zoi_core::hash` provides `parse_digest`, `format_digest`, `file_digest`, `bytes_digest`, `bytes_match_digest` and `bytes_match_hex` for working with these digests.
+
 ### Directory Layout
 
 Inside the store, each package has its own directory containing versioned installations and metadata.

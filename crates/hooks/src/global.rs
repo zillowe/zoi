@@ -7,7 +7,6 @@ use anyhow::Result;
 use colored::Colorize;
 use glob::Pattern;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use zoi_core::{sysroot, types, utils};
 
 include!(concat!(env!("OUT_DIR"), "/generated_builtin_hooks.rs"));
@@ -458,9 +457,10 @@ fn write_trusted_hashes(
 /// Checks if a hook is trusted by comparing its hash against the trusted
 /// database.
 fn is_hook_trusted(hook: &GlobalHook, as_root: bool) -> Result<bool> {
-    let mut hasher = Sha256::new();
-    hasher.update(hook.action.exec.as_bytes());
-    let hash = hex::encode(hasher.finalize());
+    let hash = zoi_core::hash::calculate_string_hash(
+        &hook.action.exec,
+        zoi_core::hash::DEFAULT_ALGORITHM
+    );
 
     let trusted_path = get_trusted_hashes_path(as_root)?;
     if as_root
@@ -485,8 +485,17 @@ fn is_hook_trusted(hook: &GlobalHook, as_root: bool) -> Result<bool> {
     };
 
     if let Some(known_hash) = trusted.get(&hook.name)
-        && known_hash == &hash
+        && zoi_core::hash::bytes_match_hex(
+            hook.action.exec.as_bytes(),
+            known_hash
+        )
     {
+        // Trust recorded as SHA-256 by an earlier version: record the
+        // SHA-512 from now on. Failing to rewrite the file changes nothing.
+        if known_hash != &hash {
+            trusted.insert(hook.name.clone(), hash);
+            let _ = write_trusted_hashes(&trusted_path, &trusted, as_root);
+        }
         return Ok(true);
     }
 

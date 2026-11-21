@@ -497,6 +497,11 @@ fn pool_keeps_special_bits_and_drops_shared_write_access() {
             .and_then(|d| d.mode)
             .expect("dir recorded")
     };
+    assert!(
+        mapping.files.iter().all(|f| f.hash.starts_with("sha512-"))
+            && pool.keys().all(|k| k.starts_with("sha512-")),
+        "pool objects are keyed by SHA-512"
+    );
     assert_eq!(file_mode("${usrroot}/etc/system-auth"), 0o644);
     assert_eq!(file_mode("${usrroot}/usr/bin/passwd"), 0o4755);
     assert_eq!(dir_mode("${usrroot}/tmp"), 0o1777);
