@@ -37,6 +37,7 @@ fn manifest(name: &str, files: Vec<String>) -> types::InstallManifest {
         service: None,
         installed_files: files,
         file_digests: None,
+        signature_verified: false,
         installed_size: None,
         sandbox: None,
         completions: None

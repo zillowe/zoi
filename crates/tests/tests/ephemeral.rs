@@ -138,6 +138,7 @@ repos:
         service: None,
         installed_files: vec![binary_path.to_string_lossy().to_string()],
         file_digests: None,
+        signature_verified: false,
         installed_size: None,
         sandbox: None,
         completions: None

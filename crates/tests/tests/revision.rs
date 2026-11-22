@@ -80,6 +80,7 @@ fn test_package_outdated_on_revision_bump() {
         service: None,
         installed_files: vec![],
         file_digests: None,
+        signature_verified: false,
         installed_size: None,
         sandbox: None,
         completions: None

@@ -375,6 +375,7 @@ fn record_installed(name: &str, version: &str) {
         service: None,
         installed_files: Vec::new(),
         file_digests: None,
+        signature_verified: false,
         installed_size: None,
         sandbox: None,
         completions: None
@@ -584,4 +585,38 @@ fn system_installs_keep_setuid_and_sticky_bits() {
 
     assert_eq!(mode_of(&root.join("usr/bin/suid-test")), 0o4755);
     assert_eq!(mode_of(&root.join("suid-tmp")), 0o1777);
+}
+
+#[test]
+fn pool_never_packages_the_info_directory_index() {
+    let tmp = tempdir().expect("tempdir");
+    let staging = tmp.path().join("staging");
+    let pool_dir = tmp.path().join("pool");
+    fs::create_dir_all(&pool_dir).expect("pool dir");
+    let info = staging.join("usrroot/usr/share/info");
+    fs::create_dir_all(&info).expect("info dir");
+    fs::write(info.join("dir"), "index").expect("dir");
+    fs::write(info.join("gmp.info.gz"), "manual").expect("manual");
+
+    let mut pool = BTreeMap::new();
+    let mut mapping = ScopeMapping::default();
+    zoi_package::pool::pool_files(
+        &staging,
+        &pool_dir,
+        &mut pool,
+        &mut mapping,
+        false
+    )
+    .expect("pool files");
+
+    let dests: Vec<&str> =
+        mapping.files.iter().map(|f| f.dest.as_str()).collect();
+    assert!(
+        dests.contains(&"${usrroot}/usr/share/info/gmp.info.gz"),
+        "{dests:?}"
+    );
+    assert!(
+        !dests.contains(&"${usrroot}/usr/share/info/dir"),
+        "{dests:?}"
+    );
 }

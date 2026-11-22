@@ -1232,6 +1232,12 @@ pub struct InstallManifest {
     /// as "unverified" instead of failing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_digests: Option<BTreeMap<String, String>>,
+    /// Whether the archive this was installed from carried a signature that
+    /// verified against the registry's trusted keys. Global hooks bundled by
+    /// such a package run without a trust prompt. Older manifests read as
+    /// `false`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub signature_verified: bool,
     /// The total size of all installed files in bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub installed_size: Option<u64>,

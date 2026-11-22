@@ -62,6 +62,7 @@ fn test_rollback_restores_shims() {
         service: None,
         installed_files: vec![bin_path.to_string_lossy().to_string()],
         file_digests: None,
+        signature_verified: false,
         installed_size: None,
         sandbox: None,
         completions: None

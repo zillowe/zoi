@@ -55,6 +55,7 @@ fn manifest(
         service: None,
         installed_files: vec![],
         file_digests: None,
+        signature_verified: false,
         installed_size: None,
         sandbox: None,
         completions: None

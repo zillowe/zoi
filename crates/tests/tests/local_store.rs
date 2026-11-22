@@ -38,6 +38,7 @@ fn sample_manifest(name: &str, version: &str) -> types::InstallManifest {
         service: None,
         installed_files: vec![],
         file_digests: None,
+        signature_verified: false,
         installed_size: None,
         sandbox: None,
         completions: None

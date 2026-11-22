@@ -106,3 +106,47 @@ fn ownership_check_rejects_files_not_owned_by_root() {
         &tmp.path().join("missing")
     ));
 }
+
+#[test]
+fn hooks_from_signature_verified_packages_are_marked() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("tempdir");
+    let root = tmp.path().to_path_buf();
+    let home = root.join("home");
+    fs::create_dir_all(&home).expect("home");
+    ctx.set_env_var("HOME", &home);
+    ctx.set_env_var("XDG_DATA_HOME", home.join(".local/share"));
+    common::TestContextGuard::set_sysroot(root.clone());
+
+    let store =
+        zoi_core::utils::get_store_base_dir(zoi_core::types::Scope::User)
+            .expect("store dir");
+    for (pkg, hook, verified) in [
+        ("signed-pkg", "fixsec-signed-hook", true),
+        ("unsigned-pkg", "fixsec-unsigned-hook", false)
+    ] {
+        let version_dir = store.join(format!("0000-{pkg}")).join("1.0.0");
+        fs::create_dir_all(version_dir.join("hooks")).expect("hooks dir");
+        fs::write(
+            version_dir.join("hooks").join(format!("{hook}.hook.yaml")),
+            hook_yaml(hook)
+        )
+        .expect("hook");
+        fs::write(
+            version_dir.join("manifest.json"),
+            format!("{{\"signature_verified\": {verified}}}")
+        )
+        .expect("manifest");
+    }
+
+    let hooks = load_hooks_for_privilege(false).expect("hooks load");
+    let marked = |name: &str| {
+        hooks
+            .iter()
+            .find(|h| h.name == name)
+            .map(|h| h.from_verified_package)
+            .expect("hook loaded")
+    };
+    assert!(marked("fixsec-signed-hook"));
+    assert!(!marked("fixsec-unsigned-hook"));
+}

@@ -35,7 +35,13 @@ pub struct GlobalHook {
     pub action: HookAction,
     /// Whether this is a builtin hook provided by Zoi.
     #[serde(skip)]
-    pub is_builtin: bool
+    pub is_builtin: bool,
+    /// Whether the hook is bundled by an installed package whose archive
+    /// signature verified against its registry's trusted keys. Such a hook
+    /// is as trusted as the package itself, which already runs its own
+    /// install hooks, so it runs without a trust prompt.
+    #[serde(skip)]
+    pub from_verified_package: bool
 }
 
 /// Defines when a global hook should be triggered.
@@ -114,6 +120,27 @@ pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
     load_hooks_for_privilege(utils::is_effective_root())
 }
 
+/// Whether the package installed in `version_dir` was installed from an
+/// archive whose signature verified (`signature_verified` in its
+/// `manifest.json`).
+///
+/// For root, the manifest must also be root-owned and not writable by other
+/// users, the same rule the hook files themselves follow, so an
+/// unprivileged user cannot mark a package as verified.
+fn package_signature_verified(version_dir: &Path, as_root: bool) -> bool {
+    let manifest = version_dir.join("manifest.json");
+    if as_root && !utils::is_root_owned_and_protected(&manifest) {
+        return false;
+    }
+    fs::read_to_string(&manifest)
+        .ok()
+        .and_then(|content| {
+            serde_json::from_str::<serde_json::Value>(&content).ok()
+        })
+        .and_then(|value| value.get("signature_verified")?.as_bool())
+        .unwrap_or(false)
+}
+
 /// Loads global hooks, restricting the search to root-controlled locations when
 /// `as_root` is `true`.
 ///
@@ -146,9 +173,11 @@ pub fn load_hooks_for_privilege(as_root: bool) -> Result<Vec<GlobalHook>> {
         }
     }
 
-    let mut dirs = vec![get_system_hooks_dir()?];
+    // Each directory with whether its hooks come from a signature-verified
+    // package.
+    let mut dirs = vec![(get_system_hooks_dir()?, false)];
     if !as_root {
-        dirs.push(get_user_hooks_dir()?);
+        dirs.push((get_user_hooks_dir()?, false));
     }
 
     let store_scopes: &[types::Scope] = if as_root {
@@ -192,7 +221,11 @@ pub fn load_hooks_for_privilege(as_root: bool) -> Result<Vec<GlobalHook>> {
                             }
                             let hooks_dir = version_dir.join("hooks");
                             if hooks_dir.exists() && hooks_dir.is_dir() {
-                                dirs.push(hooks_dir);
+                                let verified = package_signature_verified(
+                                    &version_dir,
+                                    as_root
+                                );
+                                dirs.push((hooks_dir, verified));
                             }
                         }
                     }
@@ -201,7 +234,7 @@ pub fn load_hooks_for_privilege(as_root: bool) -> Result<Vec<GlobalHook>> {
         }
     }
 
-    for dir in dirs {
+    for (dir, verified) in dirs {
         if !dir.exists() {
             continue;
         }
@@ -242,9 +275,10 @@ pub fn load_hooks_for_privilege(as_root: bool) -> Result<Vec<GlobalHook>> {
 
                 if is_hook
                     && let Ok(content) = fs::read_to_string(&path)
-                    && let Ok(hook) =
+                    && let Ok(mut hook) =
                         serde_yaml::from_str::<GlobalHook>(&content)
                 {
+                    hook.from_verified_package = verified;
                     hook_map.insert(hook.name.clone(), hook);
                 }
             }
@@ -573,7 +607,10 @@ pub fn run_global_hooks(
             modified_packages
         ) && triggered_hooks.insert(hook.name.clone())
         {
-            if !hook.is_builtin && !is_hook_trusted(&hook, as_root)? {
+            if !hook.is_builtin
+                && !hook.from_verified_package
+                && !is_hook_trusted(&hook, as_root)?
+            {
                 println!("Skipping untrusted hook: {}", hook.name);
                 continue;
             }

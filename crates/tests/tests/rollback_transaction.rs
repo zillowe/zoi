@@ -56,6 +56,7 @@ fn manifest(name: &str, deps: &[&str]) -> types::InstallManifest {
         service: None,
         installed_files: vec![],
         file_digests: None,
+        signature_verified: false,
         installed_size: None,
         sandbox: None,
         completions: None

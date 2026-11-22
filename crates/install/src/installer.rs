@@ -26,6 +26,9 @@ use crate::{manifest, plan, prebuilt, util};
 /// partial download for this package is discarded and the archive is
 /// fetched fresh, skipping the delta-upgrade fast-path as well.
 ///
+/// Returns the archive path and whether its signature was checked against
+/// the registry's trusted keys and verified.
+///
 /// # Errors
 ///
 /// Returns an error if:
@@ -41,7 +44,7 @@ pub fn download_and_cache_archive(
     pb: Option<&ProgressBar>,
     verbose: bool,
     force_redownload: bool
-) -> Result<PathBuf> {
+) -> Result<(PathBuf, bool)> {
     let config = config::read_config()?;
     let signature_policy = config
         .policy
@@ -458,7 +461,7 @@ pub fn download_and_cache_archive(
         ));
     }
 
-    Ok(archive_path)
+    Ok((archive_path, signature_checked))
 }
 
 /// Downloads and applies a single `.zdelta` patch upgrading `base_path`
@@ -980,7 +983,10 @@ pub struct PreparedNode {
     /// The method used for installation (e.g. "pre-compiled", "source").
     pub install_method: String,
     /// Whether the archive was built from source.
-    pub is_build: bool
+    pub is_build: bool,
+    /// Whether the downloaded archive's signature verified against the
+    /// registry's trusted keys.
+    pub signature_verified: bool
 }
 
 /// Performs the non-destructive first phase of installation: "Preparation".
@@ -1043,18 +1049,22 @@ pub fn prepare_node(
         None
     };
 
+    // Only registry downloads have their signature checked here; local
+    // archives and source builds are recorded as unverified.
+    let mut signature_verified = false;
     let (archive_path, install_method, is_build) = match action {
         plan::InstallAction::DownloadAndInstall(details) => {
             if let Some(p) = &pb {
                 p.set_message("Downloading package...");
             }
-            let archive_path = download_and_cache_archive(
+            let (archive_path, verified) = download_and_cache_archive(
                 node,
                 details,
                 pb.as_ref(),
                 verbose,
                 force_redownload
             )?;
+            signature_verified = verified;
             (archive_path, "pre-compiled".to_string(), false)
         }
         plan::InstallAction::InstallFromArchive(archive_path) => {
@@ -1115,7 +1125,8 @@ pub fn prepare_node(
     Ok(PreparedNode {
         archive_path,
         install_method,
-        is_build
+        is_build,
+        signature_verified
     })
 }
 
@@ -1442,7 +1453,7 @@ pub fn install_prepared_node(
         }
         link_dependents(node)?;
 
-        let install_manifest = manifest::create_manifest(
+        let mut install_manifest = manifest::create_manifest(
             pkg,
             node.reason.clone(),
             node.dependencies.clone(),
@@ -1455,6 +1466,7 @@ pub fn install_prepared_node(
             sub_package_to_install.clone(),
             file_digests
         )?;
+        install_manifest.signature_verified = prepared.signature_verified;
 
         if record {
             local::write_manifest(&install_manifest)?;

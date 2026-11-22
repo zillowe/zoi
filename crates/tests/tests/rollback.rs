@@ -59,6 +59,7 @@ fn test_transaction_rollback_uninstall() {
         service: None,
         installed_files: vec![],
         file_digests: None,
+        signature_verified: false,
         installed_size: None,
         sandbox: None,
         completions: None
@@ -122,6 +123,7 @@ fn test_package_rollback_requires_explicit_source_for_ambiguous_name_matches() {
         service: None,
         installed_files: vec![],
         file_digests: None,
+        signature_verified: false,
         installed_size: None,
         sandbox: None,
         completions: None
@@ -177,6 +179,7 @@ fn test_store_manifest_json_roundtrip_with_yaml_fallback() {
         service: None,
         installed_files: vec![],
         file_digests: None,
+        signature_verified: false,
         installed_size: None,
         sandbox: None,
         completions: None

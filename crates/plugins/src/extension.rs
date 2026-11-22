@@ -255,6 +255,7 @@ pub fn add(
         service: None,
         installed_files: vec![],
         file_digests: None,
+        signature_verified: false,
         installed_size: pkg.installed_size,
         sandbox: None,
         completions: None

@@ -125,6 +125,8 @@ pub fn create_manifest(
         } else {
             Some(file_digests)
         },
+        // Set by the installer once the archive's signature has checked out.
+        signature_verified: false,
         installed_size: pkg.installed_size,
         sandbox: pkg.sandbox.clone(),
         completions

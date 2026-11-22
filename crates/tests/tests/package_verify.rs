@@ -128,6 +128,7 @@ fn test_verify_installed_detects_modification() {
         } else {
             Some(digests.clone())
         },
+        signature_verified: false,
         installed_size: None,
         sandbox: None,
         completions: None

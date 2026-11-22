@@ -33,6 +33,18 @@ pub fn packaged_dir_mode(mode: u32) -> u32 {
     }
 }
 
+/// Whether a staged file is an index the target system generates for
+/// itself and so must not be packaged.
+///
+/// `share/info/dir` is the Info directory that `install-info` rebuilds from
+/// every installed manual (texinfo ships a hook for it). Packages that
+/// install it would each claim the same file and conflict with one another.
+fn is_generated_index(normalized: &str, metadata: &fs::Metadata) -> bool {
+    !metadata.is_dir()
+        && (normalized.ends_with("/share/info/dir")
+            || normalized.ends_with("/share/info/dir.old"))
+}
+
 /// Deduplicates and pools files from a staging directory into a central pool.
 ///
 /// This function walks the `virtual_staging_dir`, calculates hashes for all
@@ -68,6 +80,10 @@ pub fn pool_files(
         let rel_path = path.strip_prefix(virtual_staging_dir)?;
         let rel_path_str = rel_path.to_string_lossy().to_string();
         let normalized = rel_path_str.replace('\\', "/");
+
+        if is_generated_index(&normalized, &metadata) {
+            continue;
+        }
 
         // The top-level staging directories themselves (pkgstore, usrroot,
         // usrhome, createpkgdir) represent the destination roots and must not

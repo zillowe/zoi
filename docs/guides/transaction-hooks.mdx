@@ -89,6 +89,13 @@ Zoi ships with several essential builtin hooks for Linux systems:
 - **`update-desktop-database`**: Runs `update-desktop-database -q` when `.desktop` files are modified.
 - **`ldconfig`**: Runs `ldconfig` when shared libraries (`.so` files) are modified.
 
+## Hook Trust
+
+Hooks can run arbitrary commands, so the first time a hook runs, Zoi shows its command and asks whether to trust it. The answer is remembered until the hook's command changes. Two kinds of hooks never ask:
+
+- **Builtin hooks** shipped with Zoi.
+- **Hooks bundled with a signature-verified package:** the package was downloaded from a registry and its archive signature verified against that registry's trusted keys (recorded as `signature_verified` in its install manifest). Such a hook is as trusted as the package itself, which already runs its own install hooks. Packages installed from a local archive or built from source are not verified and still ask.
+
 ## Overriding Hooks
 
 Zoi follows a hierarchical loading order. If a hook in your user data directory under `zoi/hooks/` has the same **name** as a builtin or system hook, your user hook will take precedence and override the others. This allows you to easily customize or disable standard system behaviors.
