@@ -4,6 +4,29 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](./INSTALL.md).
 
+## [Prod. Release 1.29.15](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.15) - 2026-11-21
+
+### ♻️ Refactor
+
+- [`cc1982e6`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/cc1982e6c784bcd13be29109624aa19c066db7fd) *(hash)* Record SHA-512 for every hash Zoi makes itself and keep reading SHA-256
+
+### ✨ Features
+
+- [`00ccf041`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/00ccf0413ffa661ec374528790c725a5c6dab774) *(lua)* Add check and env options to cmd, run commands that exit the shell once, and remove verify()
+
+### 🎨 Styling
+
+- [`3a3387c6`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/3a3387c607b6c843399e943934a4509b2daf9e68) Fix formating
+
+### 🛡️ Dependencies
+
+- [`5b86f530`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/5b86f530a3ca594c3cc9ec2bb4687d540e48f043) Update
+- [`eac7b768`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/eac7b7680a797e7da8f691ab772bd03f04c796d6) Update posthog-rs to v1.1.3
+
+### 🩹 Bug Fixes
+
+- [`4bc00ca5`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/4bc00ca5fbfa9baa615a65fcb5100d78be42aea0) *(package)* Keep setuid and sticky bits for system installs and never package shared-writable files
+
 ## [Prod. Release 1.29.14](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.14) - 2026-11-18
 
 ### ✨ Features
