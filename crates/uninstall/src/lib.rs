@@ -794,11 +794,8 @@ fn activate_stored_version(
     manifest: &types::InstallManifest,
     quiet: bool
 ) -> anyhow::Result<()> {
-    let version_dir = package_dir.join(version);
     // Re-point `latest` at the previous version (same helper installs use).
-    if let Err(e) =
-        core_utils::symlink_dir(&version_dir, &package_dir.join("latest"))
-    {
+    if let Err(e) = core_utils::link_latest(package_dir, version) {
         return Err(anyhow!(
             "Failed to point 'latest' at version '{version}': {e}"
         ));

@@ -745,8 +745,7 @@ pub fn write_manifest(manifest: &InstallManifest) -> Result<()> {
         &manifest.repo,
         &manifest.name
     )?;
-    let latest_symlink_path = package_dir.join("latest");
-    zoi_core::utils::symlink_dir(&version_dir, &latest_symlink_path)?;
+    zoi_core::utils::link_latest(&package_dir, &manifest.version)?;
 
     Ok(())
 }

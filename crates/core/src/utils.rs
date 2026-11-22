@@ -64,6 +64,38 @@ pub fn build_blocking_http_client(
     Ok(client)
 }
 
+/// Points a package's `latest` link at its `version` directory.
+///
+/// The link holds just the version name, relative to the package directory.
+/// An absolute target would embed wherever the store happened to be when it
+/// was written: building into a sysroot (`--root`, `zoi system distro
+/// build`) it named the host path of the target, which no longer exists
+/// once that system boots, and a relative `--root` made every link dangle
+/// immediately.
+///
+/// # Errors
+///
+/// Returns an error if the link cannot be replaced.
+pub fn link_latest(package_dir: &Path, version: &str) -> std::io::Result<()> {
+    let link = package_dir.join("latest");
+    #[cfg(unix)]
+    {
+        if link.exists() || link.is_symlink() {
+            if link.is_dir() && !link.is_symlink() {
+                fs::remove_dir_all(&link)?;
+            } else {
+                fs::remove_file(&link)?;
+            }
+        }
+        std::os::unix::fs::symlink(version, &link)
+    }
+    #[cfg(not(unix))]
+    {
+        // Junctions need an absolute target.
+        symlink_dir(&package_dir.join(version), &link)
+    }
+}
+
 /// Creates a symbolic link for a directory, handling platform-specific
 /// requirements.
 ///

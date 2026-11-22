@@ -40,7 +40,16 @@ fn sysroot_store() -> &'static RwLock<Option<PathBuf>> {
 }
 
 /// Sets or replaces the global sysroot path.
+///
+/// A relative path (`--root ./target`) is made absolute against the current
+/// directory first, so paths derived from it stay valid whatever directory
+/// later code runs in.
 pub fn set_sysroot(path: PathBuf) {
+    let path = if path.is_relative() {
+        std::env::current_dir().map_or(path.clone(), |cwd| cwd.join(&path))
+    } else {
+        path
+    };
     if let Ok(mut guard) = sysroot_store().write() {
         *guard = Some(path);
     }

@@ -650,14 +650,12 @@ fn apply_links(root: &Path, group: &AlternativeGroup) -> Result<()> {
 /// Replacing an identical symlink would change its mtime for no reason, and
 /// some integrity tooling treats that as tampering.
 fn symlink_to(root: &Path, target: &str, link: &Path) -> Result<()> {
-    // `target` is absolute from the system's point of view. Inside a sysroot
-    // the link has to be relative to the target root, otherwise the
-    // produced symlink would point outside the image being built.
-    let effective = if root == Path::new("/") {
-        target.to_string()
-    } else {
-        in_root(root, target).to_string_lossy().to_string()
-    };
+    // `target` is absolute from the system's point of view, and that is what
+    // the link holds even inside a sysroot. Prefixing the root would point
+    // the link at the host's copy of the image (`/mnt/target/usr/bin/gawk`),
+    // which breaks as soon as that system boots or is chrooted into.
+    let _ = root;
+    let effective = target.to_string();
 
     if let Ok(existing) = fs::read_link(link)
         && existing.to_string_lossy() == effective
@@ -1023,14 +1021,16 @@ mod tests {
         )
         .expect("register");
 
-        // The two-hop layout is what makes switching safe.
+        // The two-hop layout is what makes switching safe. Links hold the
+        // system's own paths, never the host path of the root, so they keep
+        // working once that system boots.
         assert_eq!(
             read_link(root.path(), "/usr/bin/awk"),
-            format!("{}/etc/alternatives/awk", root.path().display())
+            "/etc/alternatives/awk"
         );
-        assert!(
-            read_link(root.path(), "/etc/alternatives/awk")
-                .ends_with("/usr/bin/gawk")
+        assert_eq!(
+            read_link(root.path(), "/etc/alternatives/awk"),
+            "/usr/bin/gawk"
         );
     }
 

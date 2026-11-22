@@ -205,3 +205,41 @@ fn test_write_manifest_is_atomic_and_leaves_no_temp_files() {
     local::write_file_atomic(&file, b"second").expect("unwrap failed");
     assert_eq!(fs::read_to_string(&file).expect("unwrap failed"), "second");
 }
+
+#[test]
+fn latest_links_are_relative_and_found_under_a_relative_root() {
+    // `--root ./target` used to give every `latest` link a relative target
+    // that resolved against the link's own directory, so no installed
+    // package was found: `update` saw nothing and `install` reinstalled
+    // every dependency.
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("unwrap failed");
+    let root = tmp.path().join("target");
+    fs::create_dir_all(&root).expect("unwrap failed");
+    isolate(&mut ctx, &root);
+    ctx.set_current_dir(tmp.path());
+    common::TestContextGuard::set_sysroot(Path::new("target").to_path_buf());
+
+    let manifest = sample_manifest("rel-pkg", "1.2.3");
+    local::write_manifest(&manifest).expect("unwrap failed");
+
+    let package_dir = local::get_package_dir(
+        manifest.scope,
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name
+    )
+    .expect("unwrap failed");
+    assert!(package_dir.starts_with(&root), "{}", package_dir.display());
+    assert_eq!(
+        fs::read_link(package_dir.join("latest")).expect("latest link"),
+        Path::new("1.2.3")
+    );
+    assert!(
+        local::get_installed_packages()
+            .expect("unwrap failed")
+            .iter()
+            .any(|m| m.name == "rel-pkg"),
+        "the package must be listed as installed"
+    );
+}
