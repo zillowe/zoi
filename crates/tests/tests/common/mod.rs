@@ -57,6 +57,16 @@ impl TestContextGuard {
         unsafe { std::env::set_var(key, value.as_ref()) };
     }
 
+    /// Unsets `key` for the rest of the test; restored on drop.
+    pub(crate) fn remove_env_var(&mut self, key: &str) {
+        if self.captured_keys.insert(key.to_string()) {
+            self.previous_env
+                .push((key.to_string(), std::env::var_os(key)));
+        }
+        // SAFETY: as for `set_env_var`.
+        unsafe { std::env::remove_var(key) };
+    }
+
     pub(crate) fn set_sysroot(path: std::path::PathBuf) {
         sysroot::set_sysroot(path);
     }

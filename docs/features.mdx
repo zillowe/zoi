@@ -25,7 +25,7 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Explicit Scope Control:** Restrict package installation to specific scopes (`user`, `system`, or `project`) using the `scopes` metadata field. Zoi automatically enforces these constraints during installation and updates.
 
-- **Scope-Aware Registry Sync:** Synchronize package metadata to either the user data directory or the system-wide store (`/var/lib/zoi` on Linux). Zoi automatically detects the correct scope when running as root or with a sysroot (`--root`).
+- **Scope-Aware Registry Sync:** Synchronize package metadata to either the user data directory or the system-wide store (`/var/lib/zoi` on Linux). Running as root or with a sysroot (`--root`), Zoi syncs and reads the system-wide databases; otherwise the user's. Installs and upgrades always read the databases `zoi sync` wrote.
 
 - **Sysroot Support (`--root`):** Operates on a different root directory, allowing you to bootstrap entire OS images, containers, or embedded systems from the outside.
 

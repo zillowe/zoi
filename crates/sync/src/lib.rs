@@ -1871,14 +1871,7 @@ pub fn run(
         );
     }
 
-    let effective_scope = scope.unwrap_or_else(|| {
-        if core_utils::is_admin() || zoi_core::sysroot::get_sysroot().is_some()
-        {
-            types::Scope::System
-        } else {
-            types::Scope::User
-        }
-    });
+    let effective_scope = scope.unwrap_or_else(core_utils::default_db_scope);
 
     if merged_config.protect_db || force {
         let db_root = core_utils::get_db_base_dir(effective_scope)?;

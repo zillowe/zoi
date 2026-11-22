@@ -80,3 +80,30 @@ fn archive_cache_stays_on_the_host_while_building_into_a_sysroot() {
         assert_eq!(cache, home.path().join(".cache/zoi/archives"));
     }
 }
+
+#[test]
+fn sync_and_resolution_use_the_same_registry_location_on_a_sysroot() {
+    // `zoi --root <dir> sync` writes the system-scope databases inside the
+    // target. Resolution used to read the user-scope ones, so `update` and
+    // `install` never saw what the sync fetched.
+    let mut ctx = common::TestContextGuard::acquire();
+    let home = tempfile::tempdir().expect("tempdir");
+    ctx.set_env_var("HOME", home.path());
+    ctx.set_env_var("XDG_DATA_HOME", home.path().join(".local/share"));
+    ctx.remove_env_var("ZOI_DB_DIR");
+    // No project `.zoi` database may be picked up instead.
+    ctx.set_current_dir(home.path());
+    common::TestContextGuard::set_sysroot(PathBuf::from("/mnt/new-disk"));
+
+    assert_eq!(
+        zoi_core::utils::default_db_scope(),
+        zoi_core::types::Scope::System
+    );
+    let system = zoi_core::utils::get_db_base_dir(
+        zoi_core::types::Scope::System
+    )
+    .expect("system db dir");
+    assert!(system.starts_with("/mnt/new-disk"), "{}", system.display());
+    assert_eq!(zoi::pkg::resolve::get_db_root().expect("db root"), system);
+    assert_eq!(zoi_core::utils::get_db_root().expect("db root"), system);
+}

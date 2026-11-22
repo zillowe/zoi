@@ -842,9 +842,29 @@ fn run_update_all_logic(
     }
     pb.finish_and_clear();
 
+    // A package that cannot be resolved was not checked at all; saying
+    // everything is up to date would hide that (for example when the
+    // registry index is missing or in another location).
+    if !plan_json && !skipped_sources.is_empty() {
+        eprintln!(
+            "{} Could not check {} package(s) for upgrades:",
+            "Warning:".yellow().bold(),
+            skipped_sources.len()
+        );
+        for skipped in &skipped_sources {
+            eprintln!("  - {skipped}");
+        }
+    }
+
     if candidates.is_empty() {
         if !plan_json {
-            println!("\nAll packages are up to date.");
+            if skipped_sources.is_empty() {
+                println!("\nAll packages are up to date.");
+            } else {
+                println!(
+                    "\nAll packages that could be checked are up to date."
+                );
+            }
         }
         return Ok(());
     }

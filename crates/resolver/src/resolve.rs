@@ -192,8 +192,8 @@ pub fn get_db_root() -> Result<PathBuf> {
         return Ok(local_db);
     }
 
-    // Default to user scope for normal CLI usage
-    zoi_core::utils::get_db_base_dir(zoi_core::types::Scope::User)
+    // The scope `zoi sync` writes to (system as root or on a sysroot).
+    zoi_core::utils::get_db_base_dir(zoi_core::utils::default_db_scope())
 }
 
 /// Returns the root directory of the package database on the host system.

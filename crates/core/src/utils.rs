@@ -360,6 +360,22 @@ pub fn get_system_cache_dir() -> PathBuf {
     crate::sysroot::apply_sysroot(path)
 }
 
+/// The scope whose registry databases Zoi syncs and reads by default.
+///
+/// System scope when running as root or on a sysroot (`--root`, `zoi system
+/// distro build`): the registries a system install uses belong to the
+/// system, not to whoever ran `sudo`. User scope otherwise. `zoi sync` writes
+/// and package resolution reads the same place, so a sync is always what the
+/// next install sees.
+#[must_use]
+pub fn default_db_scope() -> crate::types::Scope {
+    if is_admin() || crate::sysroot::get_sysroot().is_some() {
+        crate::types::Scope::System
+    } else {
+        crate::types::Scope::User
+    }
+}
+
 /// Returns the root directory for the package database.
 ///
 /// # Errors
@@ -369,7 +385,7 @@ pub fn get_db_root() -> Result<std::path::PathBuf> {
     if let Ok(path) = std::env::var("ZOI_DB_DIR") {
         return Ok(std::path::PathBuf::from(path));
     }
-    Ok(get_user_data_dir()?.join("pkgs").join("db"))
+    get_db_base_dir(default_db_scope())
 }
 
 /// Returns the root directory of the package store for a given scope.
