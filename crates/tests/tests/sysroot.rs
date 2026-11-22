@@ -99,10 +99,9 @@ fn sync_and_resolution_use_the_same_registry_location_on_a_sysroot() {
         zoi_core::utils::default_db_scope(),
         zoi_core::types::Scope::System
     );
-    let system = zoi_core::utils::get_db_base_dir(
-        zoi_core::types::Scope::System
-    )
-    .expect("system db dir");
+    let system =
+        zoi_core::utils::get_db_base_dir(zoi_core::types::Scope::System)
+            .expect("system db dir");
     assert!(system.starts_with("/mnt/new-disk"), "{}", system.display());
     assert_eq!(zoi::pkg::resolve::get_db_root().expect("db root"), system);
     assert_eq!(zoi_core::utils::get_db_root().expect("db root"), system);
