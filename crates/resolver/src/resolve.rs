@@ -196,6 +196,17 @@ pub fn get_db_root() -> Result<PathBuf> {
     zoi_core::utils::get_db_base_dir(zoi_core::utils::default_db_scope())
 }
 
+/// Whether resolution may fall back to the invoking user's synced registry
+/// (`get_host_db_root`) when the default one has none.
+///
+/// True on a sysroot, whose own database may still be empty, and when
+/// running as root: the default database is then the system one, but the
+/// registry may have been synced as the user who ran `sudo` (for example
+/// before `sudo zoi system distro build`).
+fn host_registry_fallback() -> bool {
+    zoi_core::sysroot::get_sysroot().is_some() || zoi_core::utils::is_admin()
+}
+
 /// Returns the root directory of the package database on the host system.
 ///
 /// # Errors
@@ -470,9 +481,7 @@ fn find_package_in_db(
             let default_handle = default_registry.handle.clone();
             let mut default_path = db_root.join(&default_handle);
 
-            if !default_path.exists()
-                && zoi_core::sysroot::get_sysroot().is_some()
-            {
+            if !default_path.exists() && host_registry_fallback() {
                 // Fallback to host metadata for resolution
                 let host_root = get_host_db_root()?;
                 let host_path = host_root.join(&default_handle);
@@ -492,7 +501,7 @@ fn find_package_in_db(
                 let mut found = false;
 
                 let roots_to_check =
-                    if zoi_core::sysroot::get_sysroot().is_some() {
+                    if host_registry_fallback() {
                         // When running inside a sysroot, sync targets the
                         // System scope, so the synced registry may live in the
                         // system DB root rather than the user DB root.
