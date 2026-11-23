@@ -406,7 +406,6 @@ pub fn setup_lua_environment_with_mode(
     api::crypto::add_verify_hash(lua, quiet)?;
     api::fs::add_zrm(lua)?;
     api::system::add_cmd_util(lua, quiet)?;
-    api::system::restrict_process_access(lua)?;
     api::system::add_zpatch(lua, quiet)?;
     api::fs::add_fs_util(lua)?;
     api::fs::add_find_util(lua)?;

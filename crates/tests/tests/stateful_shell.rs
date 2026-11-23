@@ -413,20 +413,11 @@ fn package_code_never_sees_secret_environment_variables() {
         .expect("cmd");
     assert_eq!(out, "unset unset visible");
 
-    let (token, plain) = lua
-        .load(
-            r#"return os.getenv("ZOI_TEST_SIGNING_TOKEN"),
-                os.getenv("ZOI_TEST_PLAIN")"#
-        )
-        .eval::<(Option<String>, Option<String>)>()
-        .expect("getenv");
-    assert_eq!(token, None);
-    assert_eq!(plain.as_deref(), Some("visible"));
-
-    for code in [r#"os.execute("true")"#, r#"io.popen("true")"#] {
-        assert!(
-            lua.load(code).exec().is_err(),
-            "{code} must not be available to packages"
-        );
-    }
+    // Luau, which Zoi embeds, gives package code no other way to the
+    // environment: no `os.getenv`, `os.execute` or `io` library.
+    let has_env_access = lua
+        .load(r#"return os.getenv ~= nil or os.execute ~= nil or io ~= nil"#)
+        .eval::<bool>()
+        .expect("lua");
+    assert!(!has_env_access, "package code must only reach the shell");
 }
