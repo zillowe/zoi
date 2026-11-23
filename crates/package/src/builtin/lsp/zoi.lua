@@ -263,13 +263,18 @@ function set_quiet(quiet) end
 ---@param destination string Destination using ${pkgstore}, ${usrroot}, etc.
 function zcp(source, destination) end
 
---- Copies a license file to the package store (${pkgstore}/LICENSE).
+--- Stages a license file: /usr/share/licenses/<pkg>/<name> in system scope
+--- (<pkg>-<sub> for a sub-package other than "main"), else ${pkgstore}/<name>.
 ---@param source string Path relative to BUILD_DIR or ${pkgluadir}.
-function zlicense(source) end
+---@param name? string File name to install it as (default: the source's).
+function zlicense(source, name) end
 
---- Copies a documentation file to the package store (${pkgstore}/doc/{filename}).
+--- Stages a documentation file: /usr/share/doc/<pkg>/<name> in system scope
+--- (<pkg>-<sub> for a sub-package other than "main"), else
+--- ${pkgstore}/doc/<name>.
 ---@param source string Path relative to BUILD_DIR or ${pkgluadir}.
-function zdoc(source) end
+---@param name? string File name to install it as (default: the source's).
+function zdoc(source, name) end
 
 --- Stages a manual page for the package.
 --- If scope is system, it is copied to /usr/share/man/man{section}/{filename}.

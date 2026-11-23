@@ -206,7 +206,9 @@ Maintainers **MUST** use the `zman()` helper function to bundle manual pages. Th
 
 ### 6.2. License Staging
 
-Every package (and every independent sub-package) **MUST** stage its license text to the package store using the `zlicense()` helper.
+Every package (and every independent sub-package) **MUST** stage the license text of the software it packages (not of the recipe) using the `zlicense()` helper, from upstream's source (usually the extracted tarball) or, when upstream ships none, from a file next to the recipe. A sub-package other than `main` gets its own directory (`/usr/share/licenses/<pkg>-<sub>`), so call `zlicense()` for every sub-package. Use the optional second argument to rename files that share a name.
+
+Other documentation worth keeping (README, NEWS, additional license notices that are not the license itself, such as `AUTHORS` or `THANKS` where the license requires attribution) **SHOULD** be staged with `zdoc()`.
 
 ```lua
 function package(args)

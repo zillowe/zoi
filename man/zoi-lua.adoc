@@ -227,11 +227,14 @@ immediately.
 *zcp*(_source_, _destination_)::
   Stage a file or directory into the package.
 
-*zlicense*(_source_)::
-  Stage a license file into the package license directory.
+*zlicense*(_source_, [_name_])::
+  Stage a license file into the package license directory,
+  _/usr/share/licenses/<pkg>_ in system scope (_<pkg>-<sub>_ for a
+  sub-package other than _main_). _name_ renames the file.
 
-*zdoc*(_source_)::
-  Stage a documentation file.
+*zdoc*(_source_, [_name_])::
+  Stage a documentation file, into _/usr/share/doc/<pkg>_ (or
+  _<pkg>-<sub>_) in system scope. _name_ renames the file.
 
 *zman*(_source_, [_section_])::
   Stage a manual page or a directory of pages. The section is inferred

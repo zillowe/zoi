@@ -96,23 +96,29 @@ Stages a file or directory to be included in the final package.
 - **Source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}` for files next to the script.
 - **Destination**: Use variables like `${pkgstore}`, `${createpkgdir}`, `${usrroot}`, or `${usrhome}`.
 
-### `zlicense(source)`
+### `zlicense(source, [name])`
 
 Stages a license file for the package. The destination path is determined by the installation scope:
 
-- **System Scope**: `${usrroot}/usr/share/licenses/<pkgname>/<filename>` (standard FHS location).
-- **Other Scopes**: `${pkgstore}/<filename>`.
+- **System Scope**: `${usrroot}/usr/share/licenses/<dir>/<name>` (standard FHS location).
+- **Other Scopes**: `${pkgstore}/<name>`.
 
-- **source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}`.
+- **source**: Path relative to `BUILD_DIR` (for example inside the extracted tarball, `foo-1.0/COPYING`), or use `${pkgluadir}`.
+- **name** (optional): The file name to install it as. Defaults to the source's file name; use it when two licenses share a name (`zlicense("foo-1.0/lib/LICENSE", "LICENSE.lib")`).
 
-### `zdoc(source)`
+`<dir>` is the package name, or `<name>-<sub>` while packaging a sub-package other than `main` (for example `systemd-libs`), so sub-packages of one package never install the same file.
+
+### `zdoc(source, [name])`
 
 Stages a documentation file for the package. The destination path is determined by the installation scope:
 
-- **System Scope**: `${usrroot}/usr/share/doc/<pkgname>/<filename>` (standard FHS location).
-- **Other Scopes**: `${pkgstore}/doc/<filename>`.
+- **System Scope**: `${usrroot}/usr/share/doc/<dir>/<name>` (standard FHS location).
+- **Other Scopes**: `${pkgstore}/doc/<name>`.
 
 - **source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}`.
+- **name** (optional): The file name to install it as; defaults to the source's file name.
+
+`<dir>` follows the same rule as `zlicense`.
 
 ### `zman(source, section)`
 

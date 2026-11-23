@@ -69,38 +69,86 @@ pub fn add_zcp(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// The directory name a package's licenses and docs go under: the package
+/// name, or `<name>-<sub>` for a sub-package other than `main`, so two
+/// sub-packages of one package never ship the same file (as Arch names its
+/// split packages, e.g. `systemd-libs`).
+fn staging_dir_name(lua: &Lua) -> Result<String, mlua::Error> {
+    let pkg_table: Table = lua.globals().get("PKG")?;
+    let pkg_name: String = pkg_table
+        .get("name")
+        .unwrap_or_else(|_| "unknown".to_string());
+    let sub: Option<String> = lua.globals().get("SUBPKG").ok();
+    Ok(match sub.as_deref() {
+        Some(sub) if !sub.is_empty() && sub != "main" => {
+            format!("{pkg_name}-{sub}")
+        }
+        _ => pkg_name
+    })
+}
+
+/// The file name a staged license or doc gets: `name` when given, else the
+/// source's own file name.
+fn staged_file_name(
+    source: &str,
+    name: Option<String>
+) -> Result<String, mlua::Error> {
+    if let Some(name) = name {
+        if name.is_empty() || name.contains('/') || name == ".." {
+            return Err(mlua::Error::RuntimeError(format!(
+                "Invalid file name '{name}': expected a plain file name"
+            )));
+        }
+        return Ok(name);
+    }
+    Path::new(source)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(str::to_string)
+        .ok_or_else(|| {
+            mlua::Error::RuntimeError(format!(
+                "Invalid source path '{source}'"
+            ))
+        })
+}
+
+/// Whether the package is being built for the system scope.
+fn is_system_scope(lua: &Lua) -> Result<bool, mlua::Error> {
+    let zoi_table: Table = lua.globals().get("ZOI")?;
+    let scope: String = zoi_table
+        .get("scope")
+        .unwrap_or_else(|_| "user".to_string());
+    Ok(scope == "system")
+}
+
 /// Adds the `zlicense` function to the Lua environment for staging licenses.
+///
+/// `zlicense(source [, name])` installs `source` (relative to the build
+/// directory or `${pkgluadir}`) as `/usr/share/licenses/<dir>/<name>` in
+/// system scope, or `${pkgstore}/<name>` otherwise; see `staging_dir_name`.
 ///
 /// # Errors
 ///
 /// Returns an error if the `zlicense` function cannot be set in the global
 /// environment.
 pub fn add_zlicense(lua: &Lua) -> Result<(), mlua::Error> {
-    let zlicense_fn = lua.create_function(|lua, source: String| {
-        let zoi_table: Table = lua.globals().get("ZOI")?;
-        let scope: String = zoi_table
-            .get("scope")
-            .unwrap_or_else(|_| "user".to_string());
-        let pkg_table: Table = lua.globals().get("PKG")?;
-        let pkg_name: String = pkg_table
-            .get("name")
-            .unwrap_or_else(|_| "unknown".to_string());
+    let zlicense_fn = lua.create_function(
+        |lua, (source, name): (String, Option<String>)| {
+            let filename = staged_file_name(&source, name)?;
+            let destination = if is_system_scope(lua)? {
+                format!(
+                    "${{usrroot}}/usr/share/licenses/{}/{filename}",
+                    staging_dir_name(lua)?
+                )
+            } else {
+                format!("${{pkgstore}}/{filename}")
+            };
 
-        let filename = Path::new(&source)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("LICENSE");
-
-        let destination = if scope == "system" {
-            format!("${{usrroot}}/usr/share/licenses/{pkg_name}/{filename}")
-        } else {
-            format!("${{pkgstore}}/{filename}")
-        };
-
-        let zcp: mlua::Function = lua.globals().get("zcp")?;
-        zcp.call::<()>((source, destination))?;
-        Ok(())
-    })?;
+            let zcp: mlua::Function = lua.globals().get("zcp")?;
+            zcp.call::<()>((source, destination))?;
+            Ok(())
+        }
+    )?;
     lua.globals().set("zlicense", zlicense_fn)?;
     Ok(())
 }
@@ -108,38 +156,32 @@ pub fn add_zlicense(lua: &Lua) -> Result<(), mlua::Error> {
 /// Adds the `zdoc` function to the Lua environment for staging documentation
 /// files.
 ///
+/// `zdoc(source [, name])` installs `source` as
+/// `/usr/share/doc/<dir>/<name>` in system scope, or
+/// `${pkgstore}/doc/<name>` otherwise; see `staging_dir_name`.
+///
 /// # Errors
 ///
 /// Returns an error if the `zdoc` function cannot be set in the global
 /// environment.
 pub fn add_zdoc(lua: &Lua) -> Result<(), mlua::Error> {
-    let zdoc_fn = lua.create_function(|lua, source: String| {
-        let zoi_table: Table = lua.globals().get("ZOI")?;
-        let scope: String = zoi_table
-            .get("scope")
-            .unwrap_or_else(|_| "user".to_string());
-        let pkg_table: Table = lua.globals().get("PKG")?;
-        let pkg_name: String = pkg_table
-            .get("name")
-            .unwrap_or_else(|_| "unknown".to_string());
+    let zdoc_fn = lua.create_function(
+        |lua, (source, name): (String, Option<String>)| {
+            let filename = staged_file_name(&source, name)?;
+            let destination = if is_system_scope(lua)? {
+                format!(
+                    "${{usrroot}}/usr/share/doc/{}/{filename}",
+                    staging_dir_name(lua)?
+                )
+            } else {
+                format!("${{pkgstore}}/doc/{filename}")
+            };
 
-        let filename = Path::new(&source)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .ok_or_else(|| {
-                mlua::Error::RuntimeError("Invalid source path".to_string())
-            })?;
-
-        let destination = if scope == "system" {
-            format!("${{usrroot}}/usr/share/doc/{pkg_name}/{filename}")
-        } else {
-            format!("${{pkgstore}}/doc/{filename}")
-        };
-
-        let zcp: mlua::Function = lua.globals().get("zcp")?;
-        zcp.call::<()>((source, destination))?;
-        Ok(())
-    })?;
+            let zcp: mlua::Function = lua.globals().get("zcp")?;
+            zcp.call::<()>((source, destination))?;
+            Ok(())
+        }
+    )?;
     lua.globals().set("zdoc", zdoc_fn)?;
     Ok(())
 }
