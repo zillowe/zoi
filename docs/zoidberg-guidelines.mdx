@@ -185,7 +185,7 @@ end
 
 Changes to the upstream source are made with patch files, never by downloading a different upstream state.
 
-- **Location:** Patches **MUST** be stored in the package directory next to the recipe and applied in `prepare()` after verification.
+- **Location:** Patches **MUST** be stored in the package's `patches/` directory (see [Package Directory Layout](#63-package-directory-layout)) and applied in `prepare()` after verification.
 - **Naming:** Patches **SHOULD** be named `NNNN-short-description.patch` (e.g. `0001-fix-build-with-gcc-16.patch`) and applied in that order.
 - **Provenance:** Each patch **SHOULD** begin with a header naming its origin (upstream commit, bug report, or mailing-list post), or stating that it is specific to Zoidberg.
 - **Backports:** Fixes from an upstream release branch that are not yet in a release are carried this way on top of the latest release tarball. The `version` stays that of the release, and the `revision` is bumped when patches change.
@@ -206,7 +206,7 @@ Maintainers **MUST** use the `zman()` helper function to bundle manual pages. Th
 
 ### 6.2. License Staging
 
-Every package (and every independent sub-package) **MUST** stage the license text of the software it packages (not of the recipe) using the `zlicense()` helper, from upstream's source (usually the extracted tarball) or, when upstream ships none, from a file next to the recipe. A sub-package other than `main` gets its own directory (`/usr/share/licenses/<pkg>-<sub>`), so call `zlicense()` for every sub-package. Use the optional second argument to rename files that share a name.
+Every package (and every independent sub-package) **MUST** stage the license text of the software it packages (not of the recipe) using the `zlicense()` helper, from upstream's source (usually the extracted tarball) or, when upstream ships none, from a copy committed as `files/LICENSE.<SPDX-id>`. A sub-package other than `main` gets its own directory (`/usr/share/licenses/<pkg>-<sub>`), so call `zlicense()` for every sub-package. Use the optional second argument to rename files that share a name.
 
 Other documentation worth keeping (README, NEWS, additional license notices that are not the license itself, such as `AUTHORS` or `THANKS` where the license requires attribution) **SHOULD** be staged with `zdoc()`.
 
@@ -221,3 +221,24 @@ function package(args)
   zlicense("LICENSE")
 end
 ```
+
+### 6.3. Package Directory Layout
+
+Every package directory **MUST** use this layout. Only the recipe and the files Zoi reads by name sit at the top level; everything a recipe uses from `${pkgluadir}` lives in one of the four subdirectories.
+
+```text
+core/<name>/
+├── <name>.pkg.lua       # the recipe
+├── nvchecker.toml       # upstream version check (omit for Zoidberg-versioned packages)
+├── env.toml             # optional: values loaded with IMPORT("env.toml")
+├── patches/             # patch files (section 5.5)
+├── keys/pgp/            # upstream signing keys, <FINGERPRINT>.asc (section 5.4)
+├── hooks/               # package hooks, <name>.hook.yaml
+└── files/               # every other file the recipe installs or uses
+```
+
+- **`patches/`:** `NNNN-short-description.patch` files, applied in order. An official upstream patch series keeps upstream's names (`patches/bash53-001`, ...).
+- **`keys/pgp/`:** One `<FINGERPRINT>.asc` per signing key (full fingerprint, uppercase).
+- **`hooks/`:** Hook definitions, staged with `zcp("${pkgluadir}/hooks/<file>", "${pkgstore}/hooks/<file>")`.
+- **`files/`:** Everything else: systemd units, PAM files, `tmpfiles`/`sysusers` files (named `<name>.tmpfiles`, `<name>.sysusers`), configuration files, scripts, kernel configs, READMEs, and license texts committed because upstream ships none (`LICENSE.<SPDX-id>`).
+- Recipes refer to these paths explicitly (`"$PKGLUADIR/patches/0001-fix.patch"`, `"${pkgluadir}/files/sshd.pam"`). Files that no recipe uses **MUST NOT** be committed.
