@@ -822,7 +822,7 @@ Visualize the dependency tree of one or more packages. This command uses the Pub
 
 **Options:**
 
-- `-r`, `--reverse` (alias `--invert`): Show what depends on the packages instead: the installed packages that depend on each one, and recursively what depends on those. It reads what is installed, so the packages must be installed. Packages that appear more than once are marked `(*)` after the first time.
+- `-r`, `--reverse` (alias `--invert`): Show what depends on the packages instead: the packages in your synced registries whose runtime dependencies include each one, and recursively what depends on those. Like `tree`, it works for any package, installed or not. Asking about a package without a sub-package also counts dependents of its sub-packages. Packages that appear more than once are marked `(*)` after the first time.
 
 ---
 

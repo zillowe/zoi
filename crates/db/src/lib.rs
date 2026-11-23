@@ -1694,6 +1694,59 @@ pub fn get_package_dependencies(
     }
 }
 
+/// A registry index entry with its runtime dependencies.
+#[derive(Debug, Clone)]
+pub struct RuntimeDependencyEntry {
+    /// Repository path (`core`, `extra`, ...).
+    pub repo: String,
+    /// Package name.
+    pub name: String,
+    /// Sub-package, if the entry is one.
+    pub sub_package: Option<String>,
+    /// Indexed version.
+    pub version: Option<String>,
+    /// Required runtime dependency strings (`zoi:@core/glibc`, ...).
+    pub runtime: Vec<String>
+}
+
+/// Lists every package in a registry's index with its runtime
+/// dependencies, for walking the dependency graph backwards.
+///
+/// # Errors
+///
+/// Returns an error if the database connection cannot be opened or the query
+/// fails.
+pub fn list_runtime_dependencies(
+    registry_handle: &str
+) -> Result<Vec<RuntimeDependencyEntry>> {
+    let conn = open_connection(registry_handle)?;
+    let mut stmt = conn.prepare(
+        "SELECT repo, name, sub_package, version, dependencies FROM packages"
+    )?;
+    let rows = stmt.query_map([], |row| {
+        let sub_package: Option<String> = row.get(2)?;
+        let deps_raw: Option<String> = row.get(4)?;
+        let runtime = deps_raw
+            .filter(|raw| !raw.is_empty())
+            .and_then(|raw| {
+                serde_json::from_str::<types::Dependencies>(&raw).ok()
+            })
+            .map(|deps| {
+                deps.resolve(&[], &[], sub_package.as_deref(), false, None)
+                    .runtime
+            })
+            .unwrap_or_default();
+        Ok(RuntimeDependencyEntry {
+            repo: row.get(0)?,
+            name: row.get(1)?,
+            sub_package,
+            version: row.get(3)?,
+            runtime
+        })
+    })?;
+    Ok(rows.filter_map(std::result::Result::ok).collect())
+}
+
 /// Finds all installed packages that depend on a specific package.
 ///
 /// # Errors

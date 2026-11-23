@@ -1,12 +1,12 @@
 //! Logic for the `tree` command.
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use anyhow::{Result, anyhow};
 use colored::Colorize;
 
 use crate::pkg::install::resolver;
-use crate::pkg::{local, resolve, types};
+use crate::pkg::resolve;
 
 /// Runs the `tree` command to display the dependency tree of one or more
 /// packages.
@@ -121,111 +121,209 @@ fn print_node(
     Ok(())
 }
 
-/// Runs `tree --reverse`: for each installed package, the installed packages
-/// that depend on it, and recursively what depends on those.
-///
-/// It reads the dependent records the store keeps for every package (the
-/// same ones `zoi why` and uninstall checks use), so it shows what is
-/// installed, not what a registry would resolve.
+/// One package in the reverse graph: `@repo/name` or `@repo/name:sub`.
+type NodeId = String;
+
+/// Runs `tree --reverse`: for each package, the packages in the synced
+/// registries whose runtime dependencies include it, and recursively what
+/// depends on those. Like `tree`, it works for any package in a registry,
+/// installed or not.
 ///
 /// # Errors
 ///
-/// Returns an error if a package is not installed or the store cannot be
-/// read.
+/// Returns an error if a package cannot be found or a registry index cannot
+/// be read.
 pub fn run_reverse(package_names: &[String]) -> Result<()> {
-    for (i, name) in package_names.iter().enumerate() {
-        let manifest = installed_manifest(name)?
-            .ok_or_else(|| anyhow!("Package '{name}' is not installed."))?;
+    println!("{} Reading registry indexes...", "::".bold().blue());
+    let (dependents, versions) = reverse_index()?;
+
+    for (i, source) in package_names.iter().enumerate() {
+        let request = resolve::parse_source_string(source)?;
+        let repo = request.repo.clone().or_else(|| {
+            versions
+                .keys()
+                .find(|id| node_name(id) == request.name)
+                .map(|id| node_repo(id).to_string())
+        });
+        let Some(repo) = repo else {
+            return Err(anyhow!("Package '{source}' was not found."));
+        };
+        let root =
+            node_id(&repo, &request.name, request.sub_package.as_deref());
+        let base = node_id(&repo, &request.name, None);
+        let sub_prefix = format!("{base}:");
+        let known = versions.keys().chain(dependents.keys()).any(|id| {
+            *id == root || *id == base || id.starts_with(&sub_prefix)
+        });
+        if !known {
+            return Err(anyhow!("Package '{source}' was not found."));
+        }
+
         if i > 0 {
             println!();
         }
-        println!(
-            "{} {}",
-            local::installed_manifest_source(&manifest).cyan().bold(),
-            format!("v{}", manifest.version).dimmed()
-        );
-        let mut visited = HashSet::new();
-        visited.insert(local::installed_manifest_source(&manifest));
-        let dependents = sorted_dependents(&manifest)?;
-        if dependents.is_empty() {
-            println!("{}", "  (nothing installed depends on it)".dimmed());
+        print_line("", "", &root, &versions, false);
+        let mut visited = HashSet::from([root.clone()]);
+        let children = dependents_of(&root, &dependents);
+        if children.is_empty() {
+            println!("{}", "  (no package depends on it)".dimmed());
         }
-        let count = dependents.len();
-        for (j, dependent) in dependents.iter().enumerate() {
-            print_dependent(dependent, "", j + 1 == count, &mut visited)?;
+        let count = children.len();
+        for (j, child) in children.iter().enumerate() {
+            print_reverse(
+                child,
+                "",
+                j + 1 == count,
+                &dependents,
+                &versions,
+                &mut visited
+            );
         }
     }
     Ok(())
 }
 
-/// The installed manifest a package source refers to, searching every
-/// scope, or `None` when it is not installed.
-fn installed_manifest(source: &str) -> Result<Option<types::InstallManifest>> {
-    let request = resolve::parse_source_string(source)?;
-    let mut candidates = Vec::new();
-    for scope in [
-        types::Scope::User,
-        types::Scope::System,
-        types::Scope::Project
-    ] {
-        candidates
-            .extend(local::find_installed_manifests_matching(&request, scope)?);
+/// Builds the reverse dependency graph of every synced registry: for each
+/// depended-on package, the packages that need it at runtime, plus each
+/// package's indexed version.
+fn reverse_index() -> Result<(
+    HashMap<NodeId, BTreeSet<NodeId>>,
+    HashMap<NodeId, String>
+)> {
+    let config = crate::pkg::config::read_config()?;
+    let mut handles = Vec::new();
+    if let Some(default) = &config.default_registry {
+        handles.push(default.handle.clone());
     }
-    if candidates.is_empty() {
-        return Ok(None);
+    handles.extend(config.added_registries.iter().map(|r| r.handle.clone()));
+
+    let mut dependents: HashMap<NodeId, BTreeSet<NodeId>> = HashMap::new();
+    let mut versions = HashMap::new();
+    for handle in handles.iter().filter(|h| !h.is_empty()) {
+        let Ok(entries) = crate::pkg::db::list_runtime_dependencies(handle)
+        else {
+            continue;
+        };
+        for entry in entries {
+            let id =
+                node_id(&entry.repo, &entry.name, entry.sub_package.as_deref());
+            if let Some(version) = entry.version {
+                versions.insert(id.clone(), version);
+            }
+            for dep_str in &entry.runtime {
+                let Ok(dep) =
+                    crate::pkg::dependencies::parse_dependency_string(dep_str)
+                else {
+                    continue;
+                };
+                if dep.manager != "zoi" {
+                    continue;
+                }
+                let Ok(req) = resolve::parse_source_string(dep.package) else {
+                    continue;
+                };
+                let repo = req.repo.unwrap_or_else(|| entry.repo.clone());
+                let target =
+                    node_id(&repo, &req.name, req.sub_package.as_deref());
+                if target != id {
+                    dependents.entry(target).or_default().insert(id.clone());
+                }
+            }
+        }
     }
-    crate::cmd::installed_select::choose_installed_manifest(
-        source,
-        &candidates,
-        false
-    )
-    .map(Some)
+    Ok((dependents, versions))
 }
 
-/// A package's dependent records (`#handle@repo/name:sub@version`), sorted.
-fn sorted_dependents(manifest: &types::InstallManifest) -> Result<Vec<String>> {
-    let package_dir = local::get_package_dir(
-        manifest.scope,
-        &manifest.registry_handle,
-        &manifest.repo,
-        &manifest.name
-    )?;
-    let mut dependents = local::get_dependents(&package_dir)?;
-    dependents.sort();
-    dependents.dedup();
-    Ok(dependents)
+/// `@repo/name` or `@repo/name:sub`.
+fn node_id(repo: &str, name: &str, sub: Option<&str>) -> NodeId {
+    match sub {
+        Some(sub) => format!("@{repo}/{name}:{sub}"),
+        None => format!("@{repo}/{name}")
+    }
 }
 
-/// Prints one dependent and, recursively, what depends on it.
-fn print_dependent(
-    source: &str,
+/// The `name` part of a node id.
+fn node_name(id: &str) -> &str {
+    let rest = id.rsplit_once('/').map_or(id, |(_, rest)| rest);
+    rest.split_once(':').map_or(rest, |(name, _)| name)
+}
+
+/// The `repo` part of a node id.
+fn node_repo(id: &str) -> &str {
+    id.trim_start_matches('@')
+        .rsplit_once('/')
+        .map_or("", |(repo, _)| repo)
+}
+
+/// What depends on `id`. A dependency on the whole package (`@core/gcc`)
+/// counts for the package itself; asking about a package without naming a
+/// sub-package also includes what depends on any of its sub-packages.
+fn dependents_of(
+    id: &str,
+    dependents: &HashMap<NodeId, BTreeSet<NodeId>>
+) -> Vec<NodeId> {
+    let mut found: BTreeSet<NodeId> =
+        dependents.get(id).cloned().unwrap_or_default();
+    if !id.contains(':') {
+        let prefix = format!("{id}:");
+        for (target, deps) in dependents {
+            if target.starts_with(&prefix) {
+                found.extend(deps.iter().cloned());
+            }
+        }
+    }
+    found.into_iter().collect()
+}
+
+/// Prints one line of the reverse tree.
+fn print_line(
+    prefix: &str,
+    connector: &str,
+    id: &str,
+    versions: &HashMap<NodeId, String>,
+    repeated: bool
+) {
+    let (base, sub) =
+        id.split_once(':').map_or((id, None), |(b, s)| (b, Some(s)));
+    let display = match sub {
+        Some(sub) => format!("{}:{}", base.cyan().bold(), sub.yellow()),
+        None => base.cyan().bold().to_string()
+    };
+    let version = versions
+        .get(id)
+        .map(|v| format!(" v{v}"))
+        .unwrap_or_default();
+    let mark = if repeated { " (*)".dimmed() } else { "".normal() };
+    println!("{prefix}{connector}{display}{mark}{version}");
+}
+
+/// Prints a dependent and, recursively, what depends on it.
+fn print_reverse(
+    id: &str,
     prefix: &str,
     is_last: bool,
-    visited: &mut HashSet<String>
-) -> Result<()> {
+    dependents: &HashMap<NodeId, BTreeSet<NodeId>>,
+    versions: &HashMap<NodeId, String>,
+    visited: &mut HashSet<NodeId>
+) {
     let connector = if is_last { "└── " } else { "├── " };
-    let repeated = !visited.insert(source.to_string());
-    let mark = if repeated {
-        " (*)".dimmed()
-    } else {
-        "".normal()
-    };
-    println!("{prefix}{connector}{}{mark}", source.cyan());
+    let repeated = !visited.insert(id.to_string());
+    print_line(prefix, connector, id, versions, repeated);
     if repeated {
-        return Ok(());
+        return;
     }
-
-    // A record can outlive its package (removed without cleaning up); show
-    // it, but there is nothing to follow.
-    let Some(manifest) = installed_manifest(source).ok().flatten() else {
-        return Ok(());
-    };
-    let dependents = sorted_dependents(&manifest)?;
+    let children = dependents_of(id, dependents);
     let new_prefix =
         format!("{prefix}{}", if is_last { "    " } else { "│   " });
-    let count = dependents.len();
-    for (i, dependent) in dependents.iter().enumerate() {
-        print_dependent(dependent, &new_prefix, i + 1 == count, visited)?;
+    let count = children.len();
+    for (i, child) in children.iter().enumerate() {
+        print_reverse(
+            child,
+            &new_prefix,
+            i + 1 == count,
+            dependents,
+            versions,
+            visited
+        );
     }
-    Ok(())
 }

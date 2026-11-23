@@ -191,3 +191,37 @@ fn test_get_dependents_ignores_non_dependents_without_error() {
         .expect("rows that do not depend on the target are not errors");
     assert!(dependents.is_empty());
 }
+
+#[test]
+fn list_runtime_dependencies_returns_each_package_with_its_runtime_deps() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("tempdir");
+    ctx.set_env_var("ZOI_DB_DIR", tmp.path());
+    let conn = db::open_connection("local").expect("open db");
+
+    let mut curl = pkg("curl", None);
+    curl.dependencies = Some(types::Dependencies {
+        runtime: Some(types::DependencyGroup::Simple(vec![
+            "zoi:@core/zlib".to_string(),
+            "zoi:@core/openssl".to_string()
+        ])),
+        build: None,
+        test: None
+    });
+    for package in [curl, pkg("zlib", None)] {
+        db::update_package(&conn, &package, "local", None, None, None)
+            .expect("index package");
+    }
+
+    let mut entries =
+        db::list_runtime_dependencies("local").expect("list runtime deps");
+    entries.sort_by(|a, b| a.name.cmp(&b.name));
+    let names: Vec<_> = entries.iter().map(|e| e.name.as_str()).collect();
+    assert_eq!(names, ["curl", "zlib"]);
+    let curl = entries.first().expect("curl entry");
+    assert_eq!(curl.repo, "core");
+    assert_eq!(curl.version.as_deref(), Some("1.0.0"));
+    assert_eq!(curl.runtime, ["zoi:@core/zlib", "zoi:@core/openssl"]);
+    let zlib = entries.get(1).expect("zlib entry");
+    assert!(zlib.runtime.is_empty());
+}
