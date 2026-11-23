@@ -155,6 +155,17 @@ uninstall-man:
 man:
     @./scripts/man.sh "{{ DEV_MANDIR }}"
 
+# Generate shell completions from the release build into DEBUGDIR/completions
+completions:
+    @if [ ! -x "{{ SRC_BIN }}" ]; then echo "Error: '{{ SRC_BIN }}' not found. Run 'just build' first."; exit 1; fi
+    @mkdir -p "{{ DEBUGDIR }}/completions"
+    @"{{ SRC_BIN }}" generate-completions bash > "{{ DEBUGDIR }}/completions/{{ NAME }}.bash"
+    @"{{ SRC_BIN }}" generate-completions zsh > "{{ DEBUGDIR }}/completions/_{{ NAME }}"
+    @"{{ SRC_BIN }}" generate-completions fish > "{{ DEBUGDIR }}/completions/{{ NAME }}.fish"
+    @"{{ SRC_BIN }}" generate-completions elvish > "{{ DEBUGDIR }}/completions/{{ NAME }}.elv"
+    @"{{ SRC_BIN }}" generate-completions powershell > "{{ DEBUGDIR }}/completions/_{{ NAME }}.ps1"
+    @echo "Shell completions written to {{ DEBUGDIR }}/completions."
+
 # Create the source tarball zoi-<version>.tar.gz (from the last commit) in DEBUGDIR
 tarball:
     @./scripts/source-tarball.sh "{{ DEBUGDIR }}"
