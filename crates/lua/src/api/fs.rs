@@ -106,9 +106,7 @@ fn staged_file_name(
         .and_then(|n| n.to_str())
         .map(str::to_string)
         .ok_or_else(|| {
-            mlua::Error::RuntimeError(format!(
-                "Invalid source path '{source}'"
-            ))
+            mlua::Error::RuntimeError(format!("Invalid source path '{source}'"))
         })
 }
 

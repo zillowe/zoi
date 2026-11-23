@@ -209,7 +209,9 @@ fn zlicense_and_zdoc_accept_a_file_name() {
     )
     .expect("lua environment");
     assert!(
-        lua.load(r#"zlicense("LICENSE", "../escape")"#).exec().is_err(),
+        lua.load(r#"zlicense("LICENSE", "../escape")"#)
+            .exec()
+            .is_err(),
         "a name with a path must be rejected"
     );
 }
