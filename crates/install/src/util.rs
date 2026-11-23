@@ -328,6 +328,31 @@ pub fn download_file_with_progress(
     Ok(())
 }
 
+/// Whether a file matches an expected hex digest, without printing
+/// anything. The algorithm is told by the digest's length (SHA-512 or
+/// SHA-256).
+///
+/// # Errors
+///
+/// Returns an error if the digest length is unsupported or the file cannot
+/// be read.
+pub fn file_hash_matches(
+    file_path: &Path,
+    expected_hash: &str
+) -> Result<bool> {
+    let expected_clean = expected_hash.trim().to_lowercase();
+    let algo = zoi_core::hash::HashAlgorithm::from_len(expected_clean.len())
+        .ok_or_else(|| {
+            anyhow!(
+                "Unsupported hash length: {}. Expected 128 (SHA-512) or 64 \
+                 (SHA-256).",
+                expected_clean.len()
+            )
+        })?;
+    let actual = zoi_core::hash::calculate_file_hash(file_path, algo)?;
+    Ok(actual.trim().eq_ignore_ascii_case(&expected_clean))
+}
+
 /// Verifies the hash of a file against an expected hash.
 ///
 /// # Errors

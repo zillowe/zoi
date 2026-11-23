@@ -316,9 +316,14 @@ pub fn download_and_cache_archive(
         match result {
             Ok(true) => {
                 report(format!(
-                    "{} Signature verified: {} (embedded)",
+                    "{} Signature verified: {} ({})",
                     "::".bold().green(),
-                    archive_filename.cyan()
+                    archive_filename.cyan(),
+                    if delta_applied {
+                        "embedded, rebuilt from delta"
+                    } else {
+                        "embedded"
+                    }
                 ));
                 embedded_verified = true;
                 signature_checked = true;
@@ -537,13 +542,16 @@ fn fetch_and_apply_delta(
                 node.pkg.name
             )
         })?;
+    // Checked quietly: the patch's temporary file name means nothing to the
+    // user. One line below reports the whole step once it has been applied.
     let expected = util::get_expected_hash(expected_delta_hash, None)?;
-    if !util::verify_file_hash(&delta_path, &expected, pb)? {
+    if !util::file_hash_matches(&delta_path, &expected)? {
         return Err(anyhow!(
             "Delta hash verification failed for '{}' v{to_version}",
             node.pkg.name
         ));
     }
+    let mut signature_checked = false;
 
     // Verify the delta patch signature whenever trusted keys are configured,
     // exactly as a full archive download would be. A missing signature is an
@@ -588,9 +596,7 @@ fn fetch_and_apply_delta(
             &temp_sig_path,
             trusted_certs
         )?;
-        if verbose {
-            println!("{}", "Delta signature verified successfully.".green());
-        }
+        signature_checked = true;
     } else if verbose {
         println!(
             "{} No trusted PGP keys for delta signature verification.",
@@ -600,8 +606,25 @@ fn fetch_and_apply_delta(
 
     let rebuilt_path = work_dir.join(format!("rebuilt-{to_version}.zpa"));
     zoi_package::delta::apply_zpa_delta(base_path, &delta_path, &rebuilt_path)?;
-    if verbose {
-        println!("{}", "Delta applied successfully.".green());
+
+    let size = fs::metadata(&delta_path).map_or(0, |m| m.len());
+    let checks = if signature_checked {
+        "hash and signature verified"
+    } else {
+        "hash verified"
+    };
+    let msg = format!(
+        "{} Delta: {} {} → {} ({}, {checks})",
+        "::".bold().blue(),
+        node.pkg.name.cyan(),
+        base_version,
+        to_version.green(),
+        zoi_core::utils::format_bytes(size)
+    );
+    if let Some(p) = pb {
+        p.println(msg);
+    } else {
+        println!("{msg}");
     }
     Ok(rebuilt_path)
 }
