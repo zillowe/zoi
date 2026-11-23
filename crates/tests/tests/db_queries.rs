@@ -203,7 +203,7 @@ fn list_runtime_dependencies_returns_each_package_with_its_runtime_deps() {
     curl.dependencies = Some(types::Dependencies {
         runtime: Some(types::DependencyGroup::Simple(vec![
             "zoi:@core/zlib".to_string(),
-            "zoi:@core/openssl".to_string()
+            "zoi:@core/openssl".to_string(),
         ])),
         build: None,
         test: None
@@ -223,5 +223,5 @@ fn list_runtime_dependencies_returns_each_package_with_its_runtime_deps() {
     assert_eq!(curl.version.as_deref(), Some("1.0.0"));
     assert_eq!(curl.runtime, ["zoi:@core/zlib", "zoi:@core/openssl"]);
     let zlib = entries.get(1).expect("zlib entry");
-    assert!(zlib.runtime.is_empty());
+    assert_eq!(zlib.runtime, [] as [std::string::String; 0]);
 }

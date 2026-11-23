@@ -186,10 +186,8 @@ pub fn run_reverse(package_names: &[String]) -> Result<()> {
 /// Builds the reverse dependency graph of every synced registry: for each
 /// depended-on package, the packages that need it at runtime, plus each
 /// package's indexed version.
-fn reverse_index() -> Result<(
-    HashMap<NodeId, BTreeSet<NodeId>>,
-    HashMap<NodeId, String>
-)> {
+fn reverse_index()
+-> Result<(HashMap<NodeId, BTreeSet<NodeId>>, HashMap<NodeId, String>)> {
     let config = crate::pkg::config::read_config()?;
     let mut handles = Vec::new();
     if let Some(default) = &config.default_registry {
@@ -293,7 +291,11 @@ fn print_line(
         .get(id)
         .map(|v| format!(" v{v}"))
         .unwrap_or_default();
-    let mark = if repeated { " (*)".dimmed() } else { "".normal() };
+    let mark = if repeated {
+        " (*)".dimmed()
+    } else {
+        "".normal()
+    };
     println!("{prefix}{connector}{display}{mark}{version}");
 }
 
