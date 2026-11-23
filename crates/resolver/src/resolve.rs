@@ -500,23 +500,22 @@ fn find_package_in_db(
                 let mut found_handle = default_handle.clone();
                 let mut found = false;
 
-                let roots_to_check =
-                    if host_registry_fallback() {
-                        // When running inside a sysroot, sync targets the
-                        // System scope, so the synced registry may live in the
-                        // system DB root rather than the user DB root.
-                        let mut roots = vec![
-                            db_root.clone(),
-                            get_host_db_root()?,
-                            zoi_core::utils::get_db_base_dir(
-                                zoi_core::types::Scope::System
-                            )?,
-                        ];
-                        roots.dedup();
-                        roots
-                    } else {
-                        vec![db_root.clone()]
-                    };
+                let roots_to_check = if host_registry_fallback() {
+                    // When running inside a sysroot, sync targets the
+                    // System scope, so the synced registry may live in the
+                    // system DB root rather than the user DB root.
+                    let mut roots = vec![
+                        db_root.clone(),
+                        get_host_db_root()?,
+                        zoi_core::utils::get_db_base_dir(
+                            zoi_core::types::Scope::System
+                        )?,
+                    ];
+                    roots.dedup();
+                    roots
+                } else {
+                    vec![db_root.clone()]
+                };
 
                 for root in roots_to_check {
                     if let Ok(entries) = fs::read_dir(&root) {
