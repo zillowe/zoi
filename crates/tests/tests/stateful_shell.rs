@@ -393,3 +393,40 @@ fn a_command_that_ends_the_shell_runs_once() {
         .expect_err("checked exit must raise");
     assert!(err.to_string().contains("exit code 4"), "{err}");
 }
+
+#[test]
+#[cfg(unix)]
+fn package_code_never_sees_secret_environment_variables() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("tempdir");
+    ctx.set_env_var("ZOI_TEST_SIGNING_TOKEN", "do-not-leak");
+    ctx.set_env_var("GPG_PRIVATE_KEY", "do-not-leak");
+    ctx.set_env_var("ZOI_TEST_PLAIN", "visible");
+    let lua = shell_env(tmp.path());
+
+    let out = lua
+        .load(
+            r#"return cmd("echo ${ZOI_TEST_SIGNING_TOKEN:-unset} "
+                .. "${GPG_PRIVATE_KEY:-unset} ${ZOI_TEST_PLAIN:-unset}")"#
+        )
+        .eval::<String>()
+        .expect("cmd");
+    assert_eq!(out, "unset unset visible");
+
+    let (token, plain) = lua
+        .load(
+            r#"return os.getenv("ZOI_TEST_SIGNING_TOKEN"),
+                os.getenv("ZOI_TEST_PLAIN")"#
+        )
+        .eval::<(Option<String>, Option<String>)>()
+        .expect("getenv");
+    assert_eq!(token, None);
+    assert_eq!(plain.as_deref(), Some("visible"));
+
+    for code in [r#"os.execute("true")"#, r#"io.popen("true")"#] {
+        assert!(
+            lua.load(code).exec().is_err(),
+            "{code} must not be available to packages"
+        );
+    }
+}

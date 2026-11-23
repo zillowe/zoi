@@ -392,6 +392,30 @@ pub fn get_system_cache_dir() -> PathBuf {
     crate::sysroot::apply_sysroot(path)
 }
 
+/// Whether an environment variable's name looks like it holds a secret:
+/// `*KEY*`, `*TOKEN*`, `*SECRET*`, `*PASSWORD*`, `*PASSWD*`, `*_PASS`,
+/// `*CREDENTIAL*`, `*_DSN`, `GPG_*`, `CI_JOB_*` and `CI_*_PASSWORD`
+/// (case-insensitive).
+///
+/// Package builds never see such variables: a build script (an upstream
+/// `configure`, a makefile) is not trusted with the builder's signing key
+/// or CI tokens. Values a build needs are given to it explicitly instead
+/// (`cmd(..., { env = ... })`). This is defence in depth, not a sandbox: a
+/// build running as the same user can still read its parent's environment
+/// through `/proc`, so secrets should not sit in the environment of a build
+/// at all.
+#[must_use]
+pub fn is_secret_env_name(name: &str) -> bool {
+    let upper = name.to_ascii_uppercase();
+    ["KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL"]
+        .iter()
+        .any(|word| upper.contains(word))
+        || upper.ends_with("_PASS")
+        || upper.ends_with("_DSN")
+        || upper.starts_with("GPG_")
+        || upper.starts_with("CI_JOB_")
+}
+
 /// The scope whose registry databases Zoi syncs and reads by default.
 ///
 /// System scope when running as root or on a sysroot (`--root`, `zoi system

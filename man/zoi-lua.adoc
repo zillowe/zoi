@@ -278,7 +278,11 @@ immediately.
   *check* or *env* the command runs in a subshell, so its `cd` and
   variables do not carry over. `$ROOT` is set to *LOCATION.ROOT* (not
   exported). A command that exits the shell is not run again; the next
-  call starts a fresh session. Returns *stdout*, *stderr*, and
+  call starts a fresh session. Commands do not inherit secret-looking
+  environment variables (*KEY*, *TOKEN*, *SECRET*, *PASSWORD*, *GPG_* and
+  similar); pass values a build needs with *env*. *os.getenv* hides the same
+  names, and *os.execute* and *io.popen* are unavailable. Returns
+  *stdout*, *stderr*, and
   *exit_code*; without *check*, a nonzero exit does not abort the
   script, so check *exit_code*.
 

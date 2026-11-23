@@ -892,9 +892,7 @@ fn host_resolv_conf_copy(
     target: &std::path::Path
 ) -> Option<tempfile::NamedTempFile> {
     let target_file = target.join("etc/resolv.conf");
-    if std::fs::symlink_metadata(&target_file)
-        .map(|m| m.is_symlink())
-        .unwrap_or(true)
+    if std::fs::symlink_metadata(&target_file).map_or(true, |m| m.is_symlink())
     {
         return None;
     }

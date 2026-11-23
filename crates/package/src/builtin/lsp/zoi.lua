@@ -246,7 +246,9 @@ function uninstall() end
 --- Executes a shell command within BUILD_DIR.
 --- Calls share one shell session, so `cd` and `export` carry over, except with
 --- `check` or `env`, which run the command in a subshell. `$ROOT` is the
---- staging path of the system root (LOCATION.ROOT).
+--- staging path of the system root (LOCATION.ROOT). Secret-looking variables
+--- (*KEY*, *TOKEN*, *SECRET*, *PASSWORD*, GPG_*, ...) are not inherited; pass
+--- what a build needs with `env`.
 ---@param command string The shell command to execute.
 ---@param opts? boolean|CmdOptions `true` to silence output, or an options table.
 ---@return string stdout, string stderr, integer exit_code

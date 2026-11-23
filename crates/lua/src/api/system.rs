@@ -37,6 +37,26 @@ fn push_env_assignment(env_cmds: &mut String, name: &str, value: &str) {
     }
 }
 
+/// Starts a build shell without the secrets in Zoi's own environment (see
+/// [`zoi_core::utils::is_secret_env_name`]): the signing passphrase, CI
+/// tokens and the like never reach package code.
+trait EnvClearSecrets {
+    /// Removes every secret-looking variable from the command's
+    /// environment.
+    fn env_clear_secrets(&mut self) -> &mut Self;
+}
+
+impl EnvClearSecrets for Command {
+    fn env_clear_secrets(&mut self) -> &mut Self {
+        for (name, _) in std::env::vars_os() {
+            if zoi_core::utils::is_secret_env_name(&name.to_string_lossy()) {
+                self.env_remove(name);
+            }
+        }
+        self
+    }
+}
+
 /// Configuration for the Lua shell session.
 pub struct ShellSessionConfig {
     /// Whether command output should be silenced.
@@ -88,7 +108,7 @@ impl ShellSession {
                 .arg("-NonInteractive")
                 .arg("-Command")
                 .arg("-")
-                .env_remove("GPG_PASSWORD")
+                .env_clear_secrets()
                 .current_dir(build_dir)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
@@ -98,8 +118,7 @@ impl ShellSession {
             Command::new("bash")
                 .arg("--noprofile")
                 .arg("--norc")
-                // The signing passphrase must never reach package code.
-                .env_remove("GPG_PASSWORD")
+                .env_clear_secrets()
                 .current_dir(build_dir)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
@@ -370,6 +389,56 @@ impl CmdOptions {
             )
         }
     }
+}
+
+/// Keeps package code to the same environment rules as `cmd`:
+/// `os.getenv` returns nothing for secret-looking names, and `os.execute`
+/// and `io.popen`, which would start a shell with Zoi's whole environment,
+/// raise an error pointing to `cmd`.
+///
+/// # Errors
+///
+/// Returns an error if the replacements cannot be registered.
+pub fn restrict_process_access(lua: &Lua) -> Result<(), mlua::Error> {
+    let globals = lua.globals();
+    if let Ok(os) = globals.get::<Table>("os") {
+        if let Ok(getenv) = os.get::<mlua::Function>("getenv") {
+            let filtered =
+                lua.create_function(move |_, name: mlua::LuaString| {
+                    let name_str = name.to_str()?.to_string();
+                    if zoi_core::utils::is_secret_env_name(&name_str) {
+                        return Ok(Value::Nil);
+                    }
+                    getenv.call::<Value>(name)
+                })?;
+            os.set("getenv", filtered)?;
+        }
+        os.set(
+            "execute",
+            lua.create_function(
+                |_, _: mlua::MultiValue| -> mlua::Result<()> {
+                    Err(mlua::Error::RuntimeError(
+                        "os.execute is not available to packages; use cmd()"
+                            .to_string()
+                    ))
+                }
+            )?
+        )?;
+    }
+    if let Ok(io) = globals.get::<Table>("io") {
+        io.set(
+            "popen",
+            lua.create_function(
+                |_, _: mlua::MultiValue| -> mlua::Result<()> {
+                    Err(mlua::Error::RuntimeError(
+                        "io.popen is not available to packages; use cmd()"
+                            .to_string()
+                    ))
+                }
+            )?
+        )?;
+    }
+    Ok(())
 }
 
 /// Exposes system command and patching utilities to the Lua environment.
