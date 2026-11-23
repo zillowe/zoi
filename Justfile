@@ -116,8 +116,7 @@ install-man:
     @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
     @if ! command -v asciidoctor >/dev/null 2>&1; then echo "Error: 'asciidoctor' is not installed. It is required to render man pages."; exit 1; fi
     @echo "Rendering man pages..."
-    @mkdir -p "{{ DEV_MANDIR }}"
-    @asciidoctor -b manpage -D "{{ DEV_MANDIR }}" man/*.adoc
+    @./scripts/man.sh "{{ DEV_MANDIR }}"
     @echo "Installing man pages to {{ MANDIR }}..."
     @sudo install -d -m 755 "{{ MANDIR }}/man1" "{{ MANDIR }}/man3" "{{ MANDIR }}/man5" "{{ MANDIR }}/man8"
     @sudo install -m 644 "{{ DEV_MANDIR }}/zoi.1" "{{ MANDIR }}/man1/zoi.1"
@@ -152,10 +151,7 @@ uninstall-man:
 
 # Generate man pages from the asciidoc sources in man/
 man:
-    @if ! command -v asciidoctor >/dev/null 2>&1; then echo "Error: 'asciidoctor' is not installed. It is required to render man pages."; exit 1; fi
-    @mkdir -p "{{ DEV_MANDIR }}"
-    @asciidoctor -b manpage -D "{{ DEV_MANDIR }}" man/*.adoc
-    @echo "Man pages rendered to {{ DEV_MANDIR }}."
+    @./scripts/man.sh "{{ DEV_MANDIR }}"
 
 # Clean project artifacts
 clean:
