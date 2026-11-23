@@ -597,6 +597,25 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
 
                 #[cfg(target_os = "linux")]
                 {
+                    // Name resolution inside the chroot uses the host's
+                    // resolver settings (as arch-chroot does): the target's
+                    // own `/etc/resolv.conf` is filled in by a network
+                    // service at boot, which never runs in a chroot. A copy
+                    // is mounted, so nothing in the chroot can change the
+                    // host's file.
+                    let resolv = host_resolv_conf_copy(target_path);
+                    let binds: Vec<(std::path::PathBuf, std::path::PathBuf)> =
+                        resolv
+                            .as_ref()
+                            .map(|file| {
+                                vec![(
+                                    file.path().to_path_buf(),
+                                    std::path::PathBuf::from(
+                                        "/etc/resolv.conf"
+                                    )
+                                )]
+                            })
+                            .unwrap_or_default();
                     let mut cmd = if let Some(run_cmd) = run {
                         let args = vec!["-c".to_string(), run_cmd];
                         crate::sandbox::wrap_command_in_root(
@@ -604,7 +623,7 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                             &shell_bin,
                             &args,
                             &envs,
-                            &[],
+                            &binds,
                             false
                         )?
                     } else {
@@ -613,7 +632,7 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                             &shell_bin,
                             &[],
                             &envs,
-                            &[],
+                            &binds,
                             false
                         )?
                     };
@@ -863,6 +882,32 @@ fn handle_response(response: Response) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// A copy of the host's `/etc/resolv.conf`, to mount over the target's
+/// while chrooted into it. `None` when the host has none or the target has
+/// no `/etc/resolv.conf` to mount over.
+#[cfg(target_os = "linux")]
+fn host_resolv_conf_copy(
+    target: &std::path::Path
+) -> Option<tempfile::NamedTempFile> {
+    let target_file = target.join("etc/resolv.conf");
+    if std::fs::symlink_metadata(&target_file)
+        .map(|m| m.is_symlink())
+        .unwrap_or(true)
+    {
+        return None;
+    }
+    let content = std::fs::read("/etc/resolv.conf").ok()?;
+    let mut file = tempfile::NamedTempFile::new().ok()?;
+    std::io::Write::write_all(&mut file, &content).ok()?;
+    // Readable by every user in the chroot, like the real file.
+    std::fs::set_permissions(
+        file.path(),
+        std::os::unix::fs::PermissionsExt::from_mode(0o644)
+    )
+    .ok()?;
+    Some(file)
 }
 
 /// Copies the host's synced registries into the target sysroot, so a fresh

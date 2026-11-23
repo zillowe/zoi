@@ -56,6 +56,8 @@ sudo zoi system distro build --target /mnt --config ./system.lua
 
 Enter a ZoiOS sysroot (chroot) with automatic device mounting and sandbox protection. This is the recommended way to run commands like `dracut` or `grub-install` during the final stages of bootstrapping a ZoiOS installation, as it ensures all operations are safely contained within the target environment.
 
+The chroot shares the host's network, and a copy of the host's `/etc/resolv.conf` is mounted over the target's for the session, so name resolution works (the target's own file is only filled in by its network service at boot). The target's file is left unchanged.
+
 **Options:**
 
 - `--run <command>`: Run a specific command inside the chroot and exit, rather than dropping into an interactive shell.
