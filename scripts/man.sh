@@ -8,8 +8,9 @@
 #
 # Each page's footer carries the Zoi version (from `Cargo.toml`) next to its
 # source name, and the date the page itself last changed: its last commit
-# date, or the file's modification time outside a git checkout (a source
-# tarball). Rendering the same release again gives the same pages.
+# date, or in a release source tarball the date recorded in
+# `man/PAGE-DATES` (see `scripts/source-tarball.sh`). Rendering the same
+# release again gives the same pages.
 #
 # Usage: scripts/man.sh [OUTPUT_DIR]   (default: scripts/release/man)
 #
@@ -49,11 +50,17 @@ if [ -z "$VERSION" ]; then
     exit 1
 fi
 
-# The date a page last changed, as YYYY-MM-DD.
+# The date a page last changed, as YYYY-MM-DD: its last commit, or in a
+# release source tarball (no `.git`) the date recorded in `man/PAGE-DATES`
+# when the tarball was made, or else the file's modification time.
 page_date() {
     local date=""
     if git rev-parse --is-inside-work-tree &>/dev/null; then
         date=$(git log -1 --format=%cs -- "$1" 2>/dev/null || true)
+    fi
+    if [ -z "$date" ] && [ -f "$SOURCE_DIR/PAGE-DATES" ]; then
+        date=$(awk -v page="$(basename "$1")" '$1 == page { print $2 }' \
+            "$SOURCE_DIR/PAGE-DATES")
     fi
     if [ -z "$date" ]; then
         date=$(date -u -r "$1" +%Y-%m-%d)

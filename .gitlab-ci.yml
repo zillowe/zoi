@@ -291,6 +291,10 @@ package:rpm:
 package:archive:
   stage: package
   image: ubuntu:latest
+  variables:
+    # Full history: man page footers and the source tarball's PAGE-DATES
+    # need each page's last commit, which a shallow clone may not have.
+    GIT_DEPTH: 0
   needs:
     - build:linux-amd64
     - build:linux-arm64
@@ -315,6 +319,9 @@ package:archive:
       echo "Rendering man pages..."
       chmod +x ./scripts/man.sh
       ./scripts/man.sh
+      echo "Creating source tarball..."
+      chmod +x ./scripts/source-tarball.sh
+      ./scripts/source-tarball.sh
       echo "Running archive script..."
       chmod +x ./scripts/archive.sh
       ./scripts/archive.sh

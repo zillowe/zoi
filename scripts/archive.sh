@@ -316,6 +316,15 @@ fi
 echo -e "${CYAN}  -> Processing LICENSE...${NC}"
 publish_asset "./LICENSE"
 
+# The official source tarball (`scripts/source-tarball.sh`): what package
+# definitions build Zoi from, signed and listed in `checksums.txt` like every
+# other asset.
+echo -e "${CYAN}  -> Processing source tarball...${NC}"
+for tarball in ./scripts/release/source/zoi-*.tar.gz; do
+    [ -f "$tarball" ] || continue
+    publish_asset "$tarball"
+done
+
 echo -e "${CYAN}🔐 Generating sha512 checksums...${NC}"
 (
     cd "$ARCHIVE_DIR" || exit 1

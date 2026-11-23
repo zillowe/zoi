@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+# Creates the release's official source tarball, `zoi-<version>.tar.gz`.
+#
+# It is `git archive` of the tagged commit plus two generated files that a
+# build from the tarball would otherwise lose with `.git`:
+#
+# - `COMMIT`: the short commit hash, which `just build` embeds in the binary.
+# - `man/PAGE-DATES`: each man page's last-change date, which `just man`
+#   prints in the page footer.
+#
+# In the release it lands in `scripts/release/source/` (a subdirectory, so
+# the binary loop in `archive.sh` does not take it for a binary) and is
+# picked up by `archive.sh`,
+# which signs it and lists it in `checksums.txt`. Package definitions build
+# from this tarball rather than from GitLab's generated tag archive.
+#
+# Usage: scripts/source-tarball.sh [OUTPUT_DIR]   (default: scripts/release/source)
+
+set -euo pipefail
+
+OUTPUT_DIR="${1:-./scripts/release/source}"
+
+VERSION=$(sed -n '/^\[workspace\.package\]/,/^\[/s/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -n 1)
+if [ -z "$VERSION" ]; then
+    echo "Error: could not read the version from Cargo.toml." >&2
+    exit 1
+fi
+
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    echo "Warning: uncommitted changes are not included; the tarball is" \
+        "made from the last commit ($(git rev-parse --short=10 HEAD))." >&2
+fi
+
+PREFIX="zoi-${VERSION}"
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+
+git archive --format=tar --prefix="${PREFIX}/" HEAD | tar -x -C "$WORK"
+
+git rev-parse --short=10 HEAD >"$WORK/$PREFIX/COMMIT"
+for page in man/*.adoc; do
+    printf '%s %s\n' "$(basename "$page")" "$(git log -1 --format=%cs -- "$page")"
+done >"$WORK/$PREFIX/man/PAGE-DATES"
+
+# Reproducible: sorted entries, fixed owner, and every mtime set to the
+# commit's time.
+EPOCH=$(git log -1 --format=%ct HEAD)
+mkdir -p "$OUTPUT_DIR"
+tar --sort=name --owner=0 --group=0 --numeric-owner \
+    --mtime="@${EPOCH}" -C "$WORK" -cf - "$PREFIX" |
+    gzip -n -9 >"$OUTPUT_DIR/${PREFIX}.tar.gz"
+
+echo "Created $OUTPUT_DIR/${PREFIX}.tar.gz"

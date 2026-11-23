@@ -25,7 +25,9 @@ NAME := "zoi"
 
 MINI_NAME := "zoi-mini"
 DAEMON_NAME := "zoid"
-COMMIT_HASH := shell("git rev-parse --short=10 HEAD")
+# From git, or `ZOI_COMMIT_HASH` when building from a source tarball (which
+# has no `.git`; the release's tarball records it in `COMMIT`).
+COMMIT_HASH := env("ZOI_COMMIT_HASH", shell("git rev-parse --short=10 HEAD 2>/dev/null || cat COMMIT 2>/dev/null || echo unknown"))
 IS_WINDOWS := if OS_NAME == "windows" { "1" } else { "0" }
 EXE_EXT := if IS_WINDOWS == "1" { ".exe" } else { "" }
 SRC_BIN := "target/" + PROFILE + "/" + NAME + EXE_EXT
@@ -152,6 +154,10 @@ uninstall-man:
 # Generate man pages from the asciidoc sources in man/
 man:
     @./scripts/man.sh "{{ DEV_MANDIR }}"
+
+# Create the source tarball zoi-<version>.tar.gz (from the last commit) in DEBUGDIR
+tarball:
+    @./scripts/source-tarball.sh "{{ DEBUGDIR }}"
 
 # Clean project artifacts
 clean:
