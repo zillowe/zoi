@@ -6,6 +6,7 @@ use anyhow::{Result, anyhow};
 use colored::Colorize;
 
 use crate::pkg::install::resolver;
+use crate::pkg::{local, resolve, types};
 
 /// Runs the `tree` command to display the dependency tree of one or more
 /// packages.
@@ -117,5 +118,111 @@ fn print_node(
         }
     }
 
+    Ok(())
+}
+
+/// Runs `tree --reverse`: for each installed package, the installed packages
+/// that depend on it, and recursively what depends on those.
+///
+/// It reads the dependent records the store keeps for every package (the
+/// same ones `zoi why` and uninstall checks use), so it shows what is
+/// installed, not what a registry would resolve.
+///
+/// # Errors
+///
+/// Returns an error if a package is not installed or the store cannot be
+/// read.
+pub fn run_reverse(package_names: &[String]) -> Result<()> {
+    for (i, name) in package_names.iter().enumerate() {
+        let manifest = installed_manifest(name)?.ok_or_else(|| {
+            anyhow!("Package '{name}' is not installed.")
+        })?;
+        if i > 0 {
+            println!();
+        }
+        println!(
+            "{} {}",
+            local::installed_manifest_source(&manifest).cyan().bold(),
+            format!("v{}", manifest.version).dimmed()
+        );
+        let mut visited = HashSet::new();
+        visited.insert(local::installed_manifest_source(&manifest));
+        let dependents = sorted_dependents(&manifest)?;
+        if dependents.is_empty() {
+            println!("{}", "  (nothing installed depends on it)".dimmed());
+        }
+        let count = dependents.len();
+        for (j, dependent) in dependents.iter().enumerate() {
+            print_dependent(dependent, "", j + 1 == count, &mut visited)?;
+        }
+    }
+    Ok(())
+}
+
+/// The installed manifest a package source refers to, searching every
+/// scope, or `None` when it is not installed.
+fn installed_manifest(source: &str) -> Result<Option<types::InstallManifest>> {
+    let request = resolve::parse_source_string(source)?;
+    let mut candidates = Vec::new();
+    for scope in [
+        types::Scope::User,
+        types::Scope::System,
+        types::Scope::Project
+    ] {
+        candidates
+            .extend(local::find_installed_manifests_matching(&request, scope)?);
+    }
+    if candidates.is_empty() {
+        return Ok(None);
+    }
+    crate::cmd::installed_select::choose_installed_manifest(
+        source,
+        &candidates,
+        false
+    )
+    .map(Some)
+}
+
+/// A package's dependent records (`#handle@repo/name:sub@version`), sorted.
+fn sorted_dependents(manifest: &types::InstallManifest) -> Result<Vec<String>> {
+    let package_dir = local::get_package_dir(
+        manifest.scope,
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name
+    )?;
+    let mut dependents = local::get_dependents(&package_dir)?;
+    dependents.sort();
+    dependents.dedup();
+    Ok(dependents)
+}
+
+/// Prints one dependent and, recursively, what depends on it.
+fn print_dependent(
+    source: &str,
+    prefix: &str,
+    is_last: bool,
+    visited: &mut HashSet<String>
+) -> Result<()> {
+    let connector = if is_last { "└── " } else { "├── " };
+    let repeated = !visited.insert(source.to_string());
+    let mark = if repeated { " (*)".dimmed() } else { "".normal() };
+    println!("{prefix}{connector}{}{mark}", source.cyan());
+    if repeated {
+        return Ok(());
+    }
+
+    // A record can outlive its package (removed without cleaning up); show
+    // it, but there is nothing to follow.
+    let Some(manifest) = installed_manifest(source).ok().flatten() else {
+        return Ok(());
+    };
+    let dependents = sorted_dependents(&manifest)?;
+    let new_prefix =
+        format!("{prefix}{}", if is_last { "    " } else { "│   " });
+    let count = dependents.len();
+    for (i, dependent) in dependents.iter().enumerate() {
+        print_dependent(dependent, &new_prefix, i + 1 == count, visited)?;
+    }
     Ok(())
 }

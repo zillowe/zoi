@@ -431,7 +431,11 @@ enum Commands {
     Tree {
         /// The package identifier(s).
         #[arg(value_name = "ALL_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
-        packages: Vec<String>
+        packages: Vec<String>,
+        /// Show the installed packages that depend on these packages, and
+        /// what depends on those, instead of their dependencies
+        #[arg(short, long, visible_alias = "invert")]
+        reverse: bool
     },
 
     /// Unpin a package, allowing it to be updated
@@ -1322,7 +1326,13 @@ pub fn run() -> anyhow::Result<()> {
                 cmd::pin::run(&package, &version, cli.yes)
             }
             Commands::Provides { term } => cmd::provides::run(&term),
-            Commands::Tree { packages } => cmd::tree::run(&packages),
+            Commands::Tree { packages, reverse } => {
+                if reverse {
+                    cmd::tree::run_reverse(&packages)
+                } else {
+                    cmd::tree::run(&packages)
+                }
+            }
             Commands::Unpin { package } => cmd::unpin::run(&package, cli.yes),
             Commands::Mark {
                 packages,

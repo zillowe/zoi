@@ -272,8 +272,10 @@ rather than risk clobbering an existing project.
 *provides* _TERM_::
   Find which package provides a specific command or file.
 
-*tree* _PACKAGES_...::
-  Visualize the dependency tree of one or more packages.
+*tree* [*-r*|*--reverse*] _PACKAGES_...::
+  Visualize the dependency tree of one or more packages. With *--reverse*
+  (alias *--invert*), show the installed packages that depend on them,
+  recursively, instead.
 
 *why* _PACKAGE_::
   Explain why a package is installed (direct request or dependency chain).

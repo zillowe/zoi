@@ -820,6 +820,10 @@ Visualize the dependency tree of one or more packages. This command uses the Pub
 
 - `<PACKAGES>...`: One or more package names, paths, or URLs to visualize.
 
+**Options:**
+
+- `-r`, `--reverse` (alias `--invert`): Show what depends on the packages instead: the installed packages that depend on each one, and recursively what depends on those. It reads what is installed, so the packages must be installed. Packages that appear more than once are marked `(*)` after the first time.
+
 ---
 
 ### `zoi uninstall <PACKAGES>...`
