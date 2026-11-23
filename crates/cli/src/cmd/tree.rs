@@ -134,9 +134,8 @@ fn print_node(
 /// read.
 pub fn run_reverse(package_names: &[String]) -> Result<()> {
     for (i, name) in package_names.iter().enumerate() {
-        let manifest = installed_manifest(name)?.ok_or_else(|| {
-            anyhow!("Package '{name}' is not installed.")
-        })?;
+        let manifest = installed_manifest(name)?
+            .ok_or_else(|| anyhow!("Package '{name}' is not installed."))?;
         if i > 0 {
             println!();
         }
@@ -206,7 +205,11 @@ fn print_dependent(
 ) -> Result<()> {
     let connector = if is_last { "└── " } else { "├── " };
     let repeated = !visited.insert(source.to_string());
-    let mark = if repeated { " (*)".dimmed() } else { "".normal() };
+    let mark = if repeated {
+        " (*)".dimmed()
+    } else {
+        "".normal()
+    };
     println!("{prefix}{connector}{}{mark}", source.cyan());
     if repeated {
         return Ok(());

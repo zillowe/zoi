@@ -416,7 +416,7 @@ fn package_code_never_sees_secret_environment_variables() {
     // Luau, which Zoi embeds, gives package code no other way to the
     // environment: no `os.getenv`, `os.execute` or `io` library.
     let has_env_access = lua
-        .load(r#"return os.getenv ~= nil or os.execute ~= nil or io ~= nil"#)
+        .load(r"return os.getenv ~= nil or os.execute ~= nil or io ~= nil")
         .eval::<bool>()
         .expect("lua");
     assert!(!has_env_access, "package code must only reach the shell");
