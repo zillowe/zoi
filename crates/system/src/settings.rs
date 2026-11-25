@@ -205,7 +205,7 @@ impl Writer<'_> {
                 fs::remove_file(&path)
                     .with_context(|| format!("Failed to replace {guest}"))?;
             }
-            std::os::unix::fs::symlink(target, &path)
+            make_symlink(target, &path)
                 .with_context(|| format!("Failed to link {guest}"))?;
         }
         self.report.changed(guest);
@@ -224,6 +224,21 @@ impl Writer<'_> {
     fn warn(&mut self, message: String) {
         self.report.warnings.push(message);
     }
+}
+
+/// Creates the symlink `path` -> `target`.
+#[cfg(unix)]
+fn make_symlink(target: &str, path: &Path) -> std::io::Result<()> {
+    std::os::unix::fs::symlink(target, path)
+}
+
+/// System settings are only applied to Unix systems (`ZoiOS`).
+#[cfg(not(unix))]
+fn make_symlink(_target: &str, _path: &Path) -> std::io::Result<()> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "symlinks are only supported on Unix systems"
+    ))
 }
 
 /// `existing` with Zoi's block replaced by (or extended with) `lines`.
