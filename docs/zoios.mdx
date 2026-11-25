@@ -141,7 +141,10 @@ A functional ZoiOS system is defined by `collection` packages. Parlex Linux uses
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@core/base`     | The minimal userland: C library, shell, POSIX tools, compression tools, networking utilities and Zoi itself. No kernel, bootloader or init. |
 | `@core/base:dev` | `@core/base` plus the standard build toolchain (GCC, binutils, make, autotools, pkgconf, ...). Used as the root of `--pure` package builds. |
+| `@core/base:docs` | `@core/base` plus `man` (man-db and groff). Optional: headless systems rarely need it.                                                     |
 | `@core/parlex`   | A bootable system: `@core/base` plus the kernel, firmware, dracut, GRUB, systemd, sudo and `zoid`.                                          |
+
+`@core/linux-firmware` is split by vendor, as on Arch Linux: `@core/linux-firmware` installs the default set, and a system that only needs some of it can list sub-packages instead, such as `@core/linux-firmware:intel` or `@core/linux-firmware:amdgpu` (plus `:amd_ucode` for AMD CPU microcode). The sub-packages are `amd`, `amd_ucode`, `amdgpu`, `atheros`, `broadcom`, `cirrus`, `intel`, `liquidio`, `marvell`, `mediatek`, `mellanox`, `nfp`, `nvidia`, `other`, `qcom`, `qlogic`, `radeon`, `realtek` and `ti`.
 
 ### The `@core/parlex` Profile
 
