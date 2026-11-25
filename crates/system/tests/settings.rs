@@ -76,7 +76,10 @@ fn every_setting_is_written_under_the_root() {
 
     assert_eq!(read(r, "etc/hostname"), "box.example.org\n");
     let hosts = read(r, "etc/hosts");
-    assert!(hosts.starts_with("127.0.0.1 localhost\n"), "keeps own lines");
+    assert!(
+        hosts.starts_with("127.0.0.1 localhost\n"),
+        "keeps own lines"
+    );
     assert!(hosts.contains("127.0.1.1        box.example.org box\n"));
     assert_eq!(
         fs::read_link(r.join("etc/localtime")).expect("localtime link"),
@@ -141,8 +144,12 @@ fn dry_run_writes_nothing() {
 #[test]
 fn unknown_or_malformed_values_are_errors() {
     let cases: [(&str, fn(&mut SystemConfig)); 6] = [
-        ("time zone", |c| c.system.timezone = Some("Mars/Base".into())),
-        ("time zone", |c| c.system.timezone = Some("../etc/passwd".into())),
+        ("time zone", |c| {
+            c.system.timezone = Some("Mars/Base".into())
+        }),
+        ("time zone", |c| {
+            c.system.timezone = Some("../etc/passwd".into())
+        }),
         ("locale", |c| c.system.locale = Some("xx_XX.UTF-8".into())),
         ("hostname", |c| c.system.hostname = Some("bad_host".into())),
         ("keymap", |c| c.system.keymap = Some("nope".into())),
@@ -190,5 +197,8 @@ fn guest_paths_are_normalized_lexically() {
         )),
         PathBuf::from("/run/systemd/resolve/stub-resolv.conf")
     );
-    assert_eq!(normalize_guest_path(Path::new("/../..")), PathBuf::from("/"));
+    assert_eq!(
+        normalize_guest_path(Path::new("/../..")),
+        PathBuf::from("/")
+    );
 }

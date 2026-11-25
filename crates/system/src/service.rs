@@ -75,9 +75,9 @@ pub fn apply_services_in_root(
     for name in services.keys() {
         let valid = !name.is_empty()
             && !name.starts_with('-')
-            && name.chars().all(|c| {
-                c.is_ascii_alphanumeric() || ":_.@\\-".contains(c)
-            });
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || ":_.@\\-".contains(c));
         if !valid {
             bail!("Invalid service name '{name}' in system.lua");
         }

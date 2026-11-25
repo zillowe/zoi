@@ -196,9 +196,9 @@ impl Display for SemVersion {
 /// Logic:
 /// - Pads missing parts (e.g. "2.41" -> "2.41.0").
 /// - Drops leading zeros, which `SemVer` forbids ("2.03.44" -> "2.3.44").
-/// - Moves letters after a part's number into build metadata, in order
-///   ("2026f" -> "2026.0.0+f", "10.6p2" -> "10.6.0+p2"), so such versions
-///   still parse and compare.
+/// - Moves letters after a part's number into build metadata, in order ("2026f"
+///   -> "2026.0.0+f", "10.6p2" -> "10.6.0+p2"), so such versions still parse
+///   and compare.
 /// - Converts extra parts into build metadata (e.g. "7.1.4.arch1" ->
 ///   "7.1.4+arch1").
 /// - Joins several `+` sections, as in git snapshot versions such as
@@ -219,8 +219,9 @@ fn sanitize_version_string(v: &str) -> String {
     let mut numbers = Vec::new();
     let mut suffixes = Vec::new();
     for part in parts {
-        let digits_end =
-            part.find(|c: char| !c.is_ascii_digit()).unwrap_or(part.len());
+        let digits_end = part
+            .find(|c: char| !c.is_ascii_digit())
+            .unwrap_or(part.len());
         let (digits, suffix) = part.split_at(digits_end);
         if digits.is_empty() {
             // Not a version part ("^1", "beta"): keep it so parsing fails

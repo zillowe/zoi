@@ -126,7 +126,13 @@ fn distro_style_versions_parse_and_order() {
         |v: &str| pubgrub::SemVersion::parse(v).expect("version should parse");
     // tzdata, LVM2, openssh, libedit and kernel versions as Zoidberg pins
     // them; none is strict semver.
-    for v in ["2026f", "2.03.44", "10.6p2", "20260512_3.1", "7.3.5.parlex.1"] {
+    for v in [
+        "2026f",
+        "2.03.44",
+        "10.6p2",
+        "20260512_3.1",
+        "7.3.5.parlex.1"
+    ] {
         assert_eq!(parse(v).to_string(), v, "display keeps the original");
     }
     assert!(parse("2026e") < parse("2026f"));

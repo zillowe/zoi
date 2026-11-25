@@ -555,12 +555,10 @@ fn apply_system_config(
         }
     }
 
-    let id = match gen_manager
-        .create_generation_with_transaction(
-            config.packages.clone(),
-            transaction_id
-        )
-    {
+    let id = match gen_manager.create_generation_with_transaction(
+        config.packages.clone(),
+        transaction_id
+    ) {
         Ok(id) => id,
         Err(e) => return Response::Error(e.to_string())
     };

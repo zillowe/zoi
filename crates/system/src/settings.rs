@@ -215,8 +215,7 @@ impl Writer<'_> {
     /// Replaces Zoi's block in `guest` (keeping the rest of the file), or
     /// appends it.
     fn managed_block(&mut self, guest: &str, lines: &[String]) -> Result<()> {
-        let existing =
-            fs::read_to_string(self.path(guest)).unwrap_or_default();
+        let existing = fs::read_to_string(self.path(guest)).unwrap_or_default();
         let content = with_managed_block(&existing, lines);
         self.write(guest, &content)
     }
@@ -316,9 +315,7 @@ fn apply_timezone(w: &mut Writer, timezone: &str) -> Result<()> {
     check_chars("time zone", timezone, |c| {
         c.is_ascii_alphanumeric() || "/_+-".contains(c)
     })?;
-    if timezone.starts_with('/')
-        || timezone.split('/').any(str::is_empty)
-    {
+    if timezone.starts_with('/') || timezone.split('/').any(str::is_empty) {
         bail!("Invalid time zone '{timezone}' in system.lua");
     }
     let zoneinfo = w.path("/usr/share/zoneinfo");
@@ -366,8 +363,7 @@ fn apply_locale(w: &mut Writer, config: &SystemConfig) -> Result<()> {
                 LOCALE_VARS.join(", ")
             );
         }
-        let ok =
-            |c: char| is_locale_char(c) || (key == "LANGUAGE" && c == ':');
+        let ok = |c: char| is_locale_char(c) || (key == "LANGUAGE" && c == ':');
         check_chars(&format!("{key} value"), value, ok)?;
     }
 
@@ -437,11 +433,9 @@ fn locale_gen_entry(w: &Writer, name: &str) -> Result<String> {
     }
     // No list to check against: derive the charset from the name, as glibc
     // names its locales ("de_DE.UTF-8" -> UTF-8).
-    let charset = name
-        .split_once('.')
-        .map_or("ISO-8859-1", |(_, rest)| {
-            rest.split('@').next().unwrap_or(rest)
-        });
+    let charset = name.split_once('.').map_or("ISO-8859-1", |(_, rest)| {
+        rest.split('@').next().unwrap_or(rest)
+    });
     Ok(format!("{name} {charset}"))
 }
 
@@ -552,8 +546,8 @@ fn apply_keyboard(w: &mut Writer, keyboard: &KeyboardConfig) -> Result<()> {
     }
     let conf = format!(
         "{HEADER}\nSection \"InputClass\"\n        Identifier \
-         \"system-keyboard\"\n        MatchIsKeyboard \"on\"\n{body}\
-         EndSection\n"
+         \"system-keyboard\"\n        MatchIsKeyboard \
+         \"on\"\n{body}EndSection\n"
     );
     w.write("/etc/X11/xorg.conf.d/00-keyboard.conf", &conf)
 }
@@ -562,8 +556,8 @@ fn apply_keyboard(w: &mut Writer, keyboard: &KeyboardConfig) -> Result<()> {
 /// systemd-resolved's stub resolver.
 fn apply_networkd(w: &mut Writer) -> Result<()> {
     let network = format!(
-        "{HEADER}\n[Match]\nType=ether\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\n\
-         RouteMetric=100\n\n[IPv6AcceptRA]\nRouteMetric=100\n"
+        "{HEADER}\n[Match]\nType=ether\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\\
+         nRouteMetric=100\n\n[IPv6AcceptRA]\nRouteMetric=100\n"
     );
     w.write("/etc/systemd/network/20-wired.network", &network)?;
     w.symlink("/etc/resolv.conf", "/run/systemd/resolve/stub-resolv.conf")
