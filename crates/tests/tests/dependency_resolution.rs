@@ -135,4 +135,8 @@ fn distro_style_versions_parse_and_order() {
     assert_eq!(parse("2.03.44").v, parse("2.3.44").v);
     assert!(parse("10.6p1") < parse("10.6p2"));
     assert!(parse("10.6p2") < parse("10.7p1"));
+    // Requirements are not versions.
+    for req in ["^1.2.3", "~1.2", ">=1.0.0", "*"] {
+        assert!(pubgrub::SemVersion::parse(req).is_err(), "{req}");
+    }
 }

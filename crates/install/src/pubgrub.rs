@@ -222,6 +222,13 @@ fn sanitize_version_string(v: &str) -> String {
         let digits_end =
             part.find(|c: char| !c.is_ascii_digit()).unwrap_or(part.len());
         let (digits, suffix) = part.split_at(digits_end);
+        if digits.is_empty() {
+            // Not a version part ("^1", "beta"): keep it so parsing fails
+            // and callers such as `semver_to_range` read it as a
+            // requirement instead.
+            numbers.push(part.to_string());
+            continue;
+        }
         let number = digits.trim_start_matches('0');
         numbers.push(if number.is_empty() {
             "0".to_string()
