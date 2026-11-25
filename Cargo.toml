@@ -93,14 +93,14 @@ cast_precision_loss = "allow"
 cast_possible_wrap = "allow"
 
 [workspace.dependencies]
-anyhow = "1.0.104"
+anyhow = "1.0.105"
 elb = "0.4.1"
 chrono = { version = "0.4.45", default-features = false, features = [
     "serde",
     "clock",
     "std",
 ] }
-clap = { version = "4.6.9", features = ["derive", "color"] }
+clap = { version = "4.6.10", features = ["derive", "color"] }
 clap_complete = "4.6.12"
 colored = "3.1.1"
 comfy-table = "8.0.1"
@@ -117,7 +117,7 @@ hex = "0.4.3"
 home = "0.5.12"
 indicatif = "0.18.6"
 junction = "2.1.0"
-mlua = { version = "0.12.2", default-features = false, features = [
+mlua = { version = "0.12.3", default-features = false, features = [
     "luau",
     "serde",
 ] }
@@ -142,13 +142,13 @@ reqwest = { version = "0.13.5", default-features = false, features = [
 ] }
 self-replace = "1.5.1"
 semver = "1.0.28"
-sequoia-openpgp = { version = "2.4.2", default-features = false, features = [
+sequoia-openpgp = { version = "2.5.0", default-features = false, features = [
     "crypto-openssl",
 ] }
 serde = { version = "1.0.229", default-features = false, features = ["derive"] }
 serde_json = "1.0.154"
 serde_yaml = { package = "yaml_serde", version = "0.10.7" }
-sha2 = "0.11.1"
+sha2 = "0.11.2"
 zbsdiff = { version = "1.6.7", features = ["zdelta"] }
 zbus = { version = "6.5.0", default-features = false, features = [
     "default-rt",
@@ -159,7 +159,7 @@ zfvm = "0.1.0"
 spdx = "0.13.6"
 tar = { version = "0.4.46", features = ["xattr"] }
 tempfile = "3.27.0"
-toml = "1.2.2"
+toml = "1.2.3"
 urlencoding = "2.1.3"
 uuid = { version = "1.29.3", default-features = false, features = ["v7"] }
 walkdir = "2.5.1"
@@ -168,8 +168,8 @@ winapi = { version = "0.3.9", default-features = false, features = [
     "winnt",
 ] }
 xz2 = "0.1.7"
-zip = { version = "9.8.1", default-features = false, features = ["deflate"] }
-zstd = "0.14.4"
+zip = { version = "9.8.2", default-features = false, features = ["deflate"] }
+zstd = "0.14.5"
 zync-rs = "0.1.2"
 ar = "0.9.0"
 sevenz-rust2 = "0.25.0"
@@ -186,12 +186,12 @@ purl = "0.1.6"
 dotenvy = "0.15.7"
 phf_codegen = "0.14.0"
 diffy = "0.5.2"
-ignore = "0.4.34"
+ignore = "0.4.35"
 aes-gcm = "0.11.1"
 rand = { version = "0.10.4", features = ["std", "thread_rng", "sys_rng"] }
 argon2 = "0.6.0"
 base64 = "0.23.1"
-posthog-rs = { version = "1.3.0", default-features = false }
+posthog-rs = { version = "1.5.0", default-features = false }
 sentry = { version = "0.49.6", default-features = false, features = [
     "backtrace",
     "contexts",
