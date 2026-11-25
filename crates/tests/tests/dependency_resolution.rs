@@ -119,3 +119,20 @@ fn git_snapshot_versions_parse_and_order() {
         "2.44+r50+g1848099f063e"
     );
 }
+
+#[test]
+fn distro_style_versions_parse_and_order() {
+    let parse =
+        |v: &str| pubgrub::SemVersion::parse(v).expect("version should parse");
+    // tzdata, LVM2, openssh, libedit and kernel versions as Zoidberg pins
+    // them; none is strict semver.
+    for v in ["2026f", "2.03.44", "10.6p2", "20260512_3.1", "7.3.5.parlex.1"] {
+        assert_eq!(parse(v).to_string(), v, "display keeps the original");
+    }
+    assert!(parse("2026e") < parse("2026f"));
+    assert!(parse("2026f") < parse("2027a"));
+    assert!(parse("2.03.44") < parse("2.03.45"));
+    assert_eq!(parse("2.03.44").v, parse("2.3.44").v);
+    assert!(parse("10.6p1") < parse("10.6p2"));
+    assert!(parse("10.6p2") < parse("10.7p1"));
+}
