@@ -119,11 +119,11 @@ Maintainers **MUST** use the first of the following that upstream provides:
 1. **The official release tarball.** The archive the project itself publishes for the release: its download page or release server, the GNU or kernel.org mirrors, release assets attached to a GitHub, GitLab, or Codeberg release, a PyPI sdist, or a crates.io crate. These are what upstream tests and signs, and often include generated files (such as `configure`) that a repository checkout lacks.
 2. **The host-generated archive of the release tag.** Only when upstream publishes no tarball of its own, use the archive the source hosting service generates for the release tag:
 
-   | Host            | Archive URL                                                         |
-   | :-------------- | :------------------------------------------------------------------ |
-   | GitHub          | `https://github.com/<owner>/<repo>/archive/refs/tags/<tag>.tar.gz`  |
-   | GitLab          | `https://gitlab.com/<group>/<repo>/-/archive/<tag>/<repo>-<tag>.tar.gz` |
-   | Codeberg/Forgejo | `https://codeberg.org/<owner>/<repo>/archive/<tag>.tar.gz`          |
+   | Host             | Archive URL                                                             |
+   | :--------------- | :---------------------------------------------------------------------- |
+   | GitHub           | `https://github.com/<owner>/<repo>/archive/refs/tags/<tag>.tar.gz`      |
+   | GitLab           | `https://gitlab.com/<group>/<repo>/-/archive/<tag>/<repo>-<tag>.tar.gz` |
+   | Codeberg/Forgejo | `https://codeberg.org/<owner>/<repo>/archive/<tag>.tar.gz`              |
 
 - **Format:** When upstream publishes several compressions of the same release, prefer the one upstream signs, then the smallest (`.tar.xz` over `.tar.gz`).
 - **Mirrors:** A recipe **MAY** try several URLs in turn (for example `ftpmirror.gnu.org` and `mirrors.kernel.org` for GNU software). Every URL **MUST** serve the identical file, verified by the same hash.

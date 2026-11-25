@@ -127,26 +127,26 @@ pub struct BuildOptions<'a> {
 
 `BuildOptions` implements `Default`, so set only the fields you need and fill the rest with `..Default::default()`. The defaults are:
 
-| Field              | Default                    | Description                                                                                       |
-| ------------------ | -------------------------- | ------------------------------------------------------------------------------------------------- |
-| `build_type`       | `None`                     | Build type. When unset, Zoi picks `pre-compiled`, then `source`, then the first listed type.      |
-| `platforms`        | the current platform       | Platforms to build for (e.g. `linux-amd64`).                                                      |
-| `sign_key`         | `None`                     | PGP key name or fingerprint used to sign the archive.                                             |
-| `sign_mode`        | `SignMode::Embed`          | How to attach the signature: `Embed` stores it inside the archive, `File` writes a `.sig` sidecar. |
-| `output_dir`       | `None`                     | Directory to write the built archive to.                                                          |
-| `sub_packages`     | `None`                     | For split packages, build only these sub-packages.                                                |
-| `install_deps`     | `true`                     | Install build-time dependencies before building.                                                  |
-| `test`             | `false`                    | Run the package's `test()` function before building.                                              |
-| `method`           | `"native"`                 | Build method: `"native"`, `"bwrap"`, or `"docker"`.                                               |
-| `image`            | `None`                     | Docker image to use when `method` is `"docker"`.                                                  |
-| `version_override` | `None`                     | Override the version declared in the `.pkg.lua` file.                                             |
-| `fakeroot`         | `false`                    | Force root ownership (UID/GID 0) in the built archive.                                            |
+| Field              | Default              | Description                                                                                        |
+| ------------------ | -------------------- | -------------------------------------------------------------------------------------------------- |
+| `build_type`       | `None`               | Build type. When unset, Zoi picks `pre-compiled`, then `source`, then the first listed type.       |
+| `platforms`        | the current platform | Platforms to build for (e.g. `linux-amd64`).                                                       |
+| `sign_key`         | `None`               | PGP key name or fingerprint used to sign the archive.                                              |
+| `sign_mode`        | `SignMode::Embed`    | How to attach the signature: `Embed` stores it inside the archive, `File` writes a `.sig` sidecar. |
+| `output_dir`       | `None`               | Directory to write the built archive to.                                                           |
+| `sub_packages`     | `None`               | For split packages, build only these sub-packages.                                                 |
+| `install_deps`     | `true`               | Install build-time dependencies before building.                                                   |
+| `test`             | `false`              | Run the package's `test()` function before building.                                               |
+| `method`           | `"native"`           | Build method: `"native"`, `"bwrap"`, or `"docker"`.                                                |
+| `image`            | `None`               | Docker image to use when `method` is `"docker"`.                                                   |
+| `version_override` | `None`               | Override the version declared in the `.pkg.lua` file.                                              |
+| `fakeroot`         | `false`              | Force root ownership (UID/GID 0) in the built archive.                                             |
 
 <Callout title="Build dependency scope" type="info">
   When `install_deps` is `true`, `build_with_options` installs the build
   dependencies for each requested platform into the **user** scope
-  (`Scope::User`) before building. There is no option to pick a different
-  scope. The library API also has no equivalent of the CLI's `--pure` flag.
+  (`Scope::User`) before building. There is no option to pick a different scope.
+  The library API also has no equivalent of the CLI's `--pure` flag.
 </Callout>
 
 ---
@@ -267,11 +267,11 @@ pub fn update_packages(
 
 ### Parameters
 
-| Parameter       | Type        | Description                                                                 |
-| --------------- | ----------- | --------------------------------------------------------------------------- |
-| `all`           | `bool`      | Update every installed package. When `true`, `package_names` is ignored.    |
-| `package_names` | `&[String]` | The packages to update when `all` is `false`.                               |
-| `yes`           | `bool`      | Automatically answer "yes" to confirmation prompts.                         |
+| Parameter       | Type        | Description                                                              |
+| --------------- | ----------- | ------------------------------------------------------------------------ |
+| `all`           | `bool`      | Update every installed package. When `true`, `package_names` is ignored. |
+| `package_names` | `&[String]` | The packages to update when `all` is `false`.                            |
+| `yes`           | `bool`      | Automatically answer "yes" to confirmation prompts.                      |
 
 This is equivalent to `zoi update` without `--dry-run`, `--explain`, `--plan-json`, `--verbose`, or `--interactive`.
 
@@ -295,13 +295,13 @@ pub fn bundle_package(
 
 ### Parameters
 
-| Parameter          | Type             | Description                                                                         |
-| ------------------ | ---------------- | ----------------------------------------------------------------------------------- |
-| `package_file`     | `&Path`          | The path to the `.pkg.lua` file.                                                    |
-| `output_dir`       | `Option<&Path>`  | Directory to write the `.zsa` to.                                                   |
-| `sign`             | `Option<String>` | PGP key name or fingerprint. The signature is always embedded in the archive.       |
-| `version_override` | `Option<&str>`   | Override the version declared in the `.pkg.lua` file.                               |
-| `build_type`       | `Option<&str>`   | Build type to bundle for (e.g. `"source"`).                                         |
+| Parameter          | Type             | Description                                                                   |
+| ------------------ | ---------------- | ----------------------------------------------------------------------------- |
+| `package_file`     | `&Path`          | The path to the `.pkg.lua` file.                                              |
+| `output_dir`       | `Option<&Path>`  | Directory to write the `.zsa` to.                                             |
+| `sign`             | `Option<String>` | PGP key name or fingerprint. The signature is always embedded in the archive. |
+| `version_override` | `Option<&str>`   | Override the version declared in the `.pkg.lua` file.                         |
+| `build_type`       | `Option<&str>`   | Build type to bundle for (e.g. `"source"`).                                   |
 
 ---
 

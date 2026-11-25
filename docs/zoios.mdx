@@ -137,11 +137,11 @@ ZoiOS uses two primary Lua files to manage its state:
 
 A functional ZoiOS system is defined by `collection` packages. Parlex Linux uses two layers:
 
-| Collection       | Contents                                                                                                                                       |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@core/base`     | The minimal userland: C library, shell, POSIX tools, compression tools, networking utilities and Zoi itself. No kernel, bootloader or init.   |
+| Collection       | Contents                                                                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@core/base`     | The minimal userland: C library, shell, POSIX tools, compression tools, networking utilities and Zoi itself. No kernel, bootloader or init. |
 | `@core/base:dev` | `@core/base` plus the standard build toolchain (GCC, binutils, make, autotools, pkgconf, ...). Used as the root of `--pure` package builds. |
-| `@core/parlex`   | A bootable system: `@core/base` plus the kernel, firmware, dracut, GRUB, systemd, sudo and `zoid`.                                             |
+| `@core/parlex`   | A bootable system: `@core/base` plus the kernel, firmware, dracut, GRUB, systemd, sudo and `zoid`.                                          |
 
 ### The `@core/parlex` Profile
 

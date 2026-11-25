@@ -9,17 +9,17 @@ Zoi provides a rich Lua environment for defining packages. This page serves as a
 
 These variables are automatically available in your script's scope.
 
-| Variable      | Type     | Description                                                       |
-| :------------ | :------- | :---------------------------------------------------------------- |
-| `SYSTEM`      | `table`  | Information about the host system.                                |
-| `ZOI`         | `table`  | Information about the Zoi environment.                            |
-| `ZOI.scope`   | `string` | The currently requested installation scope (e.g. `"user"`).       |
-| `LOCATION`    | `table`  | Absolute paths for common package locations.                      |
-| `PKG`         | `table`  | A table populated from your `metadata{...}` fields.               |
+| Variable      | Type     | Description                                                                                  |
+| :------------ | :------- | :------------------------------------------------------------------------------------------- |
+| `SYSTEM`      | `table`  | Information about the host system.                                                           |
+| `ZOI`         | `table`  | Information about the Zoi environment.                                                       |
+| `ZOI.scope`   | `string` | The currently requested installation scope (e.g. `"user"`).                                  |
+| `LOCATION`    | `table`  | Absolute paths for common package locations.                                                 |
+| `PKG`         | `table`  | A table populated from your `metadata{...}` fields.                                          |
 | `BUILD_DIR`   | `string` | Absolute path to the temporary build directory (read-only info; assigning it has no effect). |
-| `STAGING_DIR` | `string` | Absolute path to the staging directory.                           |
-| `BUILD_TYPE`  | `string` | The user-requested build method (e.g. `"source"`).                |
-| `SUBPKG`      | `string` | The name of the sub-package being processed (for split packages). |
+| `STAGING_DIR` | `string` | Absolute path to the staging directory.                                                      |
+| `BUILD_TYPE`  | `string` | The user-requested build method (e.g. `"source"`).                                           |
+| `SUBPKG`      | `string` | The name of the sub-package being processed (for split packages).                            |
 
 ### Metadata evaluation
 
@@ -69,20 +69,19 @@ These variables provide absolute paths related to the current package environmen
 
 The `LOCATION` table provides absolute paths that correspond **exactly** to the `${...}` placeholder variables used in build functions like `zcp`, `zln`, `zmkdir`, etc. These are the **staging directory paths** where files are placed during build, not the final install paths. This makes them directly usable in `cmd()` calls to achieve the same behavior as the placeholders.
 
-| Variable              | Type     | Description                                                                                         |
-| :-------------------- | :------- | :-------------------------------------------------------------------------------------------------- |
-| `LOCATION.PKGSTORE`   | `string` | Staging path for package store (`STAGING_DIR/pkgstore/`). Corresponds to `${pkgstore}`.             |
-| `LOCATION.HOME`       | `string` | Staging path for user home (`STAGING_DIR/usrhome/`). Corresponds to `${usrhome}`.                   |
-| `LOCATION.ROOT`       | `string` | Staging path for system root (`STAGING_DIR/usrroot/`). Corresponds to `${usrroot}`.                 |
-| `LOCATION.TEMPLATE`   | `string` | Staging path for createpkgdir (`STAGING_DIR/createpkgdir/`). Corresponds to `${createpkgdir}`.      |
-| `LOCATION.PKGLUADIR`  | `string` | Directory containing the current `pkg.lua` script. Corresponds to `${pkgluadir}`.                   |
-| `LOCATION.BUILDDIR`   | `string` | Temporary build directory (`BUILD_DIR`).                                                            |
-| `LOCATION.STAGINGDIR` | `string` | Staging directory (`STAGING_DIR`).                                                                  |
+| Variable              | Type     | Description                                                                                    |
+| :-------------------- | :------- | :--------------------------------------------------------------------------------------------- |
+| `LOCATION.PKGSTORE`   | `string` | Staging path for package store (`STAGING_DIR/pkgstore/`). Corresponds to `${pkgstore}`.        |
+| `LOCATION.HOME`       | `string` | Staging path for user home (`STAGING_DIR/usrhome/`). Corresponds to `${usrhome}`.              |
+| `LOCATION.ROOT`       | `string` | Staging path for system root (`STAGING_DIR/usrroot/`). Corresponds to `${usrroot}`.            |
+| `LOCATION.TEMPLATE`   | `string` | Staging path for createpkgdir (`STAGING_DIR/createpkgdir/`). Corresponds to `${createpkgdir}`. |
+| `LOCATION.PKGLUADIR`  | `string` | Directory containing the current `pkg.lua` script. Corresponds to `${pkgluadir}`.              |
+| `LOCATION.BUILDDIR`   | `string` | Temporary build directory (`BUILD_DIR`).                                                       |
+| `LOCATION.STAGINGDIR` | `string` | Staging directory (`STAGING_DIR`).                                                             |
 
 <Callout>
-  During build, `${pkgstore}` in `zcp`/`zln` expands to
-  `STAGING_DIR/pkgstore/`. `LOCATION.PKGSTORE` gives you that same path for
-  use in `cmd()`.
+  During build, `${pkgstore}` in `zcp`/`zln` expands to `STAGING_DIR/pkgstore/`.
+  `LOCATION.PKGSTORE` gives you that same path for use in `cmd()`.
 </Callout>
 
 ---
