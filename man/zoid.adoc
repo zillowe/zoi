@@ -113,8 +113,11 @@ While holding the store lock, the daemon first installs the configured
 packages; only if that succeeds does it remove system packages that you
 installed directly and that the configuration no longer lists (packages
 installed as dependencies are left alone). If installing fails, nothing is
-removed. It then applies the declared users and groups, enables the declared
-services, regenerates `/etc/fstab` from the declared filesystems,
+removed. It then applies the declared users and groups, the `system({...})`
+settings (hostname, time zone, locales, console and keyboard layout, network
+time, systemd-networkd networking), regenerates `/etc/fstab` from the declared
+filesystems (only when any are declared), enables the declared services and
+the ones those settings need,
 creates a new numbered generation linked to the package transaction, writes
 boot entries, and prunes old generations.
 

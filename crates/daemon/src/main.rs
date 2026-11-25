@@ -556,7 +556,10 @@ fn apply_system_config(
     }
 
     let id = match gen_manager
-        .create_generation_with_transaction(config.packages, transaction_id)
+        .create_generation_with_transaction(
+            config.packages.clone(),
+            transaction_id
+        )
     {
         Ok(id) => id,
         Err(e) => return Response::Error(e.to_string())
@@ -606,15 +609,27 @@ fn apply_system_config(
         Err(e) => eprintln!("Warning: Failed to apply users/groups: {e}")
     }
 
-    // Apply Services
-    if let Err(e) = zoi_system::service::apply_services(&config.services) {
-        eprintln!("Warning: Failed to apply some services: {e}");
-    }
-
-    // Update fstab
-    let fstab_content = zoi_system::mount::generate_fstab(&config.filesystems);
-    if let Err(e) = std::fs::write("/etc/fstab", fstab_content) {
-        eprintln!("Warning: Failed to update /etc/fstab: {e}");
+    // Settings (hostname, time zone, locales, keyboard, networking, fstab;
+    // fstab only when filesystems({...}) lists any), then the services they
+    // and services({...}) name.
+    let root = std::path::Path::new("/");
+    match zoi_system::settings::apply_settings(root, &config, false) {
+        Ok(settings) => {
+            zoi_system::settings::print_report(&settings);
+            match zoi_system::service::apply_services_in_root(
+                root,
+                &settings.services,
+                false
+            ) {
+                Ok(failed) if !failed.is_empty() => eprintln!(
+                    "Warning: Failed to change service(s): {}",
+                    failed.join(", ")
+                ),
+                Ok(_) => {}
+                Err(e) => eprintln!("Warning: Failed to apply services: {e}")
+            }
+        }
+        Err(e) => eprintln!("Warning: Failed to apply system settings: {e}")
     }
 
     // Prune old generations

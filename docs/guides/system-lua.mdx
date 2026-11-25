@@ -9,24 +9,42 @@ The `/etc/zoi/system.lua` file is the primary configuration file for ZoiOS. It a
 
 ### `system(table)`
 
-Defines global system metadata and high-level configuration.
+Defines global system metadata and the settings an installer would ask for. Every field is optional; a field that is not set leaves that part of the system as it is.
 
-| Field           | Type     | Description                                                          |
-| :-------------- | :------- | :------------------------------------------------------------------- |
-| `hostname`      | `string` | The network hostname for the machine.                                |
-| `timezone`      | `string` | The system timezone (e.g. `"UTC"`, `"America/New_York"`).            |
-| `locale`        | `string` | The primary system locale (e.g. `"en_US.UTF-8"`).                    |
-| `kernel_params` | `string` | Appended to the kernel command line in the bootloader.               |
-| `desktop`       | `string` | The desired desktop environment (e.g. `"kde"`, `"gnome"`, `"sway"`). |
+| Field             | Type      | Description                                                                                                                                                                  |
+| :---------------- | :-------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hostname`        | `string`  | The host name. Written to `/etc/hostname`, with a `127.0.1.1` entry in `/etc/hosts`.                                                                                         |
+| `timezone`        | `string`  | Time zone from `/usr/share/zoneinfo` (e.g. `"UTC"`, `"Europe/Berlin"`). `/etc/localtime` links to it. Needs `@core/tzdata`.                                                  |
+| `locale`          | `string`  | Default locale, `LANG` in `/etc/locale.conf` (e.g. `"en_US.UTF-8"`).                                                                                                         |
+| `locales`         | `list`    | Locales to generate. Defaults to `locale` plus every locale used in `locale_settings`. Selected in `/etc/locale.gen` and compiled with `locale-gen`.                          |
+| `locale_settings` | `table`   | Other `/etc/locale.conf` variables: `LANGUAGE` and `LC_*` (e.g. `{ LC_TIME = "en_GB.UTF-8" }`).                                                                               |
+| `keymap`          | `string`  | Console keymap, `KEYMAP` in `/etc/vconsole.conf` (e.g. `"de"`, `"us"`). Needs `@core/kbd`.                                                                                   |
+| `console_font`    | `string`  | Console font, `FONT` in `/etc/vconsole.conf` (e.g. `"ter-v16n"`). Needs `@core/kbd`.                                                                                         |
+| `keyboard`        | `table`   | Graphical keyboard layout: `layout`, `variant`, `model`, `options` (XKB names). Written to `/etc/X11/xorg.conf.d/00-keyboard.conf`, as `localectl set-x11-keymap` does.      |
+| `ntp`             | `boolean` | `true` enables network time synchronisation (`systemd-timesyncd`); `false` disables it.                                                                                      |
+| `network`         | `string`  | `"networkd"`: DHCP on every wired interface with `systemd-networkd`, and name resolution through `systemd-resolved` (`/etc/resolv.conf` links to its stub). `"none"`: leave networking alone. |
+| `kernel_params`   | `string`  | Appended to the kernel command line in the bootloader.                                                                                                                       |
+| `desktop`         | `string`  | The desired desktop environment (e.g. `"kde"`, `"gnome"`, `"sway"`).                                                                                                         |
 
 ```lua
 system({
     hostname = "parlex-station",
-    timezone = "America/Los_Angeles",
+    timezone = "Europe/Berlin",
     locale = "en_US.UTF-8",
+    locale_settings = { LC_TIME = "de_DE.UTF-8", LC_PAPER = "de_DE.UTF-8" },
+    keymap = "de",
+    keyboard = { layout = "de", options = "ctrl:nocaps" },
+    ntp = true,
+    network = "networkd",
     kernel_params = "quiet loglevel=3 mitigations=off",
 })
 ```
+
+Zoi checks every value before writing anything for it: an unknown time zone, locale (checked against glibc's `/usr/share/i18n/SUPPORTED`), keymap or console font is an error. When the data to check against is not installed at all (no `@core/tzdata`, no `@core/kbd`), the setting is skipped or written unchecked with a warning naming the package to add.
+
+Files that administrators also edit keep their own content: in `/etc/hosts` and `/etc/locale.gen`, Zoi only rewrites a block marked `# BEGIN zoi system.lua` ... `# END zoi system.lua`. The other files (`/etc/locale.conf`, `/etc/vconsole.conf`, the keyboard and network files) are written whole.
+
+`network` and `ntp` enable the services they need. An entry for the same unit in `services({...})` takes precedence.
 
 ---
 
@@ -156,15 +174,16 @@ Controls system-wide background services.
 
 | Field    | Type      | Description                                              |
 | :------- | :-------- | :------------------------------------------------------- |
-| `enable` | `boolean` | Whether to enable and start the service via `systemctl`. |
+| `enable` | `boolean` | Whether to enable the service (and, on the live system, start it) via `systemctl`. |
 
 ```lua
 services({
-    NetworkManager = { enable = true },
-    sshd = { enable = true },
-    docker = { enable = true },
+    ["sshd.service"] = { enable = true },
+    ["systemd-resolved.service"] = { enable = false },
 })
 ```
+
+On `zoi system apply` the units are enabled or disabled and started or stopped. On `zoi system distro build` they are only enabled or disabled in the target (with `systemctl --root`), and start when it boots.
 
 ---
 
@@ -178,6 +197,8 @@ Defines the disk layout and mount points for `/etc/fstab`.
   `filesystems` block is used exclusively to generate a valid `/etc/fstab` for
   the target system.
 </Callout>
+
+`/etc/fstab` is only written when the block lists at least one filesystem; without it, the existing file is left alone.
 
 | Field     | Type     | Description                                                |
 | :-------- | :------- | :--------------------------------------------------------- |
@@ -213,7 +234,9 @@ To apply your changes to the live system:
 sudo zoi system apply
 ```
 
-Zoi will resolve the packages, install them to the store, create a new **System Generation**, update the FHS view, reconcile the declared users and groups, regenerate `/etc/fstab`, enable or disable services, run the kernel pipeline, and write bootloader entries.
+Zoi will resolve the packages, install them to the store, create a new **System Generation**, update the FHS view, reconcile the declared users and groups, apply the `system({...})` settings and `/etc/fstab`, enable or disable services, run the kernel pipeline, and write bootloader entries.
+
+`zoi system distro build` applies the same accounts, settings, fstab and services to the target it builds, after installing the packages, so a freshly built system boots with its time zone, locale, keyboard and network already configured. Hostname, time zone and locale take effect on the live system for new logins and programs; the console keymap and font at the next boot (or after `systemctl restart systemd-vconsole-setup`).
 
 The apply is idempotent: running it twice with no change in between performs no
 writes, which is what makes it safe to schedule.

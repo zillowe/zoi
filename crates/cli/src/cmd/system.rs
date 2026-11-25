@@ -375,6 +375,34 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                     }
                 }
 
+                // Settings (hostname, time zone, locales, keyboard,
+                // networking, fstab) and the services they and
+                // services({...}) name, written into the target.
+                println!("{} Applying system settings...", "::".bold().blue());
+                let settings_root = std::fs::canonicalize(target_path)
+                    .unwrap_or_else(|_| target_path.to_path_buf());
+                let settings = zoi_system::settings::apply_settings(
+                    &settings_root,
+                    &config,
+                    dry_run
+                )
+                .map_err(|e| anyhow!("Failed to apply system settings: {e}"))?;
+                if !dry_run {
+                    zoi_system::settings::print_report(&settings);
+                }
+                let failed = zoi_system::service::apply_services_in_root(
+                    &settings_root,
+                    &settings.services,
+                    dry_run
+                )?;
+                if !failed.is_empty() {
+                    return Err(anyhow!(
+                        "Failed to enable or disable service(s) in the \
+                         target: {}",
+                        failed.join(", ")
+                    ));
+                }
+
                 zoi_system::distro::finalize_zoios_marker(
                     target_path,
                     dry_run
@@ -607,13 +635,8 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                     let binds: Vec<(std::path::PathBuf, std::path::PathBuf)> =
                         resolv
                             .as_ref()
-                            .map(|file| {
-                                vec![(
-                                    file.path().to_path_buf(),
-                                    std::path::PathBuf::from(
-                                        "/etc/resolv.conf"
-                                    )
-                                )]
+                            .map(|(file, guest)| {
+                                vec![(file.path().to_path_buf(), guest.clone())]
                             })
                             .unwrap_or_default();
                     let mut cmd = if let Some(run_cmd) = run {
@@ -837,14 +860,25 @@ fn print_build_summary(
         Cell::new(config.system.hostname.as_deref().unwrap_or("zoios"))
             .fg(Color::Cyan),
     ]);
-    sys_table.add_row(vec![
-        Cell::new("Timezone"),
-        Cell::new(config.system.timezone.as_deref().unwrap_or("UTC")),
-    ]);
-    sys_table.add_row(vec![
-        Cell::new("Locale"),
-        Cell::new(config.system.locale.as_deref().unwrap_or("en_US.UTF-8")),
-    ]);
+    let keyboard = config
+        .system
+        .keyboard
+        .as_ref()
+        .and_then(|k| k.layout.clone());
+    let ntp = config.system.ntp.map(|on| if on { "on" } else { "off" });
+    for (name, value) in [
+        ("Timezone", config.system.timezone.as_deref()),
+        ("Locale", config.system.locale.as_deref()),
+        ("Console keymap", config.system.keymap.as_deref()),
+        ("Keyboard layout", keyboard.as_deref()),
+        ("Network", config.system.network.as_deref()),
+        ("NTP", ntp)
+    ] {
+        sys_table.add_row(vec![
+            Cell::new(name),
+            Cell::new(value.unwrap_or("not set")),
+        ]);
+    }
 
     println!("{}", " 2. System Configuration ".bold().underline());
     println!("{sys_table}\n");
@@ -884,18 +918,33 @@ fn handle_response(response: Response) -> Result<()> {
     Ok(())
 }
 
-/// A copy of the host's `/etc/resolv.conf`, to mount over the target's
-/// while chrooted into it. `None` when the host has none or the target has
-/// no `/etc/resolv.conf` to mount over.
+/// A copy of the host's `/etc/resolv.conf`, and where to mount it in the
+/// chroot. That is the target's `/etc/resolv.conf`, or, when that is a
+/// symlink into `/run` (systemd-resolved's
+/// `/run/systemd/resolve/stub-resolv.conf`), the file it points to, which
+/// lives on the chroot's empty `/run` tmpfs. `None` when the host has no
+/// resolv.conf or the target has nothing to mount over.
 #[cfg(target_os = "linux")]
 fn host_resolv_conf_copy(
     target: &std::path::Path
-) -> Option<tempfile::NamedTempFile> {
+) -> Option<(tempfile::NamedTempFile, std::path::PathBuf)> {
     let target_file = target.join("etc/resolv.conf");
-    if std::fs::symlink_metadata(&target_file).map_or(true, |m| m.is_symlink())
-    {
-        return None;
-    }
+    let meta = std::fs::symlink_metadata(&target_file).ok()?;
+    let guest = if meta.is_symlink() {
+        let link = std::fs::read_link(&target_file).ok()?;
+        let link = if link.is_absolute() {
+            link
+        } else {
+            std::path::Path::new("/etc").join(link)
+        };
+        let link = zoi_system::settings::normalize_guest_path(&link);
+        if !link.starts_with("/run/") {
+            return None;
+        }
+        link
+    } else {
+        std::path::PathBuf::from("/etc/resolv.conf")
+    };
     let content = std::fs::read("/etc/resolv.conf").ok()?;
     let mut file = tempfile::NamedTempFile::new().ok()?;
     std::io::Write::write_all(&mut file, &content).ok()?;
@@ -905,7 +954,7 @@ fn host_resolv_conf_copy(
         std::os::unix::fs::PermissionsExt::from_mode(0o644)
     )
     .ok()?;
-    Some(file)
+    Some((file, guest))
 }
 
 /// Copies the host's synced registries into the target sysroot, so a fresh

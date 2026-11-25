@@ -829,7 +829,7 @@ fn has_binary(root: &Path, binary: &str) -> bool {
 /// configuration, not the build host's. `unshare` with a mount namespace keeps
 /// the host untouched while still providing the `/dev`, `/proc` and `/sys` that
 /// these tools insist on opening.
-fn run_in_root(root: &Path, cmd: &mut Command) -> Result<bool> {
+pub(crate) fn run_in_root(root: &Path, cmd: &mut Command) -> Result<bool> {
     let is_live_root = root == Path::new("/");
 
     if is_live_root {

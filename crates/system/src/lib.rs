@@ -33,3 +33,6 @@ pub mod protocol;
 pub mod secret;
 /// Enabling and disabling system services.
 pub mod service;
+/// Hostname, time zone, locales, keyboard, clock sync, networking and
+/// fstab from `system.lua`.
+pub mod settings;

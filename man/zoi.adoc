@@ -570,7 +570,10 @@ generation from pruning. *unpin* _ID_:: Allow pruning again.
 *secret export-key*:: Export the master key (base64).
 *secret import-key* _KEY_:: Import a master key.
 *distro build* (*-t*, *--target*=_DEV|IMG_ and *-c*, *--config*=_LUA_
-required) [*--dry-run*]:: Build a ZoiOS image or install to disk.
+required) [*--dry-run*]:: Build a ZoiOS image or install to disk: install the
+configured packages into the target, then apply its accounts, `system({...})`
+settings (hostname, time zone, locales, keyboard, network), `/etc/fstab` and
+services.
 *distro chroot* _TARGET_ [*-r*, *--run*=_CMD_] [*-v*, *--verbose*]:: Enter
 a sysroot chroot with automatic mounts.
 

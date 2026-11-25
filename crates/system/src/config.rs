@@ -6,15 +6,45 @@ use anyhow::{Result, anyhow};
 use mlua::{Lua, LuaSerdeExt, Table, Value};
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+/// The X11/Wayland keyboard layout (`system({ keyboard = {...} })`), written
+/// to `/etc/X11/xorg.conf.d/00-keyboard.conf` as `localectl` does.
+pub struct KeyboardConfig {
+    /// XKB layout(s), e.g. `"us"` or `"us,de"`.
+    pub layout: Option<String>,
+    /// XKB variant(s), e.g. `"dvorak"`.
+    pub variant: Option<String>,
+    /// XKB model, e.g. `"pc105"`.
+    pub model: Option<String>,
+    /// XKB options, e.g. `"ctrl:nocaps"`.
+    pub options: Option<String>
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 /// The `system({...})` block: identity and locale settings.
 pub struct SystemMetadata {
-    /// System hostname.
+    /// System hostname (`/etc/hostname`, and `/etc/hosts`).
     pub hostname: Option<String>,
-    /// System timezone.
+    /// Time zone, e.g. `"Europe/Berlin"` (`/etc/localtime`).
     pub timezone: Option<String>,
-    /// System locale.
+    /// Default locale, `LANG` in `/etc/locale.conf` (e.g. `"en_US.UTF-8"`).
     pub locale: Option<String>,
+    /// Locales to generate; defaults to `locale` and every locale named in
+    /// `locale_settings`.
+    pub locales: Option<Vec<String>>,
+    /// Other `/etc/locale.conf` variables (`LC_TIME`, `LANGUAGE`, ...).
+    pub locale_settings: Option<std::collections::BTreeMap<String, String>>,
+    /// Console keymap (`KEYMAP` in `/etc/vconsole.conf`), e.g. `"de"`.
+    pub keymap: Option<String>,
+    /// Console font (`FONT` in `/etc/vconsole.conf`), e.g. `"ter-v16n"`.
+    pub console_font: Option<String>,
+    /// Graphical keyboard layout.
+    pub keyboard: Option<KeyboardConfig>,
+    /// Synchronise the clock over the network with systemd-timesyncd.
+    pub ntp: Option<bool>,
+    /// Network management: `"networkd"` (systemd-networkd with DHCP on
+    /// wired interfaces, and systemd-resolved) or `"none"`.
+    pub network: Option<String>,
     /// Parameters appended to the kernel command line.
     pub kernel_params: Option<String>,
     /// Desktop environment to provision.
