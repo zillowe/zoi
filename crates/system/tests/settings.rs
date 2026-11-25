@@ -145,10 +145,10 @@ fn dry_run_writes_nothing() {
 fn unknown_or_malformed_values_are_errors() {
     let cases: [(&str, fn(&mut SystemConfig)); 6] = [
         ("time zone", |c| {
-            c.system.timezone = Some("Mars/Base".into())
+            c.system.timezone = Some("Mars/Base".into());
         }),
         ("time zone", |c| {
-            c.system.timezone = Some("../etc/passwd".into())
+            c.system.timezone = Some("../etc/passwd".into());
         }),
         ("locale", |c| c.system.locale = Some("xx_XX.UTF-8".into())),
         ("hostname", |c| c.system.hostname = Some("bad_host".into())),
