@@ -374,7 +374,7 @@ fn handle_client(
             }
         }
         Request::ApplySystemConfig(config) => {
-            apply_system_config(*config, gen_manager)
+            apply_system_config(&config, gen_manager)
         }
     };
 
@@ -511,7 +511,7 @@ fn orphaned_system_packages(
 /// only once that succeeded: removing first would leave the system without
 /// them (and possibly unbootable) if the install then failed.
 fn apply_system_config(
-    config: zoi_system::config::SystemConfig,
+    config: &zoi_system::config::SystemConfig,
     gen_manager: &GenerationManager
 ) -> Response {
     println!("Applying system configuration...");
@@ -539,7 +539,7 @@ fn apply_system_config(
     // --- Phase 2: Declarative uninstallation ---
     // Explicitly installed system packages that the new configuration no
     // longer lists are removed, now that everything it does list is in place.
-    for source in orphaned_system_packages(&config) {
+    for source in orphaned_system_packages(config) {
         println!("Removing package no longer in configuration: {source}...");
         if let Err(e) = zoi_uninstall::run(
             &source,
@@ -613,7 +613,7 @@ fn apply_system_config(
     // fstab only when filesystems({...}) lists any), then the services they
     // and services({...}) name.
     let root = std::path::Path::new("/");
-    match zoi_system::settings::apply_settings(root, &config, false) {
+    match zoi_system::settings::apply_settings(root, config, false) {
         Ok(settings) => {
             zoi_system::settings::print_report(&settings);
             match zoi_system::service::apply_services_in_root(
