@@ -4,7 +4,22 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](./INSTALL.md).
 
-## [Prod. Release 1.29.17](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/tags/Prod-Release-1.29.16) - 2026-11-26
+## [Prod. Release 1.29.18](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.18) - 2026-11-26
+
+### ✨ Features
+
+- [`fb3b6774`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/fb3b677498ae5458385cfb2c79392f33079a8259) *(system)* Apply installer settings from system.lua (time zone, locales, keyboard, networking, NTP, hostname)
+
+### 🛡️ Dependencies
+
+- [`92e90e8c`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/92e90e8cc5a3cfbcd22f9c5bd52991ebaa4aedd7) Update
+
+### 🩹 Bug Fixes
+
+- [`27d11309`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/27d11309eef2e15b682ee98f348d5a512e652c57) *(resolver)* Keep reading requirements (^1.2.3, >=1.0.0) as ranges, not versions
+- [`af54cbc8`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/af54cbc8a96ac7ba41be383fe68cb2322775027f) *(resolver)* Parse versions with letter suffixes or leading zeros (2026f, 10.6p2, 2.03.44)
+
+## [Prod. Release 1.29.17](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.17) - 2026-11-23
 
 ### ✨ Features
 
@@ -32,7 +47,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 - [`3815347f`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/3815347f3c9b2dde41d7dcd36d47cfe8a44d8437) *(store)* Write latest and alternatives links that stay valid inside a root, and make a relative --root absolute
 - [`23e08e37`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/23e08e37b3233eb5ba6f8fcc362459c717df5e5e) *(resolver)* Read registries from where zoi sync writes them as root and on a sysroot, and report packages update could not check
 
-## [Prod. Release 1.29.16](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/tags/Prod-Release-1.29.16) - 2026-11-22
+## [Prod. Release 1.29.16](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.16) - 2026-11-22
 
 ### 🩹 Bug Fixes
 
