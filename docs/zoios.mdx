@@ -142,9 +142,19 @@ A functional ZoiOS system is defined by `collection` packages. Parlex Linux uses
 | `@core/base`     | The minimal userland: C library, shell, POSIX tools, compression tools, networking utilities and Zoi itself. No kernel, bootloader or init. |
 | `@core/base:dev` | `@core/base` plus the standard build toolchain (GCC, binutils, make, autotools, pkgconf, ...). Used as the root of `--pure` package builds. |
 | `@core/base:docs` | `@core/base` plus `man` (man-db and groff). Optional: headless systems rarely need it.                                                     |
-| `@core/parlex`   | A bootable system: `@core/base` plus the kernel, firmware, dracut, GRUB, systemd, sudo and `zoid`.                                          |
+| `@core/parlex`   | A bootable system: `@core/base` plus the kernel, dracut, GRUB, systemd, sudo and `zoid`. Firmware is chosen separately (see below).       |
 
-`@core/linux-firmware` is split by vendor, as on Arch Linux: `@core/linux-firmware` installs the default set, and a system that only needs some of it can list sub-packages instead, such as `@core/linux-firmware:intel` or `@core/linux-firmware:amdgpu` (plus `:amd_ucode` for AMD CPU microcode). The sub-packages are `amd`, `amd_ucode`, `amdgpu`, `atheros`, `broadcom`, `cirrus`, `intel`, `liquidio`, `marvell`, `mediatek`, `mellanox`, `nfp`, `nvidia`, `other`, `qcom`, `qlogic`, `radeon`, `realtek` and `ti`.
+### Choosing Firmware
+
+`@core/parlex` does not install device firmware: what a machine needs depends on its hardware, so you choose it. `@core/linux-firmware` is split by vendor, as on Arch Linux:
+
+- `@core/linux-firmware` installs the default set (every common vendor). Pick it when unsure, or for an image meant for many machines.
+- Otherwise list only your hardware's vendors, for example `@core/linux-firmware:intel` for an Intel laptop's Wi-Fi, Bluetooth and graphics, or `@core/linux-firmware:amdgpu` for an AMD Radeon GPU. Add `@core/linux-firmware:amd_ucode` on AMD CPUs for microcode updates.
+- A virtual machine needs no firmware at all.
+
+The sub-packages are `amd` (non-GPU AMD devices), `amd_ucode`, `amdgpu`, `atheros`, `broadcom`, `cirrus`, `intel`, `liquidio`, `marvell`, `mediatek`, `mellanox`, `nfp`, `nvidia`, `other`, `qcom`, `qlogic`, `radeon`, `realtek` and `ti`. They are listed as optional dependencies of `@core/parlex`, so an interactive `zoi install @core/parlex` offers them; `system.lua` (and anything run with `--yes`) installs only what it lists.
+
+Without the firmware a device needs, the kernel still boots but that device stays unavailable (`dmesg` shows `failed to load firmware`). Installing the missing sub-package and rebooting fixes it.
 
 ### The `@core/parlex` Profile
 
@@ -154,6 +164,9 @@ To install or build a bootable Parlex Linux system, list the profile in `system.
 -- /etc/zoi/system.lua
 packages({
     "@core/parlex",
+    -- Firmware for this machine's hardware (see "Choosing Firmware");
+    -- leave it out on a virtual machine.
+    "@core/linux-firmware:intel",
 })
 ```
 

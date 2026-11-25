@@ -95,8 +95,13 @@ packages({
     -- Pinning to a channel
     ["@core/zoi"] = { version = "@stable" },
 
-    -- The bootable Parlex Linux profile
+    -- The bootable Parlex Linux profile, plus the firmware this machine's
+    -- hardware needs: @core/linux-firmware for every common vendor, or
+    -- vendor sub-packages such as :intel, :amdgpu, :realtek, :amd_ucode.
+    -- Parlex installs no firmware by itself; a virtual machine needs none.
     "@core/parlex",
+    "@core/linux-firmware:amdgpu",
+    "@core/linux-firmware:amd_ucode",
 
     -- Pre-selecting dependency options for a package that declares
     -- option groups, to avoid interactive prompts
