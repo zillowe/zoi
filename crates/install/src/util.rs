@@ -181,6 +181,12 @@ pub fn get_text_from_candidate_urls(
 
     for candidate_url in urls {
         match client.get(candidate_url).send() {
+            // An error page (GitLab answers a missing file with a JSON 404
+            // body) is not the resource: try the next source.
+            Ok(response) if !response.status().is_success() => {
+                let status = response.status();
+                last_error = Some(format!("{candidate_url} (HTTP {status})"));
+            }
             Ok(response) => match response.text() {
                 Ok(text) => return Ok(text),
                 Err(e) => last_error = Some(format!("{candidate_url} ({e})"))
@@ -477,17 +483,10 @@ pub fn get_expected_hash(
         }
     }
 
-    for word in resp.split_whitespace() {
-        if is_valid_hash(word) {
-            return Ok(word.to_string());
-        }
-    }
-
-    Ok(resp
-        .split_whitespace()
-        .next()
-        .unwrap_or_default()
-        .to_string())
+    resp.split_whitespace()
+        .find(|word| is_valid_hash(word))
+        .map(str::to_string)
+        .ok_or_else(|| anyhow!("No checksum found in {hash_url}"))
 }
 
 /// Fetches the expected download and installed sizes for a package.
