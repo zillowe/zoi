@@ -97,9 +97,16 @@ fn every_setting_is_written_under_the_root() {
     assert!(keyboard.contains("Option \"XkbLayout\" \"de\"\n"));
     assert!(keyboard.contains("Option \"XkbOptions\" \"ctrl:nocaps\"\n"));
     assert!(!keyboard.contains("XkbVariant"));
-    assert!(
-        read(r, "etc/systemd/network/20-wired.network").contains("DHCP=yes")
+    assert_eq!(
+        read(r, "etc/systemd/network/20-wired.network"),
+        "# Written by Zoi from system.lua; changes are overwritten.\n\
+         [Match]\nType=ether\n\n[Network]\nDHCP=yes\n\n\
+         [DHCPv4]\nRouteMetric=100\n\n[IPv6AcceptRA]\nRouteMetric=100\n"
     );
+    // No escape sequence leaked into the keyboard file either.
+    let keyboard = read(r, "etc/X11/xorg.conf.d/00-keyboard.conf");
+    assert!(keyboard.ends_with("EndSection\n"), "{keyboard}");
+    assert!(!keyboard.contains('\\'), "{keyboard}");
     assert_eq!(
         fs::read_link(r.join("etc/resolv.conf")).expect("resolv.conf link"),
         PathBuf::from("/run/systemd/resolve/stub-resolv.conf")

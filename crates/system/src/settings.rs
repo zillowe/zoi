@@ -570,10 +570,22 @@ fn apply_keyboard(w: &mut Writer, keyboard: &KeyboardConfig) -> Result<()> {
 /// DHCP on every wired interface, and name resolution through
 /// systemd-resolved's stub resolver.
 fn apply_networkd(w: &mut Writer) -> Result<()> {
-    let network = format!(
-        "{HEADER}\n[Match]\nType=ether\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\\
-         nRouteMetric=100\n\n[IPv6AcceptRA]\nRouteMetric=100\n"
-    );
+    let network = [
+        HEADER,
+        "[Match]",
+        "Type=ether",
+        "",
+        "[Network]",
+        "DHCP=yes",
+        "",
+        "[DHCPv4]",
+        "RouteMetric=100",
+        "",
+        "[IPv6AcceptRA]",
+        "RouteMetric=100",
+        ""
+    ]
+    .join("\n");
     w.write("/etc/systemd/network/20-wired.network", &network)?;
     w.symlink("/etc/resolv.conf", "/run/systemd/resolve/stub-resolv.conf")
 }
