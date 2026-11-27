@@ -793,7 +793,17 @@ pub fn get_display_server() -> Option<String> {
 }
 
 /// Returns the version of the operating system kernel.
+///
+/// A fact about the host machine, probed once per process: Lua package
+/// environments expose it as `SYSTEM.*`, and resolving dependencies creates
+/// hundreds of them.
 pub fn get_kernel_version() -> Option<String> {
+    static CACHED: OnceLock<Option<String>> = OnceLock::new();
+    CACHED.get_or_init(detect_kernel_version).clone()
+}
+
+/// Probes for [`get_kernel_version`].
+fn detect_kernel_version() -> Option<String> {
     if cfg!(unix) {
         let output = Command::new("uname").arg("-r").output().ok()?;
         if output.status.success() {
@@ -894,7 +904,17 @@ pub fn get_distro_version() -> Option<String> {
 }
 
 /// Returns a short description of the system's CPU.
+///
+/// A fact about the host machine, probed once per process: Lua package
+/// environments expose it as `SYSTEM.*`, and resolving dependencies creates
+/// hundreds of them.
 pub fn get_cpu_info() -> Option<String> {
+    static CACHED: OnceLock<Option<String>> = OnceLock::new();
+    CACHED.get_or_init(detect_cpu_info).clone()
+}
+
+/// Probes for [`get_cpu_info`].
+fn detect_cpu_info() -> Option<String> {
     if cfg!(target_os = "linux") {
         if let Ok(cpuinfo) = fs::read_to_string("/proc/cpuinfo") {
             for line in cpuinfo.lines() {
@@ -932,7 +952,17 @@ pub fn get_cpu_info() -> Option<String> {
 }
 
 /// Returns a short description of the system's GPU.
+///
+/// A fact about the host machine, probed once per process: Lua package
+/// environments expose it as `SYSTEM.*`, and resolving dependencies creates
+/// hundreds of them.
 pub fn get_gpu_info() -> Option<String> {
+    static CACHED: OnceLock<Option<String>> = OnceLock::new();
+    CACHED.get_or_init(detect_gpu_info).clone()
+}
+
+/// Probes for [`get_gpu_info`].
+fn detect_gpu_info() -> Option<String> {
     if cfg!(target_os = "linux") {
         if let Ok(output) = Command::new("lspci").output()
             && output.status.success()
