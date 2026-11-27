@@ -240,7 +240,8 @@ bump *args:
 
 # Builds the C helper with CC (default clang) and CFLAGS/LDFLAGS, then runs
 # scripts/distro-check/distro-check.sh with ARGS, e.g. `--root ./basetest`
-# (add LDFLAGS=-static to run the C checks inside the root, as root).
+# (with --root, the C checks are compiled and run inside the root instead,
+# as root and with the root's compiler).
 # Check a Linux system against freedesktop.org, FHS 3.0 and POSIX.1-2024
 distro-check *args:
     #!/usr/bin/env bash

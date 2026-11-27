@@ -19,8 +19,8 @@
 #
 # It checks the running system, or an unbooted root such as the folder
 # `zoi system distro build` creates (--root). With --root, nothing from the
-# root is run, except a statically linked syscheck through chroot when run
-# as root.
+# root is run, except the root's own compiler and the C helper it builds,
+# through chroot when run as root.
 #
 # Every result is one of:
 #   PASS  present, valid, or working
@@ -59,8 +59,10 @@ Options:
   -r, --root DIR       Check the unbooted root in DIR instead of this system.
   -n, --network        Also check DNS and HTTPS (running system only).
   -s, --syscheck FILE  Run the C helper FILE for the C library checks
-                       (versions, options and limits). With --root it must
-                       be statically linked, and runs through chroot as root.
+                       (versions, options and limits) on this system. By
+                       default syscheck.c is compiled with cc; with --root it
+                       is compiled and run inside DIR (as root, with DIR's
+                       compiler), so DIR's own C library answers.
   -c, --cc COMPILER    Compile-test the POSIX headers with COMPILER (with
                        --root, against DIR's headers via --sysroot).
       --no-color       Do not color the output.
@@ -1067,41 +1069,77 @@ check_any INFO "Package manager" zoi pacman apt dnf zypper apk xbps-install emer
 section "POSIX system interfaces" \
     "POSIX.1-2024 Base Definitions (limits, options, headers) and System Interfaces"
 
-if [ -n "$SYSCHECK" ]; then
-    if [ ! -x "$SYSCHECK" ]; then
-        report FAIL "--syscheck $SYSCHECK is not an executable file"
+# run_syscheck: prints the C helper's results for the checked system, or
+# nothing (with a note) when it cannot run. The helper must answer from the
+# checked system's own C library, so with --root it is compiled and run
+# inside the root by the root's compiler; a binary built elsewhere would
+# report the C library it was linked against.
+SYSCHECK_SRC="$(dirname "$0")/syscheck.c"
+run_syscheck() {
+    if live; then
+        if [ -n "$SYSCHECK" ]; then
+            "$SYSCHECK"
+            return
+        fi
+        if [ -f "$SYSCHECK_SRC" ] && has_cmd cc; then
+            rs_dir=$(mktemp -d "${TMPDIR:-/tmp}/distro-check.XXXXXX")
+            if cc -std=c17 -O2 -o "$rs_dir/syscheck" "$SYSCHECK_SRC" 2>/dev/null; then
+                "$rs_dir/syscheck"
+                rs_status=$?
+                rm -rf "$rs_dir"
+                return $rs_status
+            fi
+            rm -rf "$rs_dir"
+        fi
+        echo "INFO	C library checks skipped: no compiler (cc) and no --syscheck"
+        return 0
+    fi
+    if [ "$(id -u)" != 0 ]; then
+        echo "INFO	C library checks skipped: checking a --root needs root (chroot)"
+        return 0
+    fi
+    if ! has_cmd cc; then
+        echo "INFO	C library checks skipped: the root has no compiler (install @core/base:dev into it)"
+        return 0
+    fi
+    if [ ! -f "$SYSCHECK_SRC" ]; then
+        echo "INFO	C library checks skipped: $SYSCHECK_SRC not found"
+        return 0
+    fi
+    rs_name="distro-check-syscheck.$$"
+    cp "$SYSCHECK_SRC" "$ROOT/tmp/$rs_name.c"
+    if chroot "$ROOT" cc -std=c17 -O2 -o "/tmp/$rs_name" "/tmp/$rs_name.c" 2>/dev/null; then
+        chroot "$ROOT" "/tmp/$rs_name"
+        rs_status=$?
     else
-        if live; then
-            OUT=$("$SYSCHECK" 2>&1)
-            STATUS=$?
-        elif [ "$(id -u)" = 0 ]; then
-            # Inside the root, so its own C library answers. Needs a static
-            # build, since the root's loader may not match the host's.
-            COPY="/tmp/distro-check-syscheck.$$"
-            cp "$SYSCHECK" "$ROOT$COPY"
-            OUT=$(chroot "$ROOT" "$COPY" 2>&1)
-            STATUS=$?
-            rm -f "$ROOT$COPY"
-        else
-            OUT="" STATUS=0
-            report INFO "C library checks skipped: checking a --root needs root (chroot) and a static syscheck"
-        fi
-        if [ "$STATUS" != 0 ]; then
-            report FAIL "syscheck failed (exit $STATUS): $(printf '%s' "$OUT" | head -n 3 | tr '\n' ' ')"
-        elif [ -n "$OUT" ]; then
-            TAB=$(printf '\t')
-            printf '%s\n' "$OUT" | {
-                while IFS=$TAB read -r level message; do
-                    case $level in
-                    PASS | FAIL | WARN | INFO) report "$level" "$message" ;;
-                    esac
-                done
-                # The counts live in this subshell; hand them back.
-                echo "$N_PASS $N_FAIL $N_WARN $N_INFO $S_PASS $S_FAIL $S_WARN" >"${TMPDIR:-/tmp}/distro-check-counts.$$"
-            }
-            read -r N_PASS N_FAIL N_WARN N_INFO S_PASS S_FAIL S_WARN <"${TMPDIR:-/tmp}/distro-check-counts.$$"
-            rm -f "${TMPDIR:-/tmp}/distro-check-counts.$$"
-        fi
+        echo "WARN	The root's compiler could not build the C helper"
+        rs_status=0
+    fi
+    rm -f "$ROOT/tmp/$rs_name" "$ROOT/tmp/$rs_name.c"
+    return $rs_status
+}
+
+if [ -n "$SYSCHECK" ] && [ ! -x "$SYSCHECK" ]; then
+    report FAIL "--syscheck $SYSCHECK is not an executable file"
+elif [ -n "$SYSCHECK" ] || [ -f "$SYSCHECK_SRC" ]; then
+    OUT=$(run_syscheck 2>&1)
+    STATUS=$?
+    if [ "$STATUS" != 0 ]; then
+        report FAIL "The C helper failed (exit $STATUS): $(printf '%s' "$OUT" | head -n 3 | tr '\n' ' ')"
+    elif [ -n "$OUT" ]; then
+        TAB=$(printf '\t')
+        COUNTS="${TMPDIR:-/tmp}/distro-check-counts.$$"
+        printf '%s\n' "$OUT" | {
+            while IFS=$TAB read -r level message; do
+                case $level in
+                PASS | FAIL | WARN | INFO) report "$level" "$message" ;;
+                esac
+            done
+            # The counts live in this subshell; hand them back.
+            echo "$N_PASS $N_FAIL $N_WARN $N_INFO $S_PASS $S_FAIL $S_WARN" >"$COUNTS"
+        }
+        read -r N_PASS N_FAIL N_WARN N_INFO S_PASS S_FAIL S_WARN <"$COUNTS"
+        rm -f "$COUNTS"
     fi
 elif live && has_cmd getconf; then
     # Without the C helper, getconf(1) answers the main questions.

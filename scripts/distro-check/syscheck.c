@@ -12,7 +12,8 @@
  *
  *     cc -std=c17 -O2 -o syscheck syscheck.c
  *
- * Link it statically (-static) to also run it inside an unbooted root.
+ * For an unbooted root, distro-check.sh compiles it inside the root with the
+ * root's own compiler, so the root's C library is the one that answers.
  */
 
 #define _XOPEN_SOURCE 700

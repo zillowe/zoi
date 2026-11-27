@@ -190,9 +190,10 @@ folder from the host, before creating the image:
 just distro-check --root ./zoios-vm
 ```
 
-With `--root`, nothing from the folder is run. The C library checks run
-inside the folder only as root with a static helper:
-`sudo env LDFLAGS=-static just distro-check --root ./zoios-vm`.
+With `--root`, nothing from the folder is run, except for the C library
+checks: run as root, and with a compiler in the folder (`@core/base:dev`),
+the C helper is compiled and run inside it, so the folder's own C library
+answers. Without both, those checks are skipped.
 
 In the VM, copy `scripts/distro-check/distro-check.sh` over (for example with
 `scp`) and run it with `sh`; `--network` adds DNS and HTTPS checks:
