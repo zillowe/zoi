@@ -395,8 +395,7 @@ pub fn mark_key_fetched(name: &str) -> Result<()> {
 pub fn key_fetched_within(name: &str, max_age: std::time::Duration) -> bool {
     let stored = validate_key_name(name).is_ok()
         && get_pgp_dir()
-            .map(|dir| dir.join(format!("{name}.asc")).is_file())
-            .unwrap_or(false);
+            .is_ok_and(|dir| dir.join(format!("{name}.asc")).is_file());
     stored
         && fetched_marker(name)
             .ok()

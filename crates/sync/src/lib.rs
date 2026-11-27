@@ -895,7 +895,7 @@ fn try_sync_at_path(
 /// How long a repository's PGP key is trusted as current before a sync
 /// downloads it again.
 const PGP_KEY_REFRESH_INTERVAL: std::time::Duration =
-    std::time::Duration::from_secs(7 * 24 * 60 * 60);
+    std::time::Duration::from_hours(168);
 
 /// Imports PGP keys from a parsed repository configuration.
 ///
