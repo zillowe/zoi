@@ -139,10 +139,10 @@ A functional ZoiOS system is defined by `collection` packages. Parlex Linux uses
 
 | Collection       | Contents                                                                                                                                    |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@core/base`     | The minimal userland: C library, shell, POSIX tools, compression tools, networking utilities and Zoi itself. No kernel, bootloader or init. |
+| `@core/base`     | The minimal userland: C library, shell, POSIX tools (including `diff`, `ed`, `bc` and `vi`), compression tools, networking utilities and Zoi itself. No kernel, bootloader or init. |
 | `@core/base:dev` | `@core/base` plus the standard build toolchain (GCC, binutils, make, autotools, pkgconf, ...). Used as the root of `--pure` package builds. |
-| `@core/base:docs` | `@core/base` plus `man` (man-db and groff). Optional: headless systems rarely need it.                                                     |
-| `@core/parlex`   | A bootable system: `@core/base` plus the kernel, dracut, GRUB, systemd, sudo and `zoid`. Firmware is chosen separately (see below).       |
+| `@core/base:docs` | `@core/base` plus `man` (man-db and groff). Included in `@core/parlex`.                                                     |
+| `@core/parlex`   | A bootable system: `@core/base` and `@core/base:docs` plus the kernel, dracut, GRUB, systemd, sudo, `zoid`, inetutils (`hostname`), vim, OpenSSH and dosfstools. Firmware is chosen separately (see below). |
 
 ### Choosing Firmware
 

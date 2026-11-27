@@ -46,13 +46,12 @@ packages({
 	-- "@core/linux-firmware:intel",
 	-- "@core/linux-firmware:amdgpu",
 	-- "@core/linux-firmware:amd_ucode",
-	-- `man` (man-db, groff):
-	-- "@core/base:docs",
 })
 ```
 
 - **`@core/parlex`** is the bootable Parlex set: the `@core/base` userland
-  plus the kernel, dracut, GRUB, systemd, sudo and `zoid`.
+  and man pages, plus the kernel, dracut, GRUB, systemd, sudo, `zoid`, vim,
+  OpenSSH, inetutils and dosfstools.
 - **`network = "networkd"`** sets up wired networking with DHCP through
   systemd-networkd, with systemd-resolved for DNS. QEMU's user network hands
   out an address with DHCP, so the VM is online with no further setup.
