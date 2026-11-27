@@ -3081,9 +3081,9 @@ pub(crate) fn start_packagekit() -> Result<()> {
 
             if let Err(e) = result {
                 eprintln!(
-                    "Warning: failed to start the PackageKit interface: {e}. \
-                     Desktop package tools will not work; the zoi CLI is \
-                     unaffected."
+                    "Warning: failed to start the PackageKit interface: \
+                     {e:#}. Desktop package tools will not work; the zoi CLI \
+                     is unaffected."
                 );
             }
         })

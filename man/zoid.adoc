@@ -50,7 +50,10 @@ polkit does not know these actions and every non-root request is denied.
 always yes.
 
 *zoid* is normally started by systemd at boot through
-`/usr/lib/systemd/system/zoid.service`.
+`/usr/lib/systemd/system/zoid.service`. Claiming the PackageKit name also
+needs the D-Bus policy
+`/usr/share/dbus-1/system.d/org.freedesktop.PackageKit.conf` (shipped with
+*zoid*), which lets root own the name and anyone call it.
 
 == Options
 

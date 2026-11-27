@@ -8,6 +8,12 @@ Documentation=man:zoid(8)
 After=dbus.service network-online.target
 Wants=network-online.target
 
+# Restart limits belong to [Unit]; in [Service] systemd ignores them. They must
+# allow more than the default five restarts in ten seconds, or a persistent
+# misconfiguration turns into the unit being disabled.
+StartLimitIntervalSec=60
+StartLimitBurst=10
+
 [Service]
 # `Type=exec` rather than the default `simple` because it makes systemd wait
 # until execve(2) actually succeeded, so a missing or non-executable binary
@@ -25,11 +31,6 @@ ExecReload=/bin/kill -HUP $MAINPID
 # the whole ZoiOS layer, and a clean exit is as unexpected as a crash.
 Restart=always
 RestartSec=2
-
-# StartLimit must allow more than the default five restarts in ten seconds, or a
-# persistent misconfiguration turns into the unit being disabled.
-StartLimitIntervalSec=60
-StartLimitBurst=10
 
 User=root
 Group=root
@@ -62,8 +63,8 @@ ProtectSystem=no
 ProtectKernelTunables=no
 ProtectControlGroups=no
 RestrictSUIDSGID=no
-# A package script may legitimately need to start a service or run a shell.
-ProtectProcSubset=no
+# ProtectProc= and ProcSubset= stay at their defaults (all of /proc visible): a
+# package script may legitimately need to start a service or run a shell.
 
 # The daemon can be asked to quit so an administrator can use `zoi` directly
 # from a terminal; that is intentional, so no `RefuseManualStop`.

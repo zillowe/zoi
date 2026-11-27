@@ -200,8 +200,8 @@ fn start_daemon(no_packagekit: bool) -> Result<()> {
         println!("PackageKit interface disabled by --no-packagekit");
     } else if let Err(e) = packagekit::start_packagekit() {
         eprintln!(
-            "Warning: failed to start the PackageKit interface: {e}. Desktop \
-             package tools will not work; the zoi CLI is unaffected."
+            "Warning: failed to start the PackageKit interface: {e:#}. \
+             Desktop package tools will not work; the zoi CLI is unaffected."
         );
     }
 

@@ -107,7 +107,8 @@ install:
             echo "Zoid installed successfully to {{ BINDIR }}/{{ DAEMON_NAME }}{{ EXE_EXT }}"; \
             if [ -d "/usr/lib/systemd/system" ]; then \
                 sudo install -m 644 "crates/daemon/zoid.service" "/usr/lib/systemd/system/zoid.service"; \
-                echo "Zoid systemd service installed."; \
+                sudo install -Dm 644 "crates/daemon/org.freedesktop.PackageKit.conf" "/usr/share/dbus-1/system.d/org.freedesktop.PackageKit.conf"; \
+                echo "Zoid systemd service and D-Bus policy installed."; \
                 echo "Run 'sudo systemctl enable --now zoid' to start it at boot."; \
             fi; \
         fi; \
@@ -138,6 +139,7 @@ uninstall:
     @if [ -f "/usr/lib/systemd/system/zoid.service" ]; then \
         sudo systemctl disable --now zoid 2>/dev/null || true; \
         sudo rm -f "/usr/lib/systemd/system/zoid.service"; \
+        sudo rm -f "/usr/share/dbus-1/system.d/org.freedesktop.PackageKit.conf"; \
         sudo rm -rf /run/zoid; \
         echo "Zoid systemd service removed."; \
     fi

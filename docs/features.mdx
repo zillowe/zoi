@@ -21,7 +21,7 @@ Zoi is packed with features designed to make package management and environment 
   - **Automatic Kernel Pipeline:** Any transaction touching kernel paths rebuilds the module index with `depmod`, regenerates the initramfs with `dracut`, `mkinitcpio` or `booster`, signs for UEFI Secure Boot with `sbsign` when the firmware is enforcing it, and writes boot entries.
   - **Multiple Bootable Kernels:** Previous kernels are preserved before an upgrade removes them, so a bad kernel update is recovered from by selecting an earlier kernel. Controlled by `kernel_retention`.
   - **systemd-boot, GRUB 2 and Limine:** The bootloader is taken from `system.lua` or detected from the filesystem.
-  - **PackageKit D-Bus Service:** `zoid` implements `org.freedesktop.PackageKit`, the cross-desktop standard, so GNOME Software, KDE Discover and `pkcon` work on a ZoiOS system.
+  - **PackageKit D-Bus Service:** `zoid` implements `org.freedesktop.PackageKit`, the cross-desktop standard, so GNOME Software, KDE Discover and `pkcon` work on a ZoiOS system Its D-Bus policy (`/usr/share/dbus-1/system.d/org.freedesktop.PackageKit.conf`, shipped with `zoid`) lets the daemon claim the name on the system bus.
 
 - **Explicit Scope Control:** Restrict package installation to specific scopes (`user`, `system`, or `project`) using the `scopes` metadata field. Zoi automatically enforces these constraints during installation and updates.
 
