@@ -5627,6 +5627,7 @@ version = "1.29.20"
 dependencies = [
  "anyhow",
  "rusqlite",
+ "serde",
  "serde_json",
  "zoi-core",
  "zoi-deps",

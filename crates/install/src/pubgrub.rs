@@ -712,21 +712,20 @@ impl ZoiDependencyProvider {
 
         if let Ok(resolved) =
             resolve::resolve_source(&source_str, self.scope, true, true)
+            && let Some(pkg) = parse_recipe_cached(&resolved.path, self.scope)
         {
-            if let Some(pkg) = parse_recipe_cached(&resolved.path, self.scope) {
-                if let Some(v_str) = &pkg.version
-                    && let Ok(v) = SemVersion::parse(v_str)
-                {
-                    all_versions.push(v);
-                }
-                if let Some(versions_map) = &pkg.versions {
-                    for channel in versions_map.keys() {
-                        if let Ok(v_str) =
-                            resolve::resolve_channel(versions_map, channel)
-                            && let Ok(v) = SemVersion::parse(&v_str)
-                        {
-                            all_versions.push(v);
-                        }
+            if let Some(v_str) = &pkg.version
+                && let Ok(v) = SemVersion::parse(v_str)
+            {
+                all_versions.push(v);
+            }
+            if let Some(versions_map) = &pkg.versions {
+                for channel in versions_map.keys() {
+                    if let Ok(v_str) =
+                        resolve::resolve_channel(versions_map, channel)
+                        && let Ok(v) = SemVersion::parse(&v_str)
+                    {
+                        all_versions.push(v);
                     }
                 }
             }

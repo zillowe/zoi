@@ -305,8 +305,7 @@ fn setup_schema(conn: &Connection) -> Result<()> {
             [],
             |row| row.get::<_, i64>(0)
         )
-        .map(|n| n > 0)
-        .unwrap_or(false);
+        .is_ok_and(|n| n > 0);
     if !has_sub_info {
         conn.execute("DROP TABLE IF EXISTS index_cache", [])?;
     }
@@ -1262,8 +1261,8 @@ pub fn store_index_cache(
     conn.execute("DELETE FROM index_cache", [])?;
     let mut stmt = conn.prepare(
         "INSERT INTO index_cache (path, fingerprint, package_json, files, \
-         size_down, size_install, complete, fetched_at, sub_info) VALUES \
-         (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
+         size_down, size_install, complete, fetched_at, sub_info) VALUES (?1, \
+         ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
     )?;
     for e in entries {
         let (down, install) = e
