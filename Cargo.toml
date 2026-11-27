@@ -29,7 +29,7 @@ members = [
 default-members = ["crates/zoi-rs"]
 
 [workspace.package]
-version = "1.29.21"
+version = "1.29.22"
 edition = "2024"
 rust-version = "1.93.0"
 description = "Advanced Package Manager & Environment Orchestrator"
@@ -202,27 +202,27 @@ sentry = { version = "0.49.6", default-features = false, features = [
     "release-health",
 ] }
 
-zoi-common = { path = "crates/common", version = "1.29.21" }
-zoi-core = { path = "crates/core", version = "1.29.21" }
-zoi-hooks = { path = "crates/hooks", version = "1.29.21" }
-zoi-lua = { path = "crates/lua", version = "1.29.21" }
-zoi-purl = { path = "crates/purl", version = "1.29.21" }
-zoi-resolver = { path = "crates/resolver", version = "1.29.21" }
-zoi-sandbox = { path = "crates/sandbox", version = "1.29.21" }
-zoi-telemetry = { path = "crates/telemetry", version = "1.29.21" }
-zoi-project = { path = "crates/project", version = "1.29.21" }
-zoi-cli = { path = "crates/cli", version = "1.29.21" }
-zoi-db = { path = "crates/db", version = "1.29.21" }
-zoi-audit = { path = "crates/audit", version = "1.29.21" }
-zoi-deps = { path = "crates/dependencies", version = "1.29.21" }
-zoi-install = { path = "crates/install", version = "1.29.21" }
-zoi-package = { path = "crates/package", version = "1.29.21" }
-zoi-sync = { path = "crates/sync", version = "1.29.21" }
-zoi-uninstall = { path = "crates/uninstall", version = "1.29.21" }
-zoi-transaction = { path = "crates/transaction", version = "1.29.21" }
-zoi-plugins = { path = "crates/plugins", version = "1.29.21" }
-zoi-system = { path = "crates/system", version = "1.29.21" }
-zoi = { path = "crates/zoi-rs", version = "1.29.21", package = "zoi-rs" }
+zoi-common = { path = "crates/common", version = "1.29.22" }
+zoi-core = { path = "crates/core", version = "1.29.22" }
+zoi-hooks = { path = "crates/hooks", version = "1.29.22" }
+zoi-lua = { path = "crates/lua", version = "1.29.22" }
+zoi-purl = { path = "crates/purl", version = "1.29.22" }
+zoi-resolver = { path = "crates/resolver", version = "1.29.22" }
+zoi-sandbox = { path = "crates/sandbox", version = "1.29.22" }
+zoi-telemetry = { path = "crates/telemetry", version = "1.29.22" }
+zoi-project = { path = "crates/project", version = "1.29.22" }
+zoi-cli = { path = "crates/cli", version = "1.29.22" }
+zoi-db = { path = "crates/db", version = "1.29.22" }
+zoi-audit = { path = "crates/audit", version = "1.29.22" }
+zoi-deps = { path = "crates/dependencies", version = "1.29.22" }
+zoi-install = { path = "crates/install", version = "1.29.22" }
+zoi-package = { path = "crates/package", version = "1.29.22" }
+zoi-sync = { path = "crates/sync", version = "1.29.22" }
+zoi-uninstall = { path = "crates/uninstall", version = "1.29.22" }
+zoi-transaction = { path = "crates/transaction", version = "1.29.22" }
+zoi-plugins = { path = "crates/plugins", version = "1.29.22" }
+zoi-system = { path = "crates/system", version = "1.29.22" }
+zoi = { path = "crates/zoi-rs", version = "1.29.22", package = "zoi-rs" }
 
 [workspace.dependencies.winreg]
 version = "0.56.0"
