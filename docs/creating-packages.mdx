@@ -372,6 +372,18 @@ You use the `sub_packages` and `main_subs` fields in your `metadata`:
 
 - `sub_packages`: A list of all sub-packages that can be built.
 - `main_subs`: A list of the default sub-packages to install when a user installs the base package name.
+- `sub_bins` (optional): The binaries of individual sub-packages, keyed by sub-package name. A sub-package listed here links exactly these binaries; one that is not uses `bins`.
+- `sub_provides` (optional): The virtual names individual sub-packages provide, in the same way. A virtual name (such as a dependency on `awk`) installs a package without naming a sub-package, so only the default sub-package's entry can satisfy it.
+
+```lua
+metadata({
+  name = "zoi",
+  sub_packages = { "main", "zoid" },
+  main_subs = { "main" },
+  bins = { "zoi" },
+  sub_bins = { zoid = { "zoid" } },
+})
+```
 
 **Example:**
 

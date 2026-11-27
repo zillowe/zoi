@@ -123,7 +123,9 @@ declare *project*, *packages*, *registries*, *tasks*, *environments*,
   *author*, *platforms* (such as `"linux-amd64"`), *scope* or *scopes*,
   *sub_packages* and *main_subs* (split packages produce separate archives
   named `<name>-<version>-<platform>.<subpkg>.zpa` and individual
-  `.<subpkg>.zdelta` patches, sharing a single `<name>-<version>.zsa`), *type*
+  `.<subpkg>.zdelta` patches, sharing a single `<name>-<version>.zsa`;
+  *sub_bins* and *sub_provides* map sub-package names to their own *bins*
+  and *provides*, which otherwise apply to every sub-package), *type*
   (`package`, `app`, `collection`, or `extension`), *conflicts*, *replaces*, *provides*,
   *tags*, *bins*, *versions* (channel map), *rollback*, *zoios*, *zsa*
   (boolean; set to `false` or set `no_zsa = true` to disable `.zsa` source

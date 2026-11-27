@@ -121,6 +121,8 @@ LOCATION = {}
 ---@field scopes ("user"|"system"|"project")[]? Allowed installation scopes.
 ---@field sub_packages string[]? List of sub-package names.
 ---@field main_subs string[]? Default sub-packages to install.
+---@field sub_bins table<string, string[]>? Binaries of individual sub-packages (replaces `bins` for those listed).
+---@field sub_provides table<string, string[]>? Provides of individual sub-packages (replaces `provides` for those listed).
 ---@field tags string[]? Keywords for search.
 ---@field readme string? URL to the package's README.
 ---@field rollback boolean? Whether to enable rollback for this package.

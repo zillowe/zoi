@@ -209,6 +209,8 @@ pub fn build_graph_from_locked_packages(
         if let Some(scope) = scope_override {
             pkg.scope = scope;
         }
+        // A sub-package can declare its own binaries and provides.
+        pkg.apply_sub_package(request.sub_package.as_deref());
 
         let pkg_id = if let Some(sub) = &request.sub_package {
             format!("{}@{}:{}", pkg.name, version_str, sub)
@@ -527,6 +529,8 @@ pub fn resolve_dependency_graph(
                 if let Some(s) = scope_override {
                     pkg.scope = s;
                 }
+                // A sub-package can declare its own binaries and provides.
+                pkg.apply_sub_package(name.sub_package.as_deref());
 
                 let pkg_id = if let Some(sub) = &name.sub_package {
                     format!("{}@{}:{}", pkg.name, version_str, sub)

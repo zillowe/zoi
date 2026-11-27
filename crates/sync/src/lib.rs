@@ -178,8 +178,22 @@ fn refresh_registry_db(
         if present {
             db::delete_indexed_package(&tx, &pkg.name, &pkg.repo)?;
         }
-        let pkg_id =
-            db::update_package(&tx, pkg, registry_handle, None, None, None)?;
+        // Each row gets the binaries and provides of what it installs: a
+        // sub-package can declare its own, and the package itself installs
+        // its default sub-package.
+        let for_sub = |sub: Option<&str>| {
+            let mut narrowed = pkg.clone();
+            narrowed.apply_sub_package(sub);
+            narrowed
+        };
+        let pkg_id = db::update_package(
+            &tx,
+            &for_sub(None),
+            registry_handle,
+            None,
+            None,
+            None
+        )?;
 
         // The package itself installs its first main sub-package's archive
         // when it is split, so it gets that archive's file list and sizes.
@@ -208,7 +222,7 @@ fn refresh_registry_db(
             for sub in subs {
                 if let Err(e) = db::update_package(
                     &tx,
-                    pkg,
+                    &for_sub(Some(sub)),
                     registry_handle,
                     None,
                     Some(sub),

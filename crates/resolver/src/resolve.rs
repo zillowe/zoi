@@ -245,6 +245,14 @@ pub fn get_host_db_root() -> Result<PathBuf> {
         .join("db"))
 }
 
+/// What installing `pkg` without naming a sub-package provides: its default
+/// sub-package's `sub_provides` entry, or the package-wide `provides`.
+fn default_install_provides(pkg: &types::Package) -> Option<Vec<String>> {
+    let mut pkg = pkg.clone();
+    pkg.apply_sub_package(None);
+    pkg.provides
+}
+
 /// Parses a source string into a `PackageRequest`.
 ///
 /// # Errors
@@ -635,8 +643,8 @@ fn find_package_in_db(
                     None,
                     None,
                     true
-                ) && let Some(provides) = &pkg.provides
-                    && provides.iter().any(|p| p == &request.name)
+                ) && default_install_provides(&pkg)
+                    .is_some_and(|provides| provides.contains(&request.name))
                 {
                     let major_repo = repo_name
                         .split('/')

@@ -505,6 +505,15 @@ pub struct Package {
     /// List of virtual packages or features that this package provides.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provides: Option<Vec<String>>,
+    /// `bins` of individual sub-packages, keyed by sub-package name. A
+    /// sub-package listed here has exactly these binaries; one that is not
+    /// uses `bins`. See [`Package::apply_sub_package`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_bins: Option<HashMap<String, Vec<String>>>,
+    /// `provides` of individual sub-packages, keyed by sub-package name, in
+    /// the same way as `sub_bins`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_provides: Option<HashMap<String, Vec<String>>>,
     /// Custom metadata tags for the package.
     #[serde(default)]
     pub tags: Vec<String>,
@@ -671,6 +680,46 @@ impl QuietOption {
 }
 
 impl Package {
+    /// The sub-package `sub` stands for: `sub` itself, or for a split
+    /// package requested without one, its first `main_subs` entry (or
+    /// `main`), the archive such a request installs.
+    #[must_use]
+    pub fn effective_sub_package<'a>(
+        &'a self,
+        sub: Option<&'a str>
+    ) -> Option<&'a str> {
+        sub.filter(|s| !s.is_empty()).or_else(|| {
+            self.sub_packages
+                .as_ref()
+                .is_some_and(|subs| !subs.is_empty())
+                .then(|| {
+                    self.main_subs
+                        .as_ref()
+                        .and_then(|m| m.first().map(String::as_str))
+                        .unwrap_or("main")
+                })
+        })
+    }
+
+    /// Narrows `bins` and `provides` to sub-package `sub` (see
+    /// [`Package::effective_sub_package`]) where `sub_bins` or
+    /// `sub_provides` declare its own; otherwise they stay the
+    /// package-wide lists.
+    pub fn apply_sub_package(&mut self, sub: Option<&str>) {
+        let Some(sub) = self.effective_sub_package(sub).map(str::to_string)
+        else {
+            return;
+        };
+        if let Some(bins) = self.sub_bins.as_ref().and_then(|m| m.get(&sub)) {
+            self.bins = Some(bins.clone());
+        }
+        if let Some(provides) =
+            self.sub_provides.as_ref().and_then(|m| m.get(&sub))
+        {
+            self.provides = Some(provides.clone());
+        }
+    }
+
     /// Returns true if ZSA source archiving is disabled for this package.
     pub fn is_zsa_disabled(&self) -> bool {
         self.zsa == Some(false) || self.no_zsa == Some(true)
