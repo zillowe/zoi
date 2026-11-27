@@ -15,6 +15,22 @@ use zoi_resolver::local;
 use crate::resolver::InstallNode;
 use crate::{manifest, plan, prebuilt, util};
 
+/// The lock serialising work on one cached archive file within this
+/// process.
+fn archive_lock(path: &Path) -> std::sync::Arc<std::sync::Mutex<()>> {
+    static LOCKS: std::sync::LazyLock<
+        std::sync::Mutex<
+            std::collections::HashMap<
+                PathBuf,
+                std::sync::Arc<std::sync::Mutex<()>>
+            >
+        >
+    > = std::sync::LazyLock::new(Default::default);
+    let mut locks =
+        LOCKS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    std::sync::Arc::clone(locks.entry(path.to_path_buf()).or_default())
+}
+
 /// Downloads and caches a package archive.
 ///
 /// This function handles:
@@ -82,6 +98,15 @@ pub fn download_and_cache_archive(
     let sig_filename = format!("{archive_filename}.sig");
     let cached_sig_path =
         utils::safe_join(&archive_cache_root, Path::new(&sig_filename))?;
+
+    // Nodes are prepared in parallel, and two of them can need the same
+    // archive (a split package requested both bare and as its main
+    // sub-package). Without this they downloaded it twice at once into the
+    // same `.part` file; now the second waits and finds it cached.
+    let archive_lock = archive_lock(&cached_archive_path);
+    let _archive_guard = archive_lock
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
 
     let has_authorities = registry_authorities(&config, &node.registry_handle)
         .is_some_and(|a| !a.is_empty());
