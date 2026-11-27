@@ -95,13 +95,40 @@ pub enum DistroSubcommands {
     }
 }
 
+/// The algorithms `zoi system secret hash --algorithm` accepts.
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HashAlgorithmArg {
+    /// yescrypt (`$y$`), verifiable by PAM and libxcrypt (default)
+    Yescrypt,
+    /// Argon2id (`$argon2id$`), not verifiable by PAM or libxcrypt
+    Argon2
+}
+
+impl From<HashAlgorithmArg> for zoi_system::secret::HashAlgorithm {
+    fn from(arg: HashAlgorithmArg) -> Self {
+        match arg {
+            HashAlgorithmArg::Yescrypt => Self::Yescrypt,
+            HashAlgorithmArg::Argon2 => Self::Argon2
+        }
+    }
+}
+
 /// Commands for managing secrets like password hashes and encrypted strings.
 #[derive(Subcommand, Debug)]
 pub enum SecretSubcommands {
     /// Generate a one-way hash of a password for use in system.lua
     Hash {
         /// The password to hash
-        password: String
+        password: String,
+        /// The hash algorithm: yescrypt works for logins (PAM/libxcrypt);
+        /// argon2 is for programs that check Argon2 themselves
+        #[arg(
+            short,
+            long,
+            value_enum,
+            default_value_t = HashAlgorithmArg::Yescrypt
+        )]
+        algorithm: HashAlgorithmArg
     },
     /// Encrypt a sensitive string (like an API key) so only Zoi can decrypt it
     Encrypt {
@@ -195,13 +222,31 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
 
     match args.command {
         SystemSubcommands::Secret { command } => match command {
-            SecretSubcommands::Hash { password } => {
-                let hash = zoi_system::secret::hash_password(&password)?;
-                println!(
-                    "Password hash generated successfully. Use this in your \
-                     system.lua:"
-                );
-                println!("\n  {}", hash.green());
+            SecretSubcommands::Hash {
+                password,
+                algorithm
+            } => {
+                let hash = zoi_system::secret::hash_password_with(
+                    &password,
+                    algorithm.into()
+                )?;
+                if algorithm == HashAlgorithmArg::Argon2 {
+                    println!("Password hash generated successfully:");
+                    println!("\n  {}\n", hash.green());
+                    println!(
+                        "{} Logins cannot use an Argon2 hash: PAM checks \
+                         passwords with libxcrypt, which has no Argon2. For a \
+                         user password in system.lua, use the default \
+                         (yescrypt).",
+                        "Note:".yellow().bold()
+                    );
+                } else {
+                    println!(
+                        "Password hash generated successfully. Use this in \
+                         your system.lua:"
+                    );
+                    println!("\n  {}", hash.green());
+                }
             }
             SecretSubcommands::Encrypt { value } => {
                 let encrypted = zoi_system::secret::encrypt_secret(&value)?;

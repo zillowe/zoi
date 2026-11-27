@@ -567,7 +567,10 @@ List packages that define a service and their status.
 *list*:: List system generations. *status*:: Show the active generation.
 *rollback* _ID_:: Roll back to generation _ID_. *pin* _ID_:: Protect a
 generation from pruning. *unpin* _ID_:: Allow pruning again.
-*secret hash* _PASSWORD_:: One-way hash for system.lua.
+*secret hash* _PASSWORD_ [*-a*, *--algorithm*=*yescrypt*|*argon2*]::
+One-way password hash for system.lua. The default, *yescrypt*, is what PAM
+(through libxcrypt) checks at login; *argon2* hashes cannot be used for
+logins.
 *secret encrypt* _VALUE_:: Encrypt a string for this machine.
 *secret decrypt* _SECRET_:: Decrypt a machine-local secret.
 *secret export-key*:: Export the master key (base64).

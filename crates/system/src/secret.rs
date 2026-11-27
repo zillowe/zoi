@@ -13,18 +13,50 @@ use zoi_core::utils::get_user_state_dir;
 /// Secret prefix.
 const SECRET_PREFIX: &str = "ZOISEC:v1:";
 
-/// Generates a one-way password hash using Argon2 (modern standard).
+/// The algorithms `zoi system secret hash` can hash a password with.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HashAlgorithm {
+    /// yescrypt (`$y$...`), the default: what Arch, Debian and Fedora use for
+    /// new passwords, and the strongest hash libxcrypt (and so PAM, `login`,
+    /// `su`, `sudo` and sshd) can verify.
+    #[default]
+    Yescrypt,
+    /// Argon2id (`$argon2id$...`) in PHC string format. libxcrypt cannot
+    /// verify it, so it does not work as a login password in `/etc/shadow`;
+    /// it is for programs that check Argon2 themselves.
+    Argon2
+}
+
+/// Generates a one-way password hash with the default algorithm (yescrypt),
+/// in the form `/etc/shadow` and `users({...})` in system.lua expect.
 ///
 /// # Errors
 ///
 /// Returns an error if the hashing parameters are rejected.
 pub fn hash_password(password: &str) -> Result<String> {
-    let argon2 = Argon2::default();
-    let password_hash = argon2
-        .hash_password(password.as_bytes())
-        .map_err(|e| anyhow!("Failed to hash password: {e}"))?
-        .to_string();
-    Ok(password_hash)
+    hash_password_with(password, HashAlgorithm::default())
+}
+
+/// Generates a one-way password hash with `algorithm`, using a random salt
+/// and the algorithm's recommended parameters (for yescrypt the same as
+/// libxcrypt's default, `$y$j9T$...`).
+///
+/// # Errors
+///
+/// Returns an error if the hashing parameters are rejected.
+pub fn hash_password_with(
+    password: &str,
+    algorithm: HashAlgorithm
+) -> Result<String> {
+    let hash = match algorithm {
+        HashAlgorithm::Yescrypt => yescrypt::Yescrypt::default()
+            .hash_password(password.as_bytes())
+            .map(|hash| hash.as_str().to_string()),
+        HashAlgorithm::Argon2 => Argon2::default()
+            .hash_password(password.as_bytes())
+            .map(|hash| hash.to_string())
+    };
+    hash.map_err(|e| anyhow!("Failed to hash password: {e}"))
 }
 
 /// Retrieves or generates the local master key for two-way encryption.

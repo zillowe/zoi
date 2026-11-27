@@ -114,7 +114,7 @@ sudo zoi system unpin 42
 
 Manage sensitive information like passwords, API keys, and ZoiSEC master keys.
 
-- **`zoi system secret hash <password>`**: Generates a one-way Argon2 hash of a password. Use this in your `system.lua` for user passwords.
+- **`zoi system secret hash <password>`**: Generates a one-way yescrypt hash (`$y$...`) of a password. Use this in your `system.lua` for user passwords. yescrypt is what Arch, Debian and Fedora use for new passwords, and the strongest hash PAM can check at login. `--algorithm argon2` makes an Argon2id hash instead, for programs that check Argon2 themselves; logins cannot use it, because PAM checks passwords with libxcrypt, which has no Argon2.
 - **`zoi system secret encrypt <value>`**: Encrypts a string so only Zoi on this specific machine can decrypt it. It returns a `ZOISEC:v1:...` string.
 - **`zoi system secret decrypt <ZOISEC>`**: Decrypts a `ZOISEC` string back to plaintext.
 - **`zoi system secret export-key`**: Exports the machine-specific ZoiSEC master key as a base64 string. Use this to make your secrets portable to other machines.
