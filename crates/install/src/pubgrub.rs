@@ -264,6 +264,44 @@ fn sanitize_version_string(v: &str) -> String {
     }
 }
 
+/// A recipe evaluated with its default version, reused for the rest of the
+/// run: the solver lists a package's versions many times, and a recipe does
+/// not change meanwhile. `None` when it cannot be evaluated.
+fn parse_recipe_cached(
+    path: &std::path::Path,
+    scope: Option<zoi_core::types::Scope>
+) -> Option<zoi_core::types::Package> {
+    type Key = (std::path::PathBuf, String, Option<std::path::PathBuf>);
+    static PARSED: std::sync::OnceLock<
+        std::sync::Mutex<FxHashMap<Key, zoi_core::types::Package>>
+    > = std::sync::OnceLock::new();
+    let key = (
+        path.to_path_buf(),
+        format!("{scope:?}"),
+        zoi_core::sysroot::get_sysroot()
+    );
+    let cache = PARSED.get_or_init(std::sync::Mutex::default);
+    if let Some(pkg) = cache
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .get(&key)
+    {
+        return Some(pkg.clone());
+    }
+    let pkg = zoi_lua::parser::parse_lua_package(
+        &path.to_string_lossy(),
+        None,
+        scope,
+        true
+    )
+    .ok()?;
+    cache
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .insert(key, pkg.clone());
+    Some(pkg)
+}
+
 /// Errors that can occur during dependency resolution using the `PubGrub`
 /// solver.
 #[derive(Error, Debug)]
@@ -675,10 +713,7 @@ impl ZoiDependencyProvider {
         if let Ok(resolved) =
             resolve::resolve_source(&source_str, self.scope, true, true)
         {
-            let path_str = resolved.path.to_string_lossy();
-            if let Ok(pkg) = zoi_lua::parser::parse_lua_package(
-                &path_str, None, self.scope, true
-            ) {
+            if let Some(pkg) = parse_recipe_cached(&resolved.path, self.scope) {
                 if let Some(v_str) = &pkg.version
                     && let Ok(v) = SemVersion::parse(v_str)
                 {

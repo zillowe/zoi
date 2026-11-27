@@ -1332,7 +1332,40 @@ pub fn resolve_package_and_version(
     scope: Option<types::Scope>,
     quiet: bool,
     yes: bool
-) -> Result<(
+) -> Result<ResolvedPackage> {
+    // The dependency solver asks about the same packages many times, and
+    // each resolution evaluates the recipe twice. A recipe does not change
+    // during one run, so the result is reused; the sysroot is part of the
+    // key, as a target root resolves against its own registries.
+    let key = (
+        source_str.to_string(),
+        format!("{scope:?}"),
+        zoi_core::sysroot::get_sysroot()
+    );
+    let cache = RESOLVED_PACKAGES.get_or_init(Mutex::default);
+    // A recipe fetched from a URL can live in a temporary file that is gone
+    // by now: only reuse a result whose recipe is still there.
+    if let Some(hit) = cache
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .get(&key)
+        .filter(|hit| hit.3.exists())
+    {
+        return Ok(hit.clone());
+    }
+    let resolved =
+        resolve_package_and_version_uncached(source_str, scope, quiet, yes)?;
+    cache
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .insert(key, resolved.clone());
+    Ok(resolved)
+}
+
+/// What [`resolve_package_and_version`] returns: the package, its version,
+/// the shared install manifest (if any), the recipe path, the registry
+/// handle, the repository type and the registry's git revision.
+pub type ResolvedPackage = (
     types::Package,
     String,
     Option<types::SharableInstallManifest>,
@@ -1340,7 +1373,20 @@ pub fn resolve_package_and_version(
     Option<String>,
     Option<String>,
     Option<String>
-)> {
+);
+
+/// Packages resolved during this run, keyed by source, scope and sysroot.
+static RESOLVED_PACKAGES: std::sync::OnceLock<
+    Mutex<HashMap<(String, String, Option<PathBuf>), ResolvedPackage>>
+> = std::sync::OnceLock::new();
+
+/// [`resolve_package_and_version`] without the per-run cache.
+fn resolve_package_and_version_uncached(
+    source_str: &str,
+    scope: Option<types::Scope>,
+    quiet: bool,
+    yes: bool
+) -> Result<ResolvedPackage> {
     let request = parse_source_string(source_str)?;
     let resolved_source = resolve_source(source_str, scope, quiet, yes)?;
     let registry_handle = resolved_source.registry_handle.clone();
