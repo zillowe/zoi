@@ -239,6 +239,11 @@ fn index_cache_round_trips_and_drops_removed_recipes() {
         package_json: "{}".to_string(),
         files: files.map(|f| f.into_iter().map(String::from).collect()),
         sizes: Some((10, 20)),
+        subs: vec![db::SubArchiveInfo {
+            sub: "libs".to_string(),
+            files: Some(vec!["usr/lib/liba.so".to_string()]),
+            sizes: Some((1, 2))
+        }],
         complete: true,
         fetched_at: 1_700_000_000
     };

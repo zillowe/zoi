@@ -783,7 +783,7 @@ If the package is installed more than once across scopes or registries, Zoi will
 
 Downloads or updates the package database from the remote repository.
 
-Indexing is incremental: a recipe that has not changed since the last sync is left as it is, so a sync only parses, looks up (archive file lists and sizes) and rewrites the packages whose recipe changed, for example through a version or revision bump, and removes packages whose recipe is gone. Lookups that failed are retried on the next sync, and all of them are refreshed after a day. A registry's signing keys are downloaded again at most once a week.
+Indexing is incremental: a recipe that has not changed since the last sync is left as it is, so a sync only parses, looks up (archive file lists and sizes, per sub-package for split packages, which the install conflict check then reads locally) and rewrites the packages whose recipe changed, for example through a version or revision bump, and removes packages whose recipe is gone. Lookups that failed are retried on the next sync, and all of them are refreshed after a day. A registry's signing keys are downloaded again at most once a week.
 
 **Flags:**
 

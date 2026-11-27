@@ -181,7 +181,22 @@ fn refresh_registry_db(
         let pkg_id =
             db::update_package(&tx, pkg, registry_handle, None, None, None)?;
 
-        if let Some((down_size, install_size)) = entry.sizes {
+        // The package itself installs its first main sub-package's archive
+        // when it is split, so it gets that archive's file list and sizes.
+        let main_sub = pkg
+            .main_subs
+            .as_ref()
+            .and_then(|subs| subs.first().cloned())
+            .unwrap_or_else(|| "main".to_string());
+        let sub_info =
+            |sub: &str| entry.subs.iter().find(|info| info.sub == sub);
+        let (plain_files, plain_sizes) = if entry.subs.is_empty() {
+            (entry.files.as_ref(), entry.sizes)
+        } else {
+            sub_info(main_sub.as_str())
+                .map_or((None, None), |info| (info.files.as_ref(), info.sizes))
+        };
+        if let Some((down_size, install_size)) = plain_sizes {
             let _ = db::set_package_sizes(&tx, pkg_id, down_size, install_size);
         }
         // No archive hash is indexed: the installer fetches the `.hash` of
@@ -210,7 +225,10 @@ fn refresh_registry_db(
                     &pkg.repo,
                     registry_handle
                 ) {
-                    if let Some((down_size, install_size)) = entry.sizes {
+                    let info = sub_info(sub.as_str());
+                    if let Some((down_size, install_size)) =
+                        info.and_then(|i| i.sizes)
+                    {
                         let _ = db::set_package_sizes(
                             &tx,
                             sub_id,
@@ -218,12 +236,15 @@ fn refresh_registry_db(
                             install_size
                         );
                     }
+                    if let Some(list) = info.and_then(|i| i.files.as_ref()) {
+                        let _ = db::index_package_files(&tx, sub_id, list);
+                    }
                     let _ = db::set_package_hash(&tx, sub_id, "");
                 }
             }
         }
 
-        if let Some(list) = &entry.files {
+        if let Some(list) = plain_files {
             let _ = db::index_package_files(&tx, pkg_id, list);
         }
     }
@@ -300,16 +321,40 @@ fn index_recipe(
         None => parse_recipe(ctx.registry_path, path)?
     };
 
-    let files = fetch_archive_info(ctx, &pkg, |p| p.files.as_ref());
-    let sizes = fetch_archive_info(ctx, &pkg, |p| p.size.as_ref());
-    let complete = files.is_ok() && sizes.is_ok();
-    let files = files.ok().flatten().map(|text| {
-        text.lines()
-            .map(|l| l.trim().to_string())
-            .filter(|l| !l.is_empty())
-            .collect()
-    });
-    let sizes = sizes.ok().flatten().and_then(|text| parse_size_file(&text));
+    // A split package publishes one archive per sub-package (and no plain
+    // one), so their file lists and sizes are looked up instead.
+    let split_subs = pkg.sub_packages.clone().unwrap_or_default();
+    let mut complete = true;
+    let mut lookup = |sub: Option<&str>| {
+        let files = fetch_archive_info(ctx, &pkg, sub, |p| p.files.as_ref());
+        let sizes = fetch_archive_info(ctx, &pkg, sub, |p| p.size.as_ref());
+        complete &= files.is_ok() && sizes.is_ok();
+        let files = files.ok().flatten().map(|text| {
+            text.lines()
+                .map(|l| l.trim().to_string())
+                .filter(|l| !l.is_empty())
+                .collect::<Vec<_>>()
+        });
+        let sizes =
+            sizes.ok().flatten().and_then(|text| parse_size_file(&text));
+        (files, sizes)
+    };
+    let (files, sizes) = if split_subs.is_empty() {
+        lookup(None)
+    } else {
+        (None, None)
+    };
+    let subs = split_subs
+        .iter()
+        .map(|sub| {
+            let (files, sizes) = lookup(Some(sub));
+            db::SubArchiveInfo {
+                sub: sub.clone(),
+                files,
+                sizes
+            }
+        })
+        .collect();
 
     let entry = db::IndexCacheEntry {
         path: rel,
@@ -317,6 +362,7 @@ fn index_recipe(
         package_json: serde_json::to_string(&pkg).ok()?,
         files,
         sizes,
+        subs,
         complete,
         fetched_at: now
     };
@@ -363,12 +409,13 @@ fn archive_template<'a>(
 }
 
 /// Fetches a text file published next to the package's archive (`.files`,
-/// `.size`). `Ok(None)` when the registry publishes none, or the file does
-/// not exist (HTTP 404: a package split into sub-packages has no plain
-/// archive); `Err` when the lookup failed and should be retried.
+/// `.size`), of sub-package `sub`'s archive when given. `Ok(None)` when the
+/// registry publishes none or the file does not exist (HTTP 404); `Err` when
+/// the lookup failed and should be retried.
 fn fetch_archive_info<'a>(
     ctx: &'a IndexContext,
     pkg: &types::Package,
+    sub: Option<&str>,
     pick: impl Fn(&'a types::PkgLink) -> Option<&'a String>
 ) -> std::result::Result<Option<String>, ()> {
     let Some(template) = archive_template(ctx, pick) else {
@@ -385,6 +432,12 @@ fn fetch_archive_info<'a>(
         version,
         ctx.platform
     );
+    // Sub-package archives are named `<name>-<version>-<platform>.<sub>.zpa`,
+    // as the installer downloads them.
+    let url = match sub {
+        Some(sub) => url.replace(".zpa", &format!(".{sub}.zpa")),
+        None => url
+    };
     let response = client.get(&url).send().map_err(|_| ())?;
     if response.status() == reqwest::StatusCode::NOT_FOUND {
         return Ok(None);

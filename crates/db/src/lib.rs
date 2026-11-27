@@ -296,6 +296,20 @@ fn setup_schema(conn: &Connection) -> Result<()> {
     // Per-recipe results of the last index (parsed package, archive file
     // list and sizes), keyed by recipe path and reused while the recipe's
     // fingerprint is unchanged. `clear_registry` leaves it alone.
+    // A cache from an older layout is dropped: it only holds data a sync
+    // fetches again.
+    let has_sub_info: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('index_cache') WHERE \
+             name='sub_info'",
+            [],
+            |row| row.get::<_, i64>(0)
+        )
+        .map(|n| n > 0)
+        .unwrap_or(false);
+    if !has_sub_info {
+        conn.execute("DROP TABLE IF EXISTS index_cache", [])?;
+    }
     conn.execute(
         "CREATE TABLE IF NOT EXISTS index_cache (
             path TEXT PRIMARY KEY,
@@ -304,6 +318,7 @@ fn setup_schema(conn: &Connection) -> Result<()> {
             files TEXT,
             size_down INTEGER,
             size_install INTEGER,
+            sub_info TEXT,
             complete INTEGER NOT NULL,
             fetched_at INTEGER NOT NULL
         )",
@@ -1173,11 +1188,24 @@ pub struct IndexCacheEntry {
     pub files: Option<Vec<String>>,
     /// Download and installed size, if they were fetched.
     pub sizes: Option<(u64, u64)>,
+    /// The same for each sub-package archive of a split package.
+    pub subs: Vec<SubArchiveInfo>,
     /// Whether every remote lookup succeeded (otherwise the next sync
     /// fetches again).
     pub complete: bool,
     /// When the remote lookups ran, in seconds since the Unix epoch.
     pub fetched_at: i64
+}
+
+/// The file list and sizes of one sub-package's archive.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SubArchiveInfo {
+    /// Sub-package name.
+    pub sub: String,
+    /// The archive's file list, if it was fetched.
+    pub files: Option<Vec<String>>,
+    /// Download and installed size, if they were fetched.
+    pub sizes: Option<(u64, u64)>
 }
 
 /// Loads the cached per-recipe index results, keyed by recipe path.
@@ -1190,7 +1218,7 @@ pub fn load_index_cache(
 ) -> Result<HashMap<String, IndexCacheEntry>> {
     let mut stmt = conn.prepare(
         "SELECT path, fingerprint, package_json, files, size_down, \
-         size_install, complete, fetched_at FROM index_cache"
+         size_install, complete, fetched_at, sub_info FROM index_cache"
     )?;
     let rows = stmt.query_map([], |row| {
         let files: Option<String> = row.get(3)?;
@@ -1207,6 +1235,10 @@ pub fn load_index_cache(
                     u64::try_from(i).unwrap_or_default()
                 )
             }),
+            subs: row
+                .get::<_, Option<String>>(8)?
+                .and_then(|json| serde_json::from_str(&json).ok())
+                .unwrap_or_default(),
             complete: row.get::<_, i64>(6)? != 0,
             fetched_at: row.get(7)?
         })
@@ -1230,8 +1262,8 @@ pub fn store_index_cache(
     conn.execute("DELETE FROM index_cache", [])?;
     let mut stmt = conn.prepare(
         "INSERT INTO index_cache (path, fingerprint, package_json, files, \
-         size_down, size_install, complete, fetched_at) VALUES (?1, ?2, ?3, \
-         ?4, ?5, ?6, ?7, ?8)"
+         size_down, size_install, complete, fetched_at, sub_info) VALUES \
+         (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
     )?;
     for e in entries {
         let (down, install) = e
@@ -1251,7 +1283,8 @@ pub fn store_index_cache(
             down,
             install,
             i64::from(e.complete),
-            e.fetched_at
+            e.fetched_at,
+            serde_json::to_string(&e.subs).ok()
         ])?;
     }
     Ok(())
