@@ -42,6 +42,31 @@ fn test_is_zoios_detection() {
 }
 
 #[test]
+fn zoi_should_be_listed_as_a_package_manager_only_on_zoios() {
+    let _ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("failed to create temp dir");
+    let root = tmp.path().to_path_buf();
+    common::TestContextGuard::set_sysroot(root.clone());
+    fs::create_dir_all(root.join("etc")).expect("create etc");
+    let os_release_path = root.join("etc").join("os-release");
+
+    fs::write(&os_release_path, "ID=parlex\nID_LIKE=zoios\n")
+        .expect("write os-release");
+    assert!(
+        utils::get_all_available_package_managers()
+            .contains(&"zoi".to_string())
+    );
+    assert_eq!(utils::get_native_package_manager().as_deref(), Some("zoi"));
+
+    fs::write(&os_release_path, "ID=fedora\nID_LIKE=\"rhel fedora\"\n")
+        .expect("write os-release");
+    assert!(
+        !utils::get_all_available_package_managers()
+            .contains(&"zoi".to_string())
+    );
+}
+
+#[test]
 fn test_scope_compliance_validation() {
     use zoi::pkg::install::preflight::check_scope_compliance;
     use zoi::pkg::install::resolver::{DependencyGraph, InstallNode};

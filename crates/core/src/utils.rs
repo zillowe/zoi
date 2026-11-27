@@ -1059,9 +1059,14 @@ pub fn get_native_package_manager() -> Option<String> {
 /// Scans the system for all supported package managers.
 ///
 /// This provides the list of available managers shown in `zoi info` and
-/// used to validate `manager:` prefixes in dependency strings.
+/// used to validate `manager:` prefixes in dependency strings. On `ZoiOS`
+/// (Parlex and other systems reporting `zoios`), Zoi is the system's own
+/// package manager and is listed too; elsewhere it is not.
 pub fn get_all_available_package_managers() -> Vec<String> {
     let mut managers = Vec::new();
+    if is_zoios() {
+        managers.push("zoi".to_string());
+    }
     let all_possible_managers = [
         "apt",
         "pacman",
