@@ -385,13 +385,15 @@ pub fn detect_initramfs_tool(root: &Path) -> Option<InitramfsTool> {
 
 /// Returns true when `binary` is resolvable on the current `PATH`.
 fn which_on_path(binary: &str) -> bool {
-    let Ok(path) = std::env::var("PATH") else {
-        return false;
-    };
-    path.split(':').any(|dir| {
-        let candidate = Path::new(dir).join(binary);
-        candidate.is_file()
-    })
+    find_on_path(binary).is_some()
+}
+
+/// Where `binary` is on the current `PATH`.
+fn find_on_path(binary: &str) -> Option<std::path::PathBuf> {
+    let path = std::env::var("PATH").ok()?;
+    path.split(':')
+        .map(|dir| Path::new(dir).join(binary))
+        .find(|candidate| candidate.is_file())
 }
 
 /// Rebuilds the module dependency index with `depmod`.
@@ -839,7 +841,17 @@ pub(crate) fn run_in_root(root: &Path, cmd: &mut Command) -> Result<bool> {
         return Ok(status.success());
     }
 
-    let mut chroot_cmd = Command::new("chroot");
+    // The command runs inside the target, so it gets the target's standard
+    // `PATH`, not the host's: a host such as NixOS has no `/usr/bin` in its
+    // `PATH`, and `depmod`, `locale-gen` or `rm` would not be found. `chroot`
+    // itself is looked up on the host's `PATH` first, as setting the child's
+    // `PATH` would change where it is searched for.
+    let chroot_bin = find_on_path("chroot").unwrap_or_else(|| "chroot".into());
+    let mut chroot_cmd = Command::new(chroot_bin);
+    chroot_cmd.env(
+        "PATH",
+        "/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
+    );
     chroot_cmd.arg(root);
     // Carry over the program and every argument already staged on `cmd`.
     chroot_cmd.arg(cmd.get_program());
