@@ -48,8 +48,11 @@ pub fn get_conflicts(
     if let Some(bins_provided) = &pkg.bins {
         for bin in bins_provided {
             for installed_pkg in installed_packages {
+                // `bins` and `provides` describe the whole package, so its
+                // other sub-packages declare the same ones; files they really
+                // share are caught by the file conflict check.
                 if installed_pkg.name == pkg.name
-                    && installed_pkg.sub_package == pkg.sub_package
+                    && installed_pkg.repo == pkg.repo
                 {
                     continue;
                 }
@@ -69,8 +72,11 @@ pub fn get_conflicts(
     if let Some(provides) = &pkg.provides {
         for p in provides {
             for installed_pkg in installed_packages {
+                // `bins` and `provides` describe the whole package, so its
+                // other sub-packages declare the same ones; files they really
+                // share are caught by the file conflict check.
                 if installed_pkg.name == pkg.name
-                    && installed_pkg.sub_package == pkg.sub_package
+                    && installed_pkg.repo == pkg.repo
                 {
                     continue;
                 }

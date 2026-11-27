@@ -501,12 +501,14 @@ impl<'a> Orchestrator<'a> {
                     node.sub_package.as_deref(),
                     &config
                 );
-                if !options.plan_json {
-                    // With --deps-only the direct package is intentionally
-                    // skipped while its dependencies are still installed, so
-                    // the update hint would only mislead.
-                    let is_direct =
-                        matches!(node.reason, types::InstallReason::Direct);
+                // With --deps-only the direct package is intentionally
+                // skipped while its dependencies are still installed, so the
+                // update hint would only mislead.
+                let is_direct =
+                    matches!(node.reason, types::InstallReason::Direct);
+                // Only the packages the user asked for are reported: an
+                // installed dependency being reused is the expected case.
+                if !options.plan_json && is_direct {
                     if already_at_target {
                         let full_spec =
                             format!("{}@{}", display_name, node.version);

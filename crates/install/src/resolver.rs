@@ -120,10 +120,12 @@ impl DependencyGraph {
 
                 if let Some(neighbors) = self.adj.get(&u) {
                     for v_id in neighbors {
-                        let degree =
-                            in_degree.get_mut(v_id).ok_or_else(|| {
-                                anyhow!("v_id '{v_id}' missing from in_degree")
-                            })?;
+                        // An edge can point to a package that is not part of
+                        // this install (already installed, so it was left
+                        // out of the graph); it orders nothing.
+                        let Some(degree) = in_degree.get_mut(v_id) else {
+                            continue;
+                        };
                         *degree -= 1;
                         if *degree == 0 {
                             queue.push_back(v_id.clone());
