@@ -5882,6 +5882,7 @@ dependencies = [
  "indicatif",
  "rayon",
  "reqwest",
+ "serde_json",
  "tar",
  "tempfile",
  "walkdir",
