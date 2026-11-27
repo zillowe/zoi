@@ -283,9 +283,16 @@ fn refresh_registry_db(
             let _ = db::set_package_sizes(&tx, pkg_id, down_size, install_size);
         }
 
-        if let Some(hash) = &hash_info {
-            let _ = db::set_package_hash(&tx, pkg_id, hash);
-        }
+        // The fetched hash is that of the package's plain archive. A package
+        // split into sub-packages ships one archive per sub-package instead
+        // (and its plain archive, if any, is a leftover from an older build),
+        // so no hash is recorded for it: the installer then fetches the
+        // `.hash` of the exact archive it downloads.
+        let has_subs = pkg.sub_packages.as_ref().is_some_and(|s| !s.is_empty());
+        // An empty hash also clears one recorded by an older sync.
+        let recorded_hash =
+            hash_info.as_deref().filter(|_| !has_subs).unwrap_or_default();
+        let _ = db::set_package_hash(&tx, pkg_id, recorded_hash);
 
         if let Some(subs) = &pkg.sub_packages {
             for sub in subs {
@@ -316,9 +323,7 @@ fn refresh_registry_db(
                             *install_size
                         );
                     }
-                    if let Some(hash) = &hash_info {
-                        let _ = db::set_package_hash(&tx, sub_id, hash);
-                    }
+                    let _ = db::set_package_hash(&tx, sub_id, "");
                 }
             }
         }
