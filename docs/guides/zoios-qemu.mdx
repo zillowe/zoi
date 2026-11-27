@@ -162,6 +162,29 @@ fastfetch
 Changes made inside the VM are saved in `zoios-vm.img` and survive a
 reboot.
 
+## Checking how complete the system is
+
+`scripts/distro-check.sh` in the Zoi repository checks a system for what
+POSIX, the FHS and mainstream distributions lead users and programs to
+expect: utilities, directories, system files, accounts, and on a running
+system, runtime features such as cgroup v2 and a working `/bin/sh`. Each
+result is `PASS`, `FAIL`, `WARN` or `INFO`, followed by a summary.
+
+Check the folder from the host, before creating the image:
+
+```sh
+sh scripts/distro-check.sh --root ./zoios-vm
+```
+
+Or copy the script into the VM and check the running system, including DNS
+and HTTPS:
+
+```sh
+sh distro-check.sh --network
+```
+
+With `--root`, only files are checked; nothing from the folder is run.
+
 ## SSH from the host
 
 A terminal on the host is more comfortable than the QEMU window, and copy
