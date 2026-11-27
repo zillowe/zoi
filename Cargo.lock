@@ -3235,9 +3235,9 @@ dependencies = [
 
 [[package]]
 name = "posthog"
-version = "1.5.0"
+version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9e12371e7a6e90e5f6af1f82ecc0b1730b87c3b85e73c9ac01267d1574ab065"
+checksum = "104f8c25c315eca0e824f63d49e6eafa7e87d0669dc954f34fb0d330ba9a9fe8"
 dependencies = [
  "brotli",
  "bytes",
@@ -3258,9 +3258,9 @@ dependencies = [
 
 [[package]]
 name = "posthog-rs"
-version = "1.5.0"
+version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41d1e27de507ab9f8248ae54b7663c44fd775f32851194da4ccfd74881934c7c"
+checksum = "453991e01dad5119911fc8034aa6530a2160d7128fe1963c497422befdc2f32e"
 dependencies = [
  "posthog",
 ]

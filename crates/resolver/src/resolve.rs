@@ -196,6 +196,30 @@ pub fn get_db_root() -> Result<PathBuf> {
     zoi_core::utils::get_db_base_dir(zoi_core::utils::default_db_scope())
 }
 
+/// Where registry `handle` is synced: under `db_root`, or, when resolution
+/// may fall back (on a sysroot or as root), in the system database or the
+/// invoking user's. Returns the `db_root` path when it is found nowhere, so
+/// the caller reports it as not synced.
+///
+/// # Errors
+///
+/// Returns an error if a database directory cannot be determined.
+fn synced_registry_path(db_root: &Path, handle: &str) -> Result<PathBuf> {
+    let path = db_root.join(handle);
+    if path.exists() || !host_registry_fallback() {
+        return Ok(path);
+    }
+    let candidates = [
+        zoi_core::utils::get_db_base_dir(zoi_core::types::Scope::System)?,
+        get_host_db_root()?
+    ];
+    Ok(candidates
+        .iter()
+        .map(|root| root.join(handle))
+        .find(|candidate| candidate.exists())
+        .unwrap_or(path))
+}
+
 /// Whether resolution may fall back to the invoking user's synced registry
 /// (`get_host_db_root`) when the default one has none.
 ///
@@ -393,20 +417,8 @@ fn find_package_in_db(
                     .as_ref()
                     .ok_or_else(|| anyhow!("Default registry not found"))?;
 
-                let mut default_path = db_root.join(&default_registry.handle);
-                if !default_path.exists()
-                    && zoi_core::sysroot::get_sysroot().is_some()
-                {
-                    // Within a sysroot the package databases are synced into
-                    // the System scope, so fall back to that root.
-                    let sys_root = zoi_core::utils::get_db_base_dir(
-                        zoi_core::types::Scope::System
-                    )?;
-                    let sys_path = sys_root.join(&default_registry.handle);
-                    if sys_path.exists() {
-                        default_path = sys_path;
-                    }
-                }
+                let default_path =
+                    synced_registry_path(&db_root, &default_registry.handle)?;
 
                 (
                     default_path,
@@ -417,27 +429,8 @@ fn find_package_in_db(
             } else if let Some(registry) =
                 config.added_registries.iter().find(|r| r.handle == *h)
             {
-                let mut repo_path = db_root.join(&registry.handle);
-
-                if !repo_path.exists()
-                    && zoi_core::sysroot::get_sysroot().is_some()
-                {
-                    // Within a sysroot the package databases are synced into
-                    // the System scope, so fall back to that root before
-                    // consulting host metadata.
-                    let sys_root = zoi_core::utils::get_db_base_dir(
-                        zoi_core::types::Scope::System
-                    )?;
-                    let sys_path = sys_root.join(&registry.handle);
-                    if sys_path.exists() {
-                        repo_path = sys_path;
-                    } else if let Ok(host_root) = get_host_db_root() {
-                        let host_path = host_root.join(&registry.handle);
-                        if host_path.exists() {
-                            repo_path = host_path;
-                        }
-                    }
-                }
+                let repo_path =
+                    synced_registry_path(&db_root, &registry.handle)?;
 
                 let all_sub_repos = if repo_path.exists() {
                     fs::read_dir(&repo_path)?
