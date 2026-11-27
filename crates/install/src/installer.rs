@@ -262,20 +262,29 @@ pub fn download_and_cache_archive(
 
         if !util::verify_file_hash(&archive_path, &hash, pb)? {
             // Cache names carry the version but not the revision, so a
-            // cached archive can be an earlier build of the same version.
-            // That is a stale cache entry, not tampering: replace it.
-            if !from_cache || zoi_core::offline::is_offline() {
+            // cached archive can be an earlier build of the same version, and
+            // a download resumed from a `.part` left by an earlier attempt
+            // can join the start of one build to the rest of another. Both
+            // are stale cache data, not tampering: download it once more
+            // from scratch.
+            if zoi_core::offline::is_offline() {
                 return Err(anyhow!(
                     "Hash verification failed for {archive_filename} ({})",
                     node.pkg.name
                 ));
             }
             report(format!(
-                "{} Cached {} is outdated; downloading it again.",
+                "{} {} {}; downloading it again from scratch.",
                 "::".bold().yellow(),
-                archive_filename.cyan()
+                if from_cache { "Cached" } else { "Downloaded" },
+                format!("{archive_filename} does not match its checksum")
+                    .cyan()
             ));
             fs::remove_file(&cached_archive_path).ok();
+            fs::remove_file(
+                archive_cache_root.join(format!("{archive_filename}.part"))
+            )
+            .ok();
             archive_path = download_full()?;
             if !util::verify_file_hash(&archive_path, &hash, pb)? {
                 return Err(anyhow!(

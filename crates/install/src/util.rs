@@ -1,7 +1,7 @@
 use std::fmt::Write as _;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use anyhow::{Result, anyhow};
@@ -248,16 +248,38 @@ pub fn download_file_with_progress(
     let client = zoi_core::utils::get_http_client()?;
     let mut attempt = 0u32;
 
+    // A partial download is only resumed with `If-Range`, carrying the
+    // ETag (or Last-Modified) of the response that started it: when the file
+    // on the server has changed since (a rebuilt package under the same
+    // name), the server sends the whole new file instead of the rest of the
+    // old one, which would otherwise be joined to it. A partial file without
+    // a recorded validator is not resumed.
+    let validator_path = {
+        let mut name = dest_path.as_os_str().to_owned();
+        name.push(".validator");
+        PathBuf::from(name)
+    };
+    let validator = fs::read_to_string(&validator_path)
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty());
     let mut partial_size = 0;
     if dest_path.exists() {
         partial_size = dest_path.metadata()?.len();
     }
+    if partial_size > 0 && validator.is_none() {
+        partial_size = 0;
+    }
 
     let mut request = client.get(url);
-    if partial_size > 0 {
+    if partial_size > 0
+        && let Some(validator) = &validator
+    {
         let msg = format!("Resuming download from byte {partial_size}");
         pb.set_message(msg);
-        request = request.header("Range", format!("bytes={partial_size}-"));
+        request = request
+            .header("Range", format!("bytes={partial_size}-"))
+            .header("If-Range", validator.as_str());
     }
 
     let max_attempts = get_download_retry_attempts();
@@ -284,10 +306,29 @@ pub fn download_file_with_progress(
     };
 
     let mut is_resumed = false;
-    if response.status() == reqwest::StatusCode::PARTIAL_CONTENT {
+    if response.status() == reqwest::StatusCode::PARTIAL_CONTENT
+        && partial_size > 0
+    {
         is_resumed = true;
     } else if response.status().is_success() {
         partial_size = 0;
+        // Remember what this download is of, for resuming it later.
+        let header = |name: reqwest::header::HeaderName| {
+            response
+                .headers()
+                .get(name)
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_string)
+        };
+        match header(reqwest::header::ETAG)
+            .filter(|etag| !etag.starts_with("W/"))
+            .or_else(|| header(reqwest::header::LAST_MODIFIED))
+        {
+            Some(v) => fs::write(&validator_path, v)?,
+            None => {
+                fs::remove_file(&validator_path).ok();
+            }
+        }
     } else {
         return Err(anyhow!(
             "Failed to download (HTTP {}): {}",
@@ -327,6 +368,7 @@ pub fn download_file_with_progress(
         pb.inc(bytes_read as u64);
     }
 
+    fs::remove_file(&validator_path).ok();
     if let Some(p) = internal_pb {
         p.finish_and_clear();
         println!("Downloaded {}", download_label(url));
