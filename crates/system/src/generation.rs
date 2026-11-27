@@ -123,6 +123,20 @@ impl GenerationManager {
         Ok(id)
     }
 
+    /// The active-generation marker, `pkgs/view/current` next to the
+    /// generations directory: `/var/lib/zoi/pkgs/view/current` on a running
+    /// system, and inside the target (not on the build host) while
+    /// `zoi system distro build` creates the first generation.
+    #[must_use]
+    pub fn current_link(&self) -> PathBuf {
+        self.root
+            .parent()
+            .unwrap_or_else(|| Path::new("/var/lib/zoi"))
+            .join("pkgs")
+            .join("view")
+            .join("current")
+    }
+
     /// Points the active-generation marker at `id`.
     ///
     /// # Errors
@@ -138,10 +152,10 @@ impl GenerationManager {
             return Err(anyhow!("Generation {id} does not exist"));
         }
 
-        let view_root = PathBuf::from("/var/lib/zoi/pkgs/view");
-        fs::create_dir_all(&view_root)?;
-
-        let current_view = view_root.join("current");
+        let current_view = self.current_link();
+        if let Some(view_root) = current_view.parent() {
+            fs::create_dir_all(view_root)?;
+        }
 
         if current_view.exists() || current_view.is_symlink() {
             if current_view.is_dir() && !current_view.is_symlink() {
@@ -151,7 +165,18 @@ impl GenerationManager {
             }
         }
 
-        utils::symlink_dir(&gen_path, &current_view)?;
+        // Relative (`../../generations/<id>`), so the link resolves both on
+        // the running system and while the root is still a build target
+        // mounted somewhere else on the host.
+        let generations_dir = self
+            .root
+            .file_name()
+            .map_or_else(|| PathBuf::from("generations"), PathBuf::from);
+        let link_target = Path::new("..")
+            .join("..")
+            .join(generations_dir)
+            .join(id.to_string());
+        utils::symlink_dir(&link_target, &current_view)?;
 
         println!("Generation {id} recorded as active.");
 
@@ -219,7 +244,7 @@ impl GenerationManager {
     ///
     /// Returns an error if the active pointer cannot be read.
     pub fn get_current_generation_id(&self) -> Result<Option<u32>> {
-        let current_view = PathBuf::from("/var/lib/zoi/pkgs/view/current");
+        let current_view = self.current_link();
         if !current_view.exists() || !current_view.is_symlink() {
             return Ok(None);
         }
