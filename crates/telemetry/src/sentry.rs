@@ -239,11 +239,11 @@ pub fn close(timeout: Duration) -> bool {
     let Some(client) = client_slot().take() else {
         return false;
     };
-    finish(client, SessionStatus::Exited, timeout)
+    finish(&client, SessionStatus::Exited, timeout)
 }
 
 /// Sends the client's events and its ended session.
-fn finish(client: Client, status: SessionStatus, timeout: Duration) -> bool {
+fn finish(client: &Client, status: SessionStatus, timeout: Duration) -> bool {
     let deadline = Instant::now() + timeout;
     let session = build_session(&client, status);
     let mut events = client.pending.iter();
@@ -401,7 +401,7 @@ fn report_panic(info: &std::panic::PanicHookInfo<'_>) {
     );
     client.pending.insert(0, event);
     client.errors = client.errors.saturating_add(1);
-    finish(client, SessionStatus::Crashed, PANIC_SEND_TIMEOUT);
+    finish(&client, SessionStatus::Crashed, PANIC_SEND_TIMEOUT);
 }
 
 /// A new time-ordered (v7) UUID.
