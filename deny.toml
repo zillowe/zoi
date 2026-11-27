@@ -9,7 +9,6 @@ feature-depth = 1
 [advisories]
 db-urls = ["https://github.com/rustsec/advisory-db"]
 ignore = [
-    "RUSTSEC-2026-0249", # smartstring: unmaintained
     # chrono: unmaintained, no fixed release. Used directly and by
     # posthog-rs; replace when a maintained alternative is adopted.
     "RUSTSEC-2026-0543",
