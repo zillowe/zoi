@@ -332,7 +332,8 @@ pub fn add_key_from_fingerprint(
         println!("{}", "Key is valid.".green());
     }
 
-    add_key_from_bytes(&key_bytes, name, quiet)
+    add_key_from_bytes(&key_bytes, name, quiet)?;
+    mark_key_fetched(name)
 }
 
 /// Downloads a PGP key from a URL and adds it to the local keyring.
@@ -368,7 +369,41 @@ pub fn add_key_from_url(url: &str, name: &str, quiet: bool) -> Result<()> {
         println!("{}", "Key is valid.".green());
     }
 
-    add_key_from_bytes(&key_bytes, name, quiet)
+    add_key_from_bytes(&key_bytes, name, quiet)?;
+    mark_key_fetched(name)
+}
+
+/// The marker recording when key `name` was last fetched from its source.
+fn fetched_marker(name: &str) -> Result<PathBuf> {
+    validate_key_name(name)?;
+    Ok(get_pgp_dir()?.join(format!(".{name}.fetched")))
+}
+
+/// Records that key `name` was just fetched (or confirmed unchanged) from
+/// its source, for [`key_fetched_within`].
+///
+/// # Errors
+///
+/// Returns an error if the marker cannot be written.
+pub fn mark_key_fetched(name: &str) -> Result<()> {
+    fs::write(fetched_marker(name)?, b"")?;
+    Ok(())
+}
+
+/// Whether key `name` is stored and was fetched from its source less than
+/// `max_age` ago, so a sync can skip downloading it again.
+pub fn key_fetched_within(name: &str, max_age: std::time::Duration) -> bool {
+    let stored = validate_key_name(name).is_ok()
+        && get_pgp_dir()
+            .map(|dir| dir.join(format!("{name}.asc")).is_file())
+            .unwrap_or(false);
+    stored
+        && fetched_marker(name)
+            .ok()
+            .and_then(|marker| fs::metadata(marker).ok())
+            .and_then(|meta| meta.modified().ok())
+            .and_then(|time| time.elapsed().ok())
+            .is_some_and(|age| age < max_age)
 }
 
 /// Removes a PGP key from the local keyring by its name.

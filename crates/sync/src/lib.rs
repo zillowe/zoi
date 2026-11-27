@@ -56,7 +56,6 @@ fn refresh_registry_db(
     }
 
     let mut conn = db::open_connection(registry_handle)?;
-    db::clear_registry(&conn)?;
 
     let mut pkg_files = Vec::new();
     let mut sec_files = Vec::new();
@@ -110,6 +109,11 @@ fn refresh_registry_db(
     // archive not published yet) are retried, and all of them are redone
     // after a day, so an archive rebuilt in place is picked up.
     let cache = db::load_index_cache(&conn).unwrap_or_default();
+    // Without a cache (first sync, or an index written by an older Zoi) the
+    // existing rows cannot be trusted to match their recipes: start over.
+    if cache.is_empty() {
+        db::clear_registry(&conn)?;
+    }
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
@@ -120,7 +124,7 @@ fn refresh_registry_db(
         platform: &platform
     };
 
-    let entries: Vec<db::IndexCacheEntry> = pkg_files
+    let indexed: Vec<(db::IndexCacheEntry, bool)> = pkg_files
         .par_iter()
         .filter_map(|path| {
             if let Some(p) = pb {
@@ -129,15 +133,18 @@ fn refresh_registry_db(
             index_recipe(&ctx, path, &cache, now)
         })
         .collect();
+    let entries: Vec<db::IndexCacheEntry> =
+        indexed.iter().map(|(entry, _)| entry.clone()).collect();
 
-    let parsed_results: Vec<(types::Package, &db::IndexCacheEntry)> = entries
-        .iter()
-        .filter_map(|entry| {
-            serde_json::from_str::<types::Package>(&entry.package_json)
-                .ok()
-                .map(|pkg| (pkg, entry))
-        })
-        .collect();
+    let parsed_results: Vec<(types::Package, &db::IndexCacheEntry, bool)> =
+        indexed
+            .iter()
+            .filter_map(|(entry, reused)| {
+                serde_json::from_str::<types::Package>(&entry.package_json)
+                    .ok()
+                    .map(|pkg| (pkg, entry, *reused))
+            })
+            .collect();
 
     let parsed_advisories: Vec<(types::Advisory, String)> = sec_files
         .par_iter()
@@ -158,7 +165,19 @@ fn refresh_registry_db(
 
     let tx = conn.transaction()?;
 
-    for (pkg, entry) in &parsed_results {
+    // Only packages whose recipe changed (or that are new) are rewritten,
+    // and packages whose recipe is gone are removed. Unchanged packages keep
+    // their rows, file lists and search entries as they are.
+    let mut stale = db::list_indexed_packages(&tx).unwrap_or_default();
+    for (pkg, entry, reused) in &parsed_results {
+        let key = (pkg.name.clone(), pkg.repo.clone());
+        let present = stale.remove(&key);
+        if *reused && present {
+            continue;
+        }
+        if present {
+            db::delete_indexed_package(&tx, &pkg.name, &pkg.repo)?;
+        }
         let pkg_id =
             db::update_package(&tx, pkg, registry_handle, None, None, None)?;
 
@@ -211,6 +230,11 @@ fn refresh_registry_db(
 
     let _ = db::store_index_cache(&tx, &entries);
 
+    for (name, repo) in &stale {
+        db::delete_indexed_package(&tx, name, repo)?;
+    }
+
+    db::clear_advisories(&tx)?;
     for (advisory, repo) in parsed_advisories {
         let _ = db::update_advisory(&tx, &advisory, &repo, registry_handle);
     }
@@ -243,13 +267,14 @@ struct IndexContext<'a> {
 /// Indexes one recipe: reuses the cached result when the recipe and
 /// platform are unchanged and its remote lookups are complete and recent,
 /// else parses it (or reuses the parsed package) and fetches the archive's
-/// file list and sizes. `None` when the recipe cannot be read or parsed.
+/// file list and sizes. The flag is `true` for a reused result. `None` when
+/// the recipe cannot be read or parsed.
 fn index_recipe(
     ctx: &IndexContext,
     path: &Path,
     cache: &HashMap<String, db::IndexCacheEntry>,
     now: i64
-) -> Option<db::IndexCacheEntry> {
+) -> Option<(db::IndexCacheEntry, bool)> {
     let content = fs::read(path).ok()?;
     let rel = path
         .strip_prefix(ctx.registry_path)
@@ -265,7 +290,7 @@ fn index_recipe(
         && entry.complete
         && now - entry.fetched_at < INDEX_CACHE_MAX_AGE_SECS
     {
-        return Some(entry.clone());
+        return Some((entry.clone(), true));
     }
 
     let pkg = match cached.and_then(|e| {
@@ -275,29 +300,27 @@ fn index_recipe(
         None => parse_recipe(ctx.registry_path, path)?
     };
 
-    let (files, files_ok) = fetch_archive_info(ctx, &pkg, |p| p.files.as_ref())
-        .map_or((None, false), |text| {
-            let list = text
-                .lines()
-                .map(|l| l.trim().to_string())
-                .filter(|l| !l.is_empty())
-                .collect();
-            (Some(list), true)
-        });
-    let (sizes, sizes_ok) = fetch_archive_info(ctx, &pkg, |p| p.size.as_ref())
-        .map_or((None, false), |text| (parse_size_file(&text), true));
-    let wants_files = archive_template(ctx, |p| p.files.as_ref()).is_some();
-    let wants_sizes = archive_template(ctx, |p| p.size.as_ref()).is_some();
+    let files = fetch_archive_info(ctx, &pkg, |p| p.files.as_ref());
+    let sizes = fetch_archive_info(ctx, &pkg, |p| p.size.as_ref());
+    let complete = files.is_ok() && sizes.is_ok();
+    let files = files.ok().flatten().map(|text| {
+        text.lines()
+            .map(|l| l.trim().to_string())
+            .filter(|l| !l.is_empty())
+            .collect()
+    });
+    let sizes = sizes.ok().flatten().and_then(|text| parse_size_file(&text));
 
-    Some(db::IndexCacheEntry {
+    let entry = db::IndexCacheEntry {
         path: rel,
         fingerprint,
         package_json: serde_json::to_string(&pkg).ok()?,
         files,
         sizes,
-        complete: (files_ok || !wants_files) && (sizes_ok || !wants_sizes),
+        complete,
         fetched_at: now
-    })
+    };
+    Some((entry, false))
 }
 
 /// Parses a recipe, filling in its repository from its path when the
@@ -340,13 +363,20 @@ fn archive_template<'a>(
 }
 
 /// Fetches a text file published next to the package's archive (`.files`,
-/// `.size`). `None` when the registry publishes none or the fetch fails.
+/// `.size`). `Ok(None)` when the registry publishes none, or the file does
+/// not exist (HTTP 404: a package split into sub-packages has no plain
+/// archive); `Err` when the lookup failed and should be retried.
 fn fetch_archive_info<'a>(
     ctx: &'a IndexContext,
     pkg: &types::Package,
     pick: impl Fn(&'a types::PkgLink) -> Option<&'a String>
-) -> Option<String> {
-    let template = archive_template(ctx, pick)?;
+) -> std::result::Result<Option<String>, ()> {
+    let Some(template) = archive_template(ctx, pick) else {
+        return Ok(None);
+    };
+    let Some(client) = ctx.client else {
+        return Ok(None);
+    };
     let version = pkg.version.as_deref().unwrap_or("latest");
     let url = install_util::resolve_url_placeholders(
         template,
@@ -355,11 +385,14 @@ fn fetch_archive_info<'a>(
         version,
         ctx.platform
     );
-    let response = ctx.client?.get(&url).send().ok()?;
-    if !response.status().is_success() {
-        return None;
+    let response = client.get(&url).send().map_err(|_| ())?;
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(None);
     }
-    response.text().ok()
+    if !response.status().is_success() {
+        return Err(());
+    }
+    response.text().map(Some).map_err(|_| ())
 }
 
 /// Parses a `.size` file (`down: N` / `install: N` lines, or a bare
@@ -859,6 +892,11 @@ fn try_sync_at_path(
     }
 }
 
+/// How long a repository's PGP key is trusted as current before a sync
+/// downloads it again.
+const PGP_KEY_REFRESH_INTERVAL: std::time::Duration =
+    std::time::Duration::from_secs(7 * 24 * 60 * 60);
+
 /// Imports PGP keys from a parsed repository configuration.
 ///
 /// A key that cannot be imported is reported but does not fail the sync: the
@@ -892,6 +930,18 @@ fn sync_pgp_keys(
 
         if let Some(p) = pb {
             p.set_message(format!("PGP Key: {key_name}"));
+        }
+
+        // A key checked recently is not downloaded again. Keys are still
+        // refreshed weekly, to pick up new subkeys or extended expiry.
+        if pgp::key_fetched_within(key_name, PGP_KEY_REFRESH_INTERVAL) {
+            if verbose {
+                println!("Key '{key_name}' is up to date, not fetching it.");
+            }
+            if let Some(p) = pb {
+                p.inc(1);
+            }
+            continue;
         }
 
         let result = if key_source.starts_with("http") {

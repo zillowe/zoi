@@ -266,3 +266,39 @@ fn index_cache_round_trips_and_drops_removed_recipes() {
         None
     );
 }
+
+#[test]
+fn delete_indexed_package_removes_its_rows_and_files_only() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("tempdir");
+    ctx.set_env_var("ZOI_DB_DIR", tmp.path());
+    let conn = db::open_connection("local").expect("open db");
+
+    let gone = pkg("gone", None);
+    let kept = pkg("kept", None);
+    let gone_id = db::update_package(&conn, &gone, "local", None, None, None)
+        .expect("index gone");
+    db::update_package(&conn, &gone, "local", None, Some("libs"), None)
+        .expect("index gone:libs");
+    let kept_id = db::update_package(&conn, &kept, "local", None, None, None)
+        .expect("index kept");
+    db::index_package_files(&conn, gone_id, &["usr/bin/gone".to_string()])
+        .expect("files gone");
+    db::index_package_files(&conn, kept_id, &["usr/bin/kept".to_string()])
+        .expect("files kept");
+
+    db::delete_indexed_package(&conn, "gone", "core").expect("delete");
+
+    let indexed = db::list_indexed_packages(&conn).expect("list");
+    assert_eq!(
+        indexed,
+        std::collections::HashSet::from([(
+            "kept".to_string(),
+            "core".to_string()
+        )])
+    );
+    let files: i64 = conn
+        .query_row("SELECT COUNT(*) FROM package_files", [], |r| r.get(0))
+        .expect("count files");
+    assert_eq!(files, 1, "the deleted package's file list goes with it");
+}

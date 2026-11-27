@@ -1118,6 +1118,47 @@ pub fn clear_registry(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Lists the `(name, repo)` of every package in a registry's index.
+///
+/// # Errors
+///
+/// Returns an error if the query fails.
+pub fn list_indexed_packages(
+    conn: &Connection
+) -> Result<std::collections::HashSet<(String, String)>> {
+    let mut stmt = conn.prepare("SELECT DISTINCT name, repo FROM packages")?;
+    let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+    Ok(rows.filter_map(std::result::Result::ok).collect())
+}
+
+/// Removes a package and its sub-packages (with their file lists) from a
+/// registry's index.
+///
+/// # Errors
+///
+/// Returns an error if the deletion fails.
+pub fn delete_indexed_package(
+    conn: &Connection,
+    name: &str,
+    repo: &str
+) -> Result<()> {
+    conn.execute(
+        "DELETE FROM packages WHERE name = ?1 AND repo = ?2",
+        params![name, repo]
+    )?;
+    Ok(())
+}
+
+/// Removes every advisory from a registry's index.
+///
+/// # Errors
+///
+/// Returns an error if the deletion fails.
+pub fn clear_advisories(conn: &Connection) -> Result<()> {
+    conn.execute("DELETE FROM package_advisories", [])?;
+    Ok(())
+}
+
 /// What indexing one recipe produced, cached so an unchanged recipe is not
 /// parsed and fetched again (see [`load_index_cache`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
