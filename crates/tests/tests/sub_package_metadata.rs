@@ -60,7 +60,11 @@ fn sub_bins_and_sub_provides_are_parsed() {
         Some(&["splitd".to_string()][..])
     );
     assert_eq!(sub_bins.get("libs").map(Vec::len), Some(0));
-    assert!(pkg.sub_provides.as_ref().is_some_and(|m| m.contains_key("libs")));
+    assert!(
+        pkg.sub_provides
+            .as_ref()
+            .is_some_and(|m| m.contains_key("libs"))
+    );
 }
 
 #[test]
