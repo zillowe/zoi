@@ -25,9 +25,10 @@ NAME := "zoi"
 
 MINI_NAME := "zoi-mini"
 DAEMON_NAME := "zoid"
-# From git, or `ZOI_COMMIT_HASH` when building from a source tarball (which
-# has no `.git`; the release's tarball records it in `COMMIT`).
-COMMIT_HASH := env("ZOI_COMMIT_HASH", shell("git rev-parse --short=10 HEAD 2>/dev/null || cat COMMIT 2>/dev/null || echo unknown"))
+# The checkout's commit from git; outside a git checkout (a source tarball),
+# `ZOI_COMMIT_HASH`, else the `COMMIT` file the release tarball ships. Git
+# comes first so a stale exported variable cannot mislabel a build.
+COMMIT_HASH := shell("git rev-parse --short=10 HEAD 2>/dev/null || printf '%s' \"${ZOI_COMMIT_HASH:-}\" | grep . || cat COMMIT 2>/dev/null || echo unknown")
 IS_WINDOWS := if OS_NAME == "windows" { "1" } else { "0" }
 EXE_EXT := if IS_WINDOWS == "1" { ".exe" } else { "" }
 SRC_BIN := "target/" + PROFILE + "/" + NAME + EXE_EXT
