@@ -4,7 +4,73 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](./INSTALL.md).
 
-## [Prod. Release 1.29.18](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.18) - 2026-11-26
+## [Prod. Release 1.29.22](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.22) - 2026-11-27
+
+### ✨ Features
+
+- [`c900fa91`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/c900fa9164fedd4440ba2a3bfb820f27382487b2) *(system)* Make secret hash produce yescrypt by default, with Argon2 behind --algorithm (logins cannot check Argon2)
+
+### 🧪 Testing
+
+- [`8b17cd0e`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/8b17cd0e8d7c0429e693114fe078dd61dd01b8be) *(system)* Keep rustfmt from rewrapping the networkd file string (format_strings split its \n escape)
+
+### 🩹 Bug Fixes
+
+- [`e90a1386`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/e90a1386687f9cb8d89c4e86628feeff8403a447) *(daemon)* Ship the PackageKit D-Bus policy, fix zoid.service keys systemd ignored, show the full PackageKit error
+- [`41e19ad4`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/41e19ad4134f212ab07a3a681c8b950798f941cf) *(system)* Write the active-generation marker inside the target root, not on the build host
+- [`4011b65b`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/4011b65bb1a12c560a47672b596d89f033c0d50a) *(core)* List Zoi itself as a package manager on ZoiOS, so zoi info shows it as native
+
+## [Prod. Release 1.29.21](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.21) - 2026-11-27
+
+### ⚡ Performance
+
+- [`fd05021e`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/fd05021e8b38b2778c0390fb1c04cbdfc64d9272) *(sync)* Index each sub-package archive's file list and sizes, so conflict checks stay local
+- [`07c7428c`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/07c7428c43e72d94a319fd47c826c04c93d46a43) *(resolver)* Resolve and evaluate each package's recipe once per run
+- [`6cb3ef1c`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/6cb3ef1c6e2afd652846ca8035af070edf630cf1) *(core)* Probe the host's kernel, CPU and GPU once per process
+- [`bc92016c`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/bc92016c920dcacc6c029f5260d46cec9cd65498) *(sync)* Rewrite only changed packages in the index, and fetch registry keys at most weekly
+- [`86f20cca`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/86f20ccaac194f27f7548d767b5f1bda0f98d076) *(sync)* Reindex only recipes that changed, and stop fetching archive hashes during sync
+
+### ✨ Features
+
+- [`1042dd33`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/1042dd3319058e31ac9bc64400139d6ebf8d93f5) *(package)* Let sub-packages declare their own bins and provides (sub_bins, sub_provides)
+
+### 🛠️ Build
+
+- [`582ef45e`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/582ef45e67fac1d32f72b4d428b51b44ed5a7cfe) *(deps)* Build libgit2 into Zoi instead of linking the build host's
+- [`9a5d15a9`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/9a5d15a9749cc95e50e5f1b722148f32629e3b64) Take the commit from git before ZOI_COMMIT_HASH
+
+### 🩹 Bug Fixes
+
+- [`26e4a885`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/26e4a8853197105e57afb5fe49776494daba207e) *(system)* Write a valid systemd-networkd file (a stray escape broke [DHCPv4])
+- [`48d5c52f`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/48d5c52f64f9fb8a6e7e485a64ea09535c115f12) *(install)* Install a sub-package of an installed package; quiet installed dependencies
+- [`88323c80`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/88323c80b9e11b12ccde3d03cffc220331f4206f) *(system)* Give commands run in a target root the target's standard PATH
+- [`1d932a55`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/1d932a55280b1f3321d6ab25b82e73a09641dd7f) *(install)* Download an archive shared by two nodes once, not twice into the same file
+- [`430fb76b`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/430fb76b6fa03949fa6aef210a4cfc09bd463614) *(install)* Resume downloads only of an unchanged file (If-Range) and retry any checksum mismatch from scratch
+- [`ec17bd82`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/ec17bd8220588bdd0855a83393788a1912ecdf13) *(lua)* Name the file when IMPORT cannot read it
+- [`1330e222`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/1330e222e8742d5cb78af87269c06903b5a6b113) *(install)* Treat an HTTP error page as a failed fetch, not a checksum
+- [`e0674fd9`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/e0674fd9e3ec371a07cc0a4d24bd247a6a166217) *(sync)* Do not give sub-packages the hash of the plain archive
+
+## [Prod. Release 1.29.20](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases/Prod-Release-1.29.20) - 2026-11-27
+
+### 🛠️ Build
+
+- [`44b2b4f6`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/44b2b4f672f65f31e37db27bf2a4adca1a062665) *(deps)* Update sevenz-rust2 to 0.27
+
+### 🛡️ Dependencies
+
+- [`f4c09e2f`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/f4c09e2fa314bc53637790c6aee5ee401c637f32) Update
+
+### 🩹 Bug Fixes
+
+- [`bc3b7e24`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/bc3b7e24e5f5d55db94d26d96850c10b76f76d67) *(resolver)* Find a named registry synced in another database as root, and sync where release CI resolves
+
+## [Prod. Release 1.29.19](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/tags/Prod-Release-1.29.19) - 2026-11-25
+
+### 🩹 Bug Fixes
+
+- [`9ed49658`](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/commit/9ed4965837716c0502a329065fef4cf800c01aa4) *(system)* Build the settings module on Windows (symlinks only on Unix)
+
+## [Prod. Release 1.29.18](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/tags/Prod-Release-1.29.18) - 2026-11-25
 
 ### ✨ Features
 
