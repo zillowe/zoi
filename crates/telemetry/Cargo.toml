@@ -33,5 +33,3 @@ serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
 zoi-core.workspace = true
-posthog-rs.workspace = true
-sentry.workspace = true

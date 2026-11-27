@@ -371,21 +371,20 @@ pub fn flush_queue() -> FlushSummary {
             summary.skipped += 1;
             continue;
         };
-        let mut event = posthog_rs::Event::new(
-            queued.event.as_str(),
-            queued.distinct_id.as_str()
-        );
-        for (key, value) in queued.props {
-            let _ = event.insert_prop(key, value);
-        }
-        match client.capture_immediate(event) {
-            Ok(report) if report.all_persisted() => {
+        match client.capture(&queued.event, &queued.distinct_id, &queued.props)
+        {
+            Ok(super::posthog::Delivery::Stored) => {
                 fs::remove_file(&path).ok();
                 summary.sent += 1;
             }
-            Ok(_) => {
-                // - Accepted by the transport but not persisted: keep for
-                //   retry, move on to the next file.
+            Ok(super::posthog::Delivery::Dropped) => {
+                // - Refused for good: retrying would be refused again.
+                fs::remove_file(&path).ok();
+                summary.skipped += 1;
+            }
+            Ok(super::posthog::Delivery::Retry) => {
+                // - Not stored this time: keep for retry, move on to the next
+                //   file.
                 summary.failed += 1;
             }
             Err(_) => {

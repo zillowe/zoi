@@ -5,7 +5,7 @@
 //! non-identifiable data and requiring explicit user opt-in.
 //!
 //! Backends:
-//! - `PostHog` via the official `posthog-rs` Rust SDK for success-only
+//! - `PostHog` via a small built-in client ([`posthog`]) for success-only
 //!   analytics: per-action install/uninstall package events plus a bare daily
 //!   active-user ping (`dau`, no command identity). Delivery is asynchronous:
 //!   producers append events to a durable disk queue (`state/telemetry/queue/`,
@@ -13,13 +13,13 @@
 //!   CLI hot path never touches the network and slow networks never stall
 //!   command exit. Every event carries the anonymous client ID as
 //!   `distinct_id`, so DAU/WAU/MAU fall out of any event stream.
-//! - Sentry via the official `sentry` Rust SDK (with network transport) for
-//!   error tracking: panics via the `panic` integration plus explicit
-//!   `capture_error` calls on command failures.
+//! - Sentry via a small built-in client ([`sentry`]) for error tracking and
+//!   release health: panics, explicit `capture_error` calls on command
+//!   failures, and one session per invocation.
 //! - Local crash reports in `$XDG_STATE_HOME/zoi/crash/*.zoicrash` (Sentry
 //!   envelope format), see [`crash`]. These are the reliable crash channel:
 //!   they are written synchronously by the panic hook even under `panic =
-//!   "abort"`, where in-memory SDK events may never flush.
+//!   "abort"`, where in-memory events may never be sent.
 
 use std::error::Error;
 use std::fs;
@@ -28,7 +28,9 @@ use serde::Serialize;
 use uuid::Timestamp;
 
 pub mod crash;
+pub mod posthog;
 pub mod queue;
+pub mod sentry;
 
 /// Represents an anonymous telemetry event sent to `PostHog`.
 #[derive(Debug, Serialize)]
@@ -269,14 +271,14 @@ pub fn app_release() -> String {
     )
 }
 
-/// Builds a `posthog-rs` blocking client for the detached flush worker, or
+/// Builds a blocking `PostHog` client for the detached flush worker, or
 /// `None` when telemetry must stay silent (opted-out, offline, missing API
 /// key, or running as `zoi-mini`, which is never tracked).
 ///
 /// Only the background flusher (`zoi telemetry flush`, see [`queue`]) builds
 /// this client: no CLI invocation waits on it, so timeouts are generous to
 /// maximize delivery odds on slow networks instead of bounding exit lag.
-fn posthog_client() -> Option<posthog_rs::Client> {
+fn posthog_client() -> Option<posthog::Client> {
     if !telemetry_enabled()
         || zoi_core::offline::is_offline()
         || zoi_core::utils::is_mini_mode()
@@ -290,16 +292,7 @@ fn posthog_client() -> Option<posthog_rs::Client> {
     let host = resolve_posthog_host();
     // - Generous on purpose: only the detached flusher uses this client and
     //   nothing waits on it, so slow networks get every chance to deliver.
-    let options = posthog_rs::ClientOptionsBuilder::default()
-        .api_key(key)
-        .host(host)
-        .request_timeout_seconds(10)
-        .flush_at(1)
-        .shutdown_timeout_ms(15_000)
-        .disable_geoip(true)
-        .build()
-        .ok()?;
-    Some(posthog_rs::client(options))
+    posthog::Client::new(&key, &host, std::time::Duration::from_secs(10)).ok()
 }
 
 /// Initializes Sentry for this process when telemetry is opted-in.
@@ -313,18 +306,16 @@ fn posthog_client() -> Option<posthog_rs::Client> {
 /// `Application` session linked to the release, so Sentry reports adoption,
 /// crash-free users, and crash-free sessions per release. Note the release
 /// name is the custom [`app_release`] value (`zoi@<version>+<commit>`, which
-/// the `sentry:release` CI job reproduces), not `sentry::release_name!`,
-/// which would resolve to this crate's name without the commit hash.
+/// the `sentry:release` CI job reproduces).
 ///
-/// The exit flush is deliberately capped at 500ms (`shutdown_timeout`):
-/// dropping the guard ends the session and blocks until the transport
-/// drains, which measured ~0.85s on a trivial command with the 2s default.
-/// Telemetry must never stall the CLI, so on slow networks some session
-/// closes are dropped instead of holding the process open. Fast networks
-/// deliver well within the budget, so release health stays accurate there.
-/// (Truly backgrounding delivery past exit is impossible: process exit kills
-/// all threads, so any guaranteed delivery must complete beforehand.)
-pub fn init_sentry() -> Option<sentry::ClientInitGuard> {
+/// The exit send is deliberately capped at 500ms: dropping the guard ends
+/// the session and sends it with any captured events. Telemetry must never
+/// stall the CLI, so on slow networks some session closes are dropped
+/// instead of holding the process open. Fast networks deliver well within
+/// the budget, so release health stays accurate there. (Truly backgrounding
+/// delivery past exit is impossible: process exit kills all threads, so any
+/// guaranteed delivery must complete beforehand.)
+pub fn init_sentry() -> Option<sentry::Guard> {
     if !telemetry_enabled()
         || zoi_core::offline::is_offline()
         || zoi_core::utils::is_mini_mode()
@@ -332,25 +323,19 @@ pub fn init_sentry() -> Option<sentry::ClientInitGuard> {
         return None;
     }
     let dsn = resolve_sentry_dsn().filter(|s| !s.is_empty())?;
-    if dsn.parse::<sentry::types::Dsn>().is_err() {
-        return None;
-    }
-    let guard = sentry::init(
-        sentry::ClientOptions::new()
-            .dsn(dsn.as_str())
-            .environment(resolve_environment())
-            .release(app_release())
-            .auto_session_tracking(true)
-            .session_mode(sentry::SessionMode::Application)
-            .shutdown_timeout(std::time::Duration::from_millis(500))
-    );
-    Some(guard)
+    let dsn = sentry::Dsn::parse(&dsn).ok()?;
+    Some(sentry::init(
+        dsn,
+        resolve_environment(),
+        app_release(),
+        std::time::Duration::from_millis(500)
+    ))
 }
 
 /// Guards held for the process lifetime by [`init_telemetry`].
 pub struct TelemetryGuards {
     /// Sentry guard, present only when opted-in with a DSN.
-    pub sentry_guard: Option<sentry::ClientInitGuard>
+    pub sentry_guard: Option<sentry::Guard>
 }
 
 /// Installs crash handling and initializes opt-in backends.
@@ -409,7 +394,7 @@ fn prompt_pending_crashes() {
     }
 }
 
-/// Securely captures an anonymous event for delivery via the `posthog-rs` SDK.
+/// Securely captures an anonymous event for delivery to `PostHog`.
 ///
 /// The hot path never touches the network: the event is appended to the
 /// durable disk queue and a detached `zoi telemetry flush` child is spawned
@@ -418,8 +403,8 @@ fn prompt_pending_crashes() {
 /// retried by the next flush.
 ///
 /// Privacy Guarantee:
-/// - No IP addresses, hostnames, or personal data are ever collected
-///   (`disable_geoip(true)` is set on the SDK client).
+/// - No IP addresses, hostnames, or personal data are ever collected (every
+///   event is sent with `$geoip_disable`).
 /// - The `client_id` is a randomly generated UUID v7 stored in the Zoi user
 ///   state directory under `telemetry/client_id`.
 /// - Telemetry is strictly opt-in. This function returns `Ok(false)`
@@ -685,10 +670,10 @@ pub fn posthog_capture_dau_ping() -> Result<bool, Box<dyn Error>> {
 /// unconfigured, or `zoi-mini`). The full error chain is attached, so error
 /// strings may contain local paths - never call this with user secrets.
 ///
-/// Note: delivery goes through the SDK's background transport thread. On the
-/// normal return path the [`TelemetryGuards`] drop flushes it, but code that
-/// ends the process via `std::process::exit` must call [`shutdown_sentry`]
-/// first, otherwise queued events are lost.
+/// Note: the event is sent when the session ends. On the normal return path
+/// the [`TelemetryGuards`] drop sends it, but code that ends the process via
+/// `std::process::exit` must call [`shutdown_sentry`] first, otherwise the
+/// event is lost.
 pub fn sentry_capture_error(command: &str, error: &dyn Error) {
     if !telemetry_enabled()
         || zoi_core::offline::is_offline()
@@ -696,9 +681,6 @@ pub fn sentry_capture_error(command: &str, error: &dyn Error) {
     {
         return;
     }
-    sentry::configure_scope(|scope| {
-        scope.set_tag("command", command);
-    });
     let mut error_chain = format!("{error}");
     let mut source = error.source();
     while let Some(cause) = source {
@@ -706,22 +688,20 @@ pub fn sentry_capture_error(command: &str, error: &dyn Error) {
         let _ = writeln!(error_chain, "\nCaused by: {cause}");
         source = cause.source();
     }
-    sentry::capture_message(&error_chain, sentry::Level::Error);
+    sentry::capture_message(&error_chain, &[("command", command)]);
 }
 
-/// Drains queued Sentry events and shuts down the transport.
+/// Ends the Sentry session and sends it with the captured events.
 ///
 /// Must be called before any `std::process::exit`, which skips destructors
-/// and would otherwise abandon events still in the SDK's background queue
-/// (notably the failure report from [`sentry_capture_error`]). This also
-/// flushes the release-health session, so the invocation is counted even on
-/// the error path. Waits at most 2 seconds so a stalled network can never
-/// hang the CLI. Returns `true` when the queue drained in time, `false` on
-/// timeout or when Sentry was never initialized.
+/// and would otherwise abandon captured events (notably the failure report
+/// from [`sentry_capture_error`]). This also sends the release-health
+/// session, so the invocation is counted even on the error path. Waits at
+/// most 2 seconds so a stalled network can never hang the CLI. Returns
+/// `true` when everything was delivered in time, `false` on failure,
+/// timeout, or when Sentry was never initialized.
 pub fn shutdown_sentry() -> bool {
-    sentry::Hub::current().client().is_some_and(|client| {
-        client.close(Some(std::time::Duration::from_secs(2)))
-    })
+    sentry::close(std::time::Duration::from_secs(2))
 }
 
 #[cfg(test)]

@@ -124,76 +124,162 @@ fn test_dau_ping_respects_opt_in_and_mini_mode() {
     assert!(!res, "zoi-mini must never send DAU pings");
 }
 
-/// Runs `f` with a client-less Sentry Hub bound to the current thread.
-///
-/// `sentry::init` permanently binds a client to the process-wide main Hub,
-/// which thread-local Hubs inherit - so "without init" assertions must run
-/// inside an explicitly empty Hub to be deterministic regardless of test
-/// thread scheduling.
-fn without_sentry_client<R>(f: impl FnOnce() -> R) -> R {
-    let hub =
-        std::sync::Arc::new(sentry::Hub::new(None, std::sync::Arc::default()));
-    sentry::Hub::run(hub, f)
+/// Opts in to telemetry with `dsn` as the Sentry DSN, inside a fresh home.
+fn opt_in_with_sentry_dsn(
+    ctx: &mut common::TestContextGuard,
+    root: &std::path::Path,
+    dsn: &str
+) {
+    ctx.set_env_var("HOME", root);
+    ctx.set_env_var("SENTRY_DSN", dsn);
+    common::TestContextGuard::set_sysroot(root.to_path_buf());
+    let cfg = types::Config {
+        telemetry_enabled: true,
+        ..Default::default()
+    };
+    config::write_user_config(&cfg).expect("unwrap failed");
+}
+
+/// Starts a stub Sentry server that answers `expected` envelope requests
+/// with 200 and records their bodies.
+fn start_stub_sentry(
+    expected: usize
+) -> (
+    String,
+    std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+    std::thread::JoinHandle<()>
+) {
+    use std::io::{BufRead as _, Read as _, Write as _};
+    use std::sync::{Arc, Mutex};
+
+    let listener =
+        std::net::TcpListener::bind("127.0.0.1:0").expect("stub bind");
+    let addr = listener.local_addr().expect("stub addr");
+    let bodies = Arc::new(Mutex::new(Vec::new()));
+    let bodies_child = Arc::clone(&bodies);
+    let handle = std::thread::spawn(move || {
+        for _ in 0..expected {
+            let Ok((stream, _)) = listener.accept() else {
+                return;
+            };
+            let mut reader = std::io::BufReader::new(stream);
+            let mut content_length = 0usize;
+            loop {
+                let mut line = String::new();
+                if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                    break;
+                }
+                let trimmed = line.trim_end();
+                if trimmed.is_empty() {
+                    break;
+                }
+                if let Some((name, value)) = trimmed.split_once(':')
+                    && name.eq_ignore_ascii_case("content-length")
+                {
+                    content_length = value.trim().parse().unwrap_or(0);
+                }
+            }
+            let mut body = vec![0u8; content_length];
+            reader.read_exact(&mut body).ok();
+            bodies_child
+                .lock()
+                .expect("bodies lock")
+                .push(String::from_utf8_lossy(&body).into_owned());
+            let mut stream = reader.into_inner();
+            let reply = "{}";
+            let response = format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: \
+                 application/json\r\ncontent-length: {}\r\nconnection: \
+                 close\r\n\r\n{reply}",
+                reply.len()
+            );
+            stream.write_all(response.as_bytes()).ok();
+        }
+    });
+    (format!("http://{addr}"), bodies, handle)
 }
 
 #[test]
 fn test_shutdown_sentry_without_init_is_noop() {
-    // Must return false (nothing to drain) without hanging or panicking.
-    assert!(!without_sentry_client(telemetry::shutdown_sentry));
-}
-
-#[test]
-fn test_shutdown_sentry_drains_initialized_client() {
-    // With an initialized client and an empty queue, close must succeed
-    // without touching the network.
-    let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("Failed to create temp dir");
-    let root = tmp.path().to_path_buf();
-
-    ctx.set_env_var("HOME", root.clone());
-    ctx.set_env_var("SENTRY_DSN", "https://abc123@o999.sentry.io/42");
-    common::TestContextGuard::set_sysroot(root.clone());
-
-    let cfg = types::Config {
-        telemetry_enabled: true,
-        ..Default::default()
-    };
-    config::write_user_config(&cfg).expect("unwrap failed");
-
-    let _guard = telemetry::init_sentry();
-    assert!(telemetry::shutdown_sentry());
+    let _ctx = common::TestContextGuard::acquire();
+    // Clear a client another test may have left running.
+    telemetry::shutdown_sentry();
+    // Must return false (nothing to send) without hanging or panicking.
+    assert!(!telemetry::shutdown_sentry());
 }
 
 #[test]
 fn test_sentry_capture_error_is_safe_without_init() {
-    // Must never panic, with or without a Sentry client bound. Scoped to an
-    // empty Hub so no delivery is attempted against other tests' clients.
+    let _ctx = common::TestContextGuard::acquire();
+    telemetry::shutdown_sentry();
     let err = anyhow::anyhow!("boom");
-    without_sentry_client(|| {
-        telemetry::sentry_capture_error("update", err.as_ref());
-    });
+    telemetry::sentry_capture_error("update", err.as_ref());
+    assert!(
+        !telemetry::shutdown_sentry(),
+        "nothing may have been started"
+    );
+}
+
+#[test]
+fn test_init_sentry_rejects_an_invalid_dsn() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("Failed to create temp dir");
+    opt_in_with_sentry_dsn(&mut ctx, tmp.path(), "not-a-dsn");
+    assert!(telemetry::init_sentry().is_none());
+}
+
+#[test]
+fn test_sentry_sends_the_error_with_the_session() {
+    // A failed command: the error event and the ended session reach Sentry
+    // in one envelope when the session is closed.
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("Failed to create temp dir");
+    let (url, bodies, server) = start_stub_sentry(1);
+    let dsn = url.replacen("http://", "http://abc123@", 1) + "/42";
+    opt_in_with_sentry_dsn(&mut ctx, tmp.path(), &dsn);
+
+    let guard = telemetry::init_sentry().expect("Sentry should start");
+    let err = anyhow::anyhow!("boom");
+    telemetry::sentry_capture_error("update", err.as_ref());
+    assert!(
+        telemetry::shutdown_sentry(),
+        "the envelope must be delivered"
+    );
+    drop(guard);
+    server.join().expect("stub server should finish");
+
+    let bodies = bodies.lock().expect("bodies lock");
+    let envelope = bodies.first().expect("one envelope");
+    let lines: Vec<serde_json::Value> = envelope
+        .lines()
+        .map(|l| serde_json::from_str(l).expect("JSON line"))
+        .collect();
+    let event = lines.get(2).expect("event payload");
+    assert_eq!(
+        event.pointer("/message/formatted").and_then(|v| v.as_str()),
+        Some("boom")
+    );
+    assert_eq!(event.pointer("/tags/command"), Some(&"update".into()));
+    assert!(event.get("user").is_none(), "no user data may be sent");
+    let session = lines.get(4).expect("session payload");
+    assert_eq!(session.get("status"), Some(&"exited".into()));
+    assert_eq!(session.get("errors"), Some(&1.into()));
 }
 
 #[test]
 fn test_init_sentry_with_dsn_does_not_panic() {
-    // Regression test: `sentry::init` with a DSN panicked with
-    // "sentry crate was compiled without transport", which broke every CLI
-    // invocation (and suppressed the crash-upload prompt) for opted-in users.
+    // Regression test: starting Sentry with a DSN once panicked, which broke
+    // every CLI invocation for opted-in users. The DSN points at a closed
+    // local port, so ending the session fails fast without the network.
     let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("Failed to create temp dir");
-    let root = tmp.path().to_path_buf();
-
-    ctx.set_env_var("HOME", root.clone());
-    ctx.set_env_var("SENTRY_DSN", "https://abc123@o999.sentry.io/42");
-    common::TestContextGuard::set_sysroot(root.clone());
-
-    let cfg = types::Config {
-        telemetry_enabled: true,
-        ..Default::default()
-    };
-    config::write_user_config(&cfg).expect("unwrap failed");
-
-    let _guard = telemetry::init_sentry();
+    opt_in_with_sentry_dsn(
+        &mut ctx,
+        tmp.path(),
+        "http://abc123@127.0.0.1:9/42"
+    );
+    let guard = telemetry::init_sentry();
+    assert!(guard.is_some());
 }
 
 #[test]

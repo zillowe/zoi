@@ -187,6 +187,27 @@ fn frames_to_json(frames: &[ParsedFrame]) -> serde_json::Value {
         .collect()
 }
 
+/// The Sentry stack frames of a `std::backtrace::Backtrace` rendered as text,
+/// oldest first.
+pub(crate) fn stack_frames(backtrace: &str) -> serde_json::Value {
+    frames_to_json(&parse_backtrace_frames(backtrace))
+}
+
+/// A panic's message with its location, such as `boom at src/main.rs:3:5`.
+pub(crate) fn panic_message(info: &std::panic::PanicHookInfo<'_>) -> String {
+    let message = if let Some(s) = info.payload().downcast_ref::<&str>() {
+        (*s).to_string()
+    } else if let Some(s) = info.payload().downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "unknown panic payload".to_string()
+    };
+    let location = info
+        .location()
+        .map_or_else(String::new, |l| format!(" at {l}"));
+    format!("{message}{location}")
+}
+
 /// Builds a minimal Sentry-envelope payload for a panic message.
 fn build_envelope(
     event_id: &str,
@@ -214,7 +235,7 @@ fn build_envelope(
         "exception": {"values": [{
             "type": "panic",
             "value": panic_message,
-            "stacktrace": {"frames": frames_to_json(&parse_backtrace_frames(backtrace))},
+            "stacktrace": {"frames": stack_frames(backtrace)},
         }]},
         "contexts": {
             "os": {"name": std::env::consts::OS, "arch": std::env::consts::ARCH},
@@ -272,23 +293,13 @@ pub fn write_crash_report(
 
 /// Installs a panic hook that saves a local `.zoicrash` file on panic.
 ///
-/// The previous hook (including Sentry's, if initialized) is chained so no
-/// behavior is lost. Saving is best-effort: hook failures are swallowed to
-/// avoid masking the original panic.
+/// The previous hook is chained so no behavior is lost. Saving is
+/// best-effort: hook failures are swallowed to avoid masking the original
+/// panic.
 pub fn install_panic_hook() {
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        let message = if let Some(s) = info.payload().downcast_ref::<&str>() {
-            (*s).to_string()
-        } else if let Some(s) = info.payload().downcast_ref::<String>() {
-            s.clone()
-        } else {
-            "unknown panic payload".to_string()
-        };
-        let location = info
-            .location()
-            .map_or_else(String::new, |l| format!(" at {l}"));
-        let _ = write_crash_report(&format!("{message}{location}"));
+        let _ = write_crash_report(&panic_message(info));
         previous(info);
     }));
 }
@@ -314,65 +325,19 @@ pub fn send_crash_report(
     let dsn = super::resolve_sentry_dsn()
         .filter(|s| !s.is_empty())
         .ok_or("Telemetry enabled but SENTRY_DSN is not set")?;
-    let (envelope_url, key) = envelope_endpoint(&dsn)?;
+    let dsn = super::sentry::Dsn::parse(&dsn)?;
     let body = fs::read(path)?;
-    let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .use_rustls_tls()
-        .build()?;
-    let response = client
-        .post(envelope_url)
-        .header("X-Sentry-Auth", sentry_auth_header(&key))
-        .header("Content-Type", "application/x-sentry-envelope")
-        .body(body)
-        .send()?;
-    if !response.status().is_success() {
-        return Err(format!("Sentry HTTP {}", response.status()).into());
-    }
+    super::sentry::send_envelope(
+        &dsn,
+        body,
+        std::time::Duration::from_secs(10)
+    )?;
     Ok(true)
-}
-
-/// Derives the Sentry envelope ingest URL and public key from a DSN.
-///
-/// DSN format: `https://<key>@<host>/<project_id>`.
-fn envelope_endpoint(
-    dsn: &str
-) -> Result<(String, String), Box<dyn std::error::Error>> {
-    let without_scheme = dsn.split("://").nth(1).ok_or("Invalid SENTRY_DSN")?;
-    let (key, rest) =
-        without_scheme.split_once('@').ok_or("Invalid SENTRY_DSN")?;
-    let (host, project) = rest.rsplit_once('/').ok_or("Invalid SENTRY_DSN")?;
-    Ok((
-        format!("https://{host}/api/{project}/envelope/"),
-        key.to_string()
-    ))
-}
-
-/// Builds the `X-Sentry-Auth` header value for envelope uploads.
-fn sentry_auth_header(key: &str) -> String {
-    format!(
-        "Sentry sentry_version=7, sentry_client=zoi.telemetry/{}, \
-         sentry_key={key}",
-        env!("CARGO_PKG_VERSION")
-    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn envelope_endpoint_parses_dsn() {
-        let (url, key) = envelope_endpoint("https://abc123@o999.sentry.io/42")
-            .expect("valid DSN should parse");
-        assert_eq!(url, "https://o999.sentry.io/api/42/envelope/");
-        assert_eq!(key, "abc123");
-    }
-
-    #[test]
-    fn envelope_endpoint_rejects_garbage() {
-        assert!(envelope_endpoint("not-a-dsn").is_err());
-    }
 
     #[test]
     fn crash_extension_constant() {

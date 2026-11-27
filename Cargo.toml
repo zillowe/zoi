@@ -191,14 +191,6 @@ rand = { version = "0.10.4", features = ["std", "thread_rng", "sys_rng"] }
 argon2 = "0.6.0"
 yescrypt = "0.1.0"
 base64 = "0.23.1"
-posthog-rs = { version = "1.7.1", default-features = false }
-sentry = { version = "0.49.6", default-features = false, features = [
-    "backtrace",
-    "contexts",
-    "panic",
-    "transport",
-    "release-health",
-] }
 
 zoi-common = { path = "crates/common", version = "1.29.22" }
 zoi-core = { path = "crates/core", version = "1.29.22" }

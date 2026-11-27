@@ -9,10 +9,10 @@ This page aims to be radically transparent about what we collect, why we collect
 
 ## What We Collect
 
-When you choose to enable telemetry, Zoi sends secure, anonymous events through two official Rust SDKs:
+When you choose to enable telemetry, Zoi sends secure, anonymous events to two services, using small clients built into Zoi (`crates/telemetry/src/posthog.rs` and `sentry.rs`) rather than the vendors' SDKs:
 
-- **PostHog** (`posthog-rs`) for usage analytics, sent to an EU PostHog cloud-hosted ([`https://eu.i.posthog.com`](https://posthog.com)) instance when you perform certain actions. Delivery is asynchronous: commands only append small event files to `$XDG_STATE_HOME/zoi/telemetry/queue/` (fast local I/O, no network) and spawn a detached `zoi telemetry flush` worker that uploads them after your command has already exited. A slow network therefore never stalls the CLI, and events that fail to upload stay queued for the next run instead of being lost. The queue holds at most 100 files and drops anything older than 30 days.
-- **Sentry** (`sentry` crate with network transport) for error tracking. Failed commands are reported to Sentry automatically while opted-in (error message, cause chain, and stacktrace, tagged with the command name). Crash files you approve are uploaded the same way.
+- **PostHog** for usage analytics, sent to an EU PostHog cloud-hosted ([`https://eu.i.posthog.com`](https://posthog.com)) instance when you perform certain actions. Delivery is asynchronous: commands only append small event files to `$XDG_STATE_HOME/zoi/telemetry/queue/` (fast local I/O, no network) and spawn a detached `zoi telemetry flush` worker that uploads them after your command has already exited. A slow network therefore never stalls the CLI, and events that fail to upload stay queued for the next run instead of being lost. The queue holds at most 100 files and drops anything older than 30 days.
+- **Sentry** for error tracking and release health. While opted-in, failed commands are reported (error message and cause chain, tagged with the command name), a panic is reported with its stack trace, and each command counts as one session so crash-free rates per release can be measured. Events and the session are sent when the command ends, waiting at most half a second, so a slow network never stalls the CLI. No user, IP address or host name is sent. Crash files you approve are uploaded the same way.
 
 Scope: telemetry applies to the main `zoi` CLI and follows the user's opt-in. The lightweight `zoi-mini` helper never sends telemetry, even when telemetry is enabled.
 
@@ -89,7 +89,7 @@ zoi telemetry disable
 
 Zoi has a built-in crash reporter inspired by Ghostty. When Zoi panics, it saves a crash report to disk. Crash reports are saved to the `$XDG_STATE_HOME/zoi/crash` directory (default `~/.local/state/zoi/crash` on Linux). Crash reports are not automatically sent anywhere off your machine.
 
-Crash files use the `.zoicrash` extension and contain a Sentry envelope (header line, item-header line, event-payload line with panic message, backtrace, OS/arch, release, and environment). You can upload these to your own Sentry account with the SDK-backed sender or with `sentry-cli`, and any tool that reads Sentry envelopes can inspect them.
+Crash files use the `.zoicrash` extension and contain a Sentry envelope (header line, item-header line, event-payload line with panic message, backtrace, OS/arch, release, and environment). You can upload these with `zoi telemetry crash send`, or to your own Sentry account with `sentry-cli`, and any tool that reads Sentry envelopes can inspect them.
 
 If telemetry is enabled, the next time you start Zoi after a crash it will ask whether to upload each pending report. If telemetry is disabled, reports are only saved locally and you are never prompted.
 
