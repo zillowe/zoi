@@ -876,6 +876,13 @@ pub fn check(registry_root: &Path) -> Result<()> {
     Ok(())
 }
 
+/// The current year in UTC, used to name advisories (`<PREFIX>-<year>-...`).
+fn current_utc_year() -> i16 {
+    jiff::Timestamp::now()
+        .to_zoned_datetime(jiff::tz::TimeZone::UTC)
+        .year()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -953,11 +960,4 @@ mod tests {
         let found = check_obsolete_manifest_keys(dir.path());
         assert!(found.is_empty(), "unexpected warning: {found:?}");
     }
-}
-
-/// The current year in UTC, used to name advisories (`<PREFIX>-<year>-...`).
-fn current_utc_year() -> i16 {
-    jiff::Timestamp::now()
-        .to_zoned_datetime(jiff::tz::TimeZone::UTC)
-        .year()
 }

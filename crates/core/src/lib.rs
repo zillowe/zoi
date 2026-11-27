@@ -7,6 +7,11 @@
 //! - Hash calculations and cache management.
 //! - Sysroot and path utilities.
 
+// Linked only for its `vendored` feature: Sequoia (PGP) uses OpenSSL, and
+// this builds it into Zoi on every platform. (git2's `vendored-openssl`
+// covers only the Unix targets where libgit2 uses OpenSSL.)
+use openssl as _;
+
 /// Built-in package definitions and resources.
 pub mod alternatives;
 pub mod builtin;

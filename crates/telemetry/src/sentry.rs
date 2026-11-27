@@ -245,7 +245,7 @@ pub fn close(timeout: Duration) -> bool {
 /// Sends the client's events and its ended session.
 fn finish(client: &Client, status: SessionStatus, timeout: Duration) -> bool {
     let deadline = Instant::now() + timeout;
-    let session = build_session(&client, status);
+    let session = build_session(client, status);
     let mut events = client.pending.iter();
     // Sentry takes at most one event per envelope, so the session travels
     // with the first event and any further events go on their own.
