@@ -54,8 +54,11 @@ pub fn add_import_util(
             let _ = refs.push(file_name.clone());
         }
         let path = resolve_in_package_dir(&current_path_buf, &file_name)?;
-        let content = fs::read_to_string(&path)
-            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+        let content = fs::read_to_string(&path).map_err(|e| {
+            mlua::Error::RuntimeError(format!(
+                "IMPORT: cannot read '{file_name}': {e}"
+            ))
+        })?;
 
         if let Some(extension) = path.extension().and_then(|s| s.to_str()) {
             match extension {
