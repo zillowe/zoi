@@ -290,8 +290,10 @@ fn refresh_registry_db(
         // `.hash` of the exact archive it downloads.
         let has_subs = pkg.sub_packages.as_ref().is_some_and(|s| !s.is_empty());
         // An empty hash also clears one recorded by an older sync.
-        let recorded_hash =
-            hash_info.as_deref().filter(|_| !has_subs).unwrap_or_default();
+        let recorded_hash = hash_info
+            .as_deref()
+            .filter(|_| !has_subs)
+            .unwrap_or_default();
         let _ = db::set_package_hash(&tx, pkg_id, recorded_hash);
 
         if let Some(subs) = &pkg.sub_packages {

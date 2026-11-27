@@ -40,15 +40,20 @@ stages:
   image: rust:latest
   variables:
     CARGO_HOME: "$CI_PROJECT_DIR/.cargo"
+  # Only Cargo's downloads are shared between jobs. A single cache of
+  # `.cargo/` and `target/` written by every job grew past the runners' disk
+  # (clippy, test and nightly artifacts piled up in one `target/`).
   cache:
-    key:
-      prefix: rust
-      files:
-        - Cargo.lock
-    paths:
-      - .cargo/
-      - target/
-    policy: pull-push
+    - &cargo_cache
+      key:
+        prefix: cargo
+        files:
+          - Cargo.lock
+      paths:
+        - .cargo/registry/index/
+        - .cargo/registry/cache/
+        - .cargo/git/db/
+      policy: pull-push
   before_script:
     - *base_apt
     - apt-get install -y bubblewrap
@@ -77,6 +82,15 @@ lint:
   stage: test
   extends:
     - .rust_setup
+  cache:
+    - *cargo_cache
+    - key:
+        prefix: target-lint
+        files:
+          - Cargo.lock
+      paths:
+        - target/
+      policy: pull-push
   variables:
     <<: [*mold_vars, *system_libs_vars]
   before_script:
@@ -98,6 +112,15 @@ test:
   stage: test
   extends:
     - .rust_setup
+  cache:
+    - *cargo_cache
+    - key:
+        prefix: target-test
+        files:
+          - Cargo.lock
+      paths:
+        - target/
+      policy: pull-push
   variables:
     <<: [*mold_vars, *system_libs_vars]
   before_script:
