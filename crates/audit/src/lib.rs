@@ -9,7 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use zoi_core::{config, types, utils};
 
@@ -35,7 +35,7 @@ pub enum AuditAction {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AuditEntry {
     /// When the action occurred.
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     /// The user who performed the action.
     pub user: String,
     /// The action performed.
@@ -217,7 +217,7 @@ pub fn log_event(
 
     let user = get_username();
     let entry = AuditEntry {
-        timestamp: Utc::now(),
+        timestamp: Timestamp::now(),
         user,
         action,
         package_name: manifest.name.clone(),

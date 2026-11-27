@@ -774,7 +774,9 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                             println!(
                                 "{:<5} {:<25} {:<50}",
                                 generation.id,
-                                generation.created_at.to_rfc3339(),
+                                generation
+                                    .created_at
+                                    .strftime("%Y-%m-%d %H:%M:%S UTC"),
                                 generation.packages.join(", ")
                             );
                         }

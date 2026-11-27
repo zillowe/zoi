@@ -178,7 +178,7 @@ fn ensure_client_id() -> Result<String, Box<dyn Error>> {
         let id = {
             let ts = Timestamp::from_unix(
                 uuid::NoContext,
-                chrono::Utc::now().timestamp_millis().cast_unsigned(),
+                jiff::Timestamp::now().as_millisecond().cast_unsigned(),
                 0
             );
             uuid::Uuid::new_v7(ts).to_string()
@@ -519,7 +519,7 @@ pub fn posthog_capture_event(
     let ev = PackageEvent {
         client_id: &client_id,
         event: event_name,
-        ts: chrono::Utc::now().to_rfc3339(),
+        ts: jiff::Timestamp::now().to_string(),
         app_version,
         os,
         arch,
@@ -664,7 +664,7 @@ pub fn posthog_capture_dau_ping() -> Result<bool, Box<dyn Error>> {
     }
 
     let now_ms =
-        u128::from(chrono::Utc::now().timestamp_millis().unsigned_abs());
+        u128::from(jiff::Timestamp::now().as_millisecond().unsigned_abs());
     if dau_ping_throttled(now_ms) {
         return Ok(false);
     }

@@ -11,7 +11,6 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
-use chrono::Utc;
 use colored::Colorize;
 use uuid::{Timestamp, Uuid};
 use zoi_audit as audit;
@@ -72,11 +71,11 @@ pub fn begin() -> Result<types::Transaction> {
     Ok(types::Transaction {
         id: Uuid::new_v7(Timestamp::from_unix(
             uuid::NoContext,
-            Utc::now().timestamp_millis().cast_unsigned(),
+            jiff::Timestamp::now().as_millisecond().cast_unsigned(),
             0
         ))
         .to_string(),
-        start_time: Utc::now().to_rfc3339(),
+        start_time: jiff::Timestamp::now().to_string(),
         operations: Vec::new()
     })
 }

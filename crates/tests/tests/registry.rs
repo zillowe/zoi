@@ -3,7 +3,6 @@
 use std::fs;
 
 use anyhow::Result;
-use chrono::Datelike;
 use tempfile::TempDir;
 use zoi::pkg::registry;
 
@@ -90,7 +89,9 @@ fn test_registry_advisory_id_assignment() -> Result<()> {
     registry::init(reg_path)?;
     registry::add_package(reg_path, Some("vuln-pkg"), Some("core"))?;
 
-    let current_year = chrono::Utc::now().year();
+    let current_year = jiff::Timestamp::now()
+        .to_zoned_datetime(jiff::tz::TimeZone::UTC)
+        .year();
     let temp_adv_path = reg_path
         .join("core/vuln-pkg")
         .join(format!("ZSA-{current_year}-TEMP.sec.yaml"));

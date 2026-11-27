@@ -25,7 +25,7 @@ workspace = true
 
 [dependencies]
 anyhow.workspace = true
-chrono.workspace = true
+jiff.workspace = true
 clap.workspace = true
 clap_complete.workspace = true
 colored.workspace = true

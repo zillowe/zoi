@@ -2,7 +2,6 @@
 
 use std::fs;
 
-use chrono::Utc;
 use tempfile::tempdir;
 use zoi::pkg::audit::{self, AuditAction, AuditEntry};
 use zoi::pkg::types::{InstallManifest, InstallReason, PackageType, Scope};
@@ -51,7 +50,7 @@ fn test_audit_entry_serialization() {
     let manifest = test_manifest("audit-test", "2.0.0");
 
     let entry = AuditEntry {
-        timestamp: Utc::now(),
+        timestamp: jiff::Timestamp::now(),
         user: "test-user".to_string(),
         action: AuditAction::Install,
         package_name: manifest.name.clone(),

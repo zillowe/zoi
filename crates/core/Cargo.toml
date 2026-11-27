@@ -23,7 +23,7 @@ workspace = true
 [dependencies]
 anyhow.workspace = true
 zbsdiff.workspace = true
-chrono.workspace = true
+jiff.workspace = true
 clap_complete.workspace = true
 colored.workspace = true
 regex.workspace = true

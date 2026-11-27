@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use zoi_core::utils;
 
@@ -12,7 +12,7 @@ pub struct Generation {
     /// Monotonic id, which is also the directory name.
     pub id: u32,
     /// When the record was created.
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
     /// Packages this record refers to.
     pub packages: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -111,7 +111,7 @@ impl GenerationManager {
 
         let generation = Generation {
             id,
-            created_at: Utc::now(),
+            created_at: Timestamp::now(),
             packages,
             transaction_id,
             pinned: false

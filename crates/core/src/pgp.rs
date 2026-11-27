@@ -4,7 +4,6 @@ use std::process::Command;
 use std::time::SystemTime;
 
 use anyhow::{Result, anyhow};
-use chrono::{DateTime, Utc};
 use colored::Colorize;
 pub use sequoia_openpgp;
 use sequoia_openpgp::Cert;
@@ -62,26 +61,24 @@ pub fn get_cert_status(cert: &Cert) -> String {
                 return "Revoked".red().bold().to_string();
             }
             if let Some(expiration) = vc.primary_key().key_expiration_time() {
-                let datetime: DateTime<Utc> = DateTime::<Utc>::from(expiration);
+                let date = format_date(expiration);
                 if expiration < now {
-                    return format!(
-                        "Expired ({})",
-                        datetime.format("%Y-%m-%d")
-                    )
-                    .red()
-                    .to_string();
+                    return format!("Expired ({date})").red().to_string();
                 }
-                return format!(
-                    "Valid (expires {})",
-                    datetime.format("%Y-%m-%d")
-                )
-                .green()
-                .to_string();
+                return format!("Valid (expires {date})").green().to_string();
             }
             "Valid (no expiration)".green().to_string()
         }
         Err(e) => format!("Invalid: {e}").red().to_string()
     }
+}
+
+/// Formats a key's expiration time as a UTC date (`YYYY-MM-DD`).
+fn format_date(time: SystemTime) -> String {
+    jiff::Timestamp::try_from(time).map_or_else(
+        |_| "an unknown date".to_string(),
+        |ts| ts.strftime("%Y-%m-%d").to_string()
+    )
 }
 
 /// Validates a PGP certificate, checking for revocation and expiration.
@@ -103,10 +100,9 @@ pub fn validate_cert(cert: &Cert) -> Result<()> {
             if let Some(expiration) = vc.primary_key().key_expiration_time()
                 && expiration < now
             {
-                let datetime: DateTime<Utc> = DateTime::<Utc>::from(expiration);
                 return Err(anyhow!(
                     "The PGP key expired on {}.",
-                    datetime.format("%Y-%m-%d")
+                    format_date(expiration)
                 ));
             }
             Ok(())

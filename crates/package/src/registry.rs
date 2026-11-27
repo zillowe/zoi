@@ -9,7 +9,6 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
-use chrono::Datelike;
 use colored::Colorize;
 use walkdir::WalkDir;
 use zoi_core::types;
@@ -158,7 +157,7 @@ repos:
 
     let advisories_json_path = path.join("advisories.json");
     if !advisories_json_path.exists() {
-        let current_year = chrono::Utc::now().year();
+        let current_year = current_utc_year();
         let content = format!(
             r#"{{
   "version": "2",
@@ -378,7 +377,7 @@ pub fn add_advisory(
     // interpolated into the advisory file name below.
     let prefix = validate_advisory_prefix(&prefix)?;
 
-    let current_year = chrono::Utc::now().year();
+    let current_year = current_utc_year();
     let adv_file_path =
         pkg_dir.join(format!("{prefix}-{current_year}-TEMP.sec.yaml"));
 
@@ -507,7 +506,7 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
             types::AdvisoryRegistry::default()
         };
 
-    let current_year = chrono::Utc::now().year();
+    let current_year = current_utc_year();
     let current_year_u32 = u32::try_from(current_year).unwrap_or(0);
     if adv_registry.year != current_year_u32 {
         adv_registry.year = current_year_u32;
@@ -954,4 +953,11 @@ mod tests {
         let found = check_obsolete_manifest_keys(dir.path());
         assert!(found.is_empty(), "unexpected warning: {found:?}");
     }
+}
+
+/// The current year in UTC, used to name advisories (`<PREFIX>-<year>-...`).
+fn current_utc_year() -> i16 {
+    jiff::Timestamp::now()
+        .to_zoned_datetime(jiff::tz::TimeZone::UTC)
+        .year()
 }

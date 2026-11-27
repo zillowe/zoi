@@ -27,7 +27,7 @@ workspace = true
 nix.workspace = true
 
 [dependencies]
-chrono.workspace = true
+jiff.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

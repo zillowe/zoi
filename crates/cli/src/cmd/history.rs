@@ -88,8 +88,8 @@ pub fn run(verify: bool, export: Option<PathBuf>, ndjson: bool) -> Result<()> {
             Cell::new(
                 entry
                     .timestamp
-                    .with_timezone(&chrono::Local)
-                    .format("%Y-%m-%d %H:%M:%S")
+                    .to_zoned_datetime(jiff::tz::TimeZone::system())
+                    .strftime("%Y-%m-%d %H:%M:%S")
             ),
             Cell::new(entry.user),
             action_cell,

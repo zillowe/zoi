@@ -312,7 +312,7 @@ fn test_dau_ping_throttled_to_once_per_day() {
     std::fs::create_dir_all(ts_path.parent().expect("ts file has a parent"))
         .expect("telemetry state dir should be creatable");
     let now_ms =
-        u128::from(chrono::Utc::now().timestamp_millis().unsigned_abs());
+        u128::from(jiff::Timestamp::now().as_millisecond().unsigned_abs());
     std::fs::write(&ts_path, now_ms.to_string())
         .expect("ts should be writable");
 

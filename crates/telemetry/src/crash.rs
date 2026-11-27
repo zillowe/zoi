@@ -241,25 +241,25 @@ pub fn write_crash_report(
     panic_message: &str
 ) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let dir = crash_dir()?;
-    let now = chrono::Utc::now();
+    let now = jiff::Timestamp::now();
     let event_id = {
         let ts = uuid::Timestamp::from_unix(
             uuid::NoContext,
-            now.timestamp_millis().cast_unsigned(),
+            now.as_millisecond().cast_unsigned(),
             0
         );
         uuid::Uuid::new_v7(ts).to_string()
     };
     let filename = format!(
         "zoi-{}-{}.{}",
-        now.format("%Y%m%dT%H%M%SZ"),
+        now.strftime("%Y%m%dT%H%M%SZ"),
         event_id.split('-').next().unwrap_or("00000000"),
         CRASH_EXTENSION
     );
     let backtrace = std::backtrace::Backtrace::force_capture().to_string();
     let contents = build_envelope(
         &event_id,
-        &now.to_rfc3339(),
+        &now.to_string(),
         &super::resolve_environment(),
         super::app_release().as_str(),
         panic_message,
