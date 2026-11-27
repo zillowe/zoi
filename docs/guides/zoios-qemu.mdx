@@ -1,0 +1,239 @@
+---
+title: Trying ZoiOS in QEMU
+description: Build a ZoiOS (Parlex Linux) system into a folder, turn it into a disk image and boot it in a QEMU window, without touching a real disk.
+---
+
+This guide builds a small Parlex Linux system into a folder on your
+machine, packs it into a disk image and boots it in a QEMU window. Nothing is
+written to a real disk, so it is the safest way to try ZoiOS, test a
+`system.lua`, or check a package change before it reaches a real machine.
+
+QEMU boots the kernel directly, so the image needs no partitions and no
+bootloader. To install onto real hardware instead, see
+[Building a ZoiOS Distro](/docs/zds/zoi/guides/zoios-build).
+
+## Prerequisites
+
+- **A Linux host** with Zoi installed and synced (`zoi sync`).
+- **QEMU** (`qemu-system-x86_64`) with its GTK display, and access to
+  `/dev/kvm` (usually by being in the `kvm` group). Without KVM, drop
+  `-enable-kvm -cpu host` from the commands below; the VM still works, only
+  more slowly.
+- **e2fsprogs** 1.43 or newer, for `mkfs.ext4 -d`.
+- **`sudo`**: the system is built as root, so its files get the right owners.
+- About **3 GiB** of free space for the folder plus the size you give the
+  image.
+
+## Step 1: Write the system configuration
+
+Create `zoios-vm.lua`:
+
+```lua
+system({
+	hostname = "zoios-vm",
+	timezone = "UTC",
+	locale = "en_US.UTF-8",
+	keymap = "us",
+	ntp = true,
+	network = "networkd",
+})
+
+packages({
+	"@core/parlex",
+	-- Firmware for real hardware; a QEMU VM needs none. Use
+	-- "@core/linux-firmware" for every common vendor, or only the vendors
+	-- the machine has:
+	-- "@core/linux-firmware:intel",
+	-- "@core/linux-firmware:amdgpu",
+	-- "@core/linux-firmware:amd_ucode",
+	-- `man` (man-db, groff):
+	-- "@core/base:docs",
+})
+```
+
+- **`@core/parlex`** is the bootable Parlex set: the `@core/base` userland
+  plus the kernel, dracut, GRUB, systemd, sudo and `zoid`.
+- **`network = "networkd"`** sets up wired networking with DHCP through
+  systemd-networkd, with systemd-resolved for DNS. QEMU's user network hands
+  out an address with DHCP, so the VM is online with no further setup.
+- **Firmware** is left out because QEMU's virtual devices need none. If
+  the build asks about Parlex's optional firmware packages, choose none.
+
+See [system.lua](/docs/zds/zoi/guides/system-lua) for every block you can
+add, such as `users`, `groups` and `services`.
+
+## Step 2: Build the system into a folder
+
+```sh
+mkdir zoios-vm
+sudo zoi system distro build --target ./zoios-vm --config ./zoios-vm.lua
+```
+
+Add `--dry-run` first to see the plan without installing anything.
+
+The build installs every package into `./zoios-vm`, applies the settings
+from `system({...})`, and runs the packages' hooks. The kernel hooks run
+`depmod` and dracut, so `./zoios-vm/boot/` ends up with `vmlinuz-linux` and
+`initramfs-linux.img`. Downloads are cached in `/var/cache/zoi/archives` on
+the host, so a second build reuses them.
+
+## Step 3: Set a root password
+
+Parlex ships with the root account locked. Set a password inside the new
+system:
+
+```sh
+sudo zoi system distro chroot ./zoios-vm
+passwd
+exit
+```
+
+`zoi system distro chroot` mounts `/dev`, `/proc` and `/sys` into the target
+for you, so commands inside it behave as they would on the running system.
+
+## Step 4: Create the disk image
+
+```sh
+truncate -s 6G zoios-vm.img
+sudo mkfs.ext4 -q -F -L zoios -d ./zoios-vm zoios-vm.img
+```
+
+- **`truncate`** creates a sparse 6 GiB file, which takes up space only as
+  it fills. The base system uses about 1.3 GiB.
+- **`mkfs.ext4 -d`** formats the file and copies the folder into it, keeping
+  owners and permissions. Run it with `sudo`, because some files in the
+  folder can only be read by root.
+- **`-L zoios`** labels the filesystem, so the kernel can find it as
+  `root=LABEL=zoios`.
+
+QEMU also needs the kernel and initramfs as files it can read. dracut makes
+the initramfs readable only by root, so copy both out and make them yours:
+
+```sh
+sudo install -m644 -o "$(id -u)" -g "$(id -g)" \
+  ./zoios-vm/boot/vmlinuz-linux ./zoios-vm/boot/initramfs-linux.img .
+```
+
+## Step 5: Boot it in a QEMU window
+
+```sh
+qemu-system-x86_64 -enable-kvm -cpu host -m 2G -smp 2 \
+  -kernel ./vmlinuz-linux -initrd ./initramfs-linux.img \
+  -append "root=LABEL=zoios rw console=tty0 console=ttyS0" \
+  -drive file=zoios-vm.img,format=raw,if=virtio \
+  -nic user,model=virtio-net-pci \
+  -vga virtio -display gtk -serial vc
+```
+
+| Option | Purpose |
+| --- | --- |
+| `-kernel`, `-initrd` | Boot the kernel directly, so the image needs no bootloader. |
+| `-append` | The kernel command line: the root filesystem by label, and kernel messages on both the screen (`tty0`) and the serial port (`ttyS0`). |
+| `-drive …,if=virtio` | The disk image, as a virtio disk (`/dev/vda` in the VM). |
+| `-nic user,model=virtio-net-pci` | A network card behind QEMU's built-in NAT. The VM can reach the internet; the host reaches it only through port forwards. |
+| `-vga virtio -display gtk` | A graphical window. |
+| `-serial vc` | Adds the serial port as a text view in the same window (see below). |
+
+After a few seconds the window shows a login prompt. Log in as `root` with
+the password from Step 3.
+
+### Working in the QEMU window
+
+- **Releasing the mouse and keyboard:** press **Ctrl+Alt+G**.
+- **Copying text:** the main screen is a picture, so text cannot be copied
+  from it. Choose **View → serial0** for the serial console, which also has a
+  login prompt. Select text there with the mouse and use **Edit → Copy**.
+  Switch back with **View → virtio-vga-0**.
+- **Copying and pasting both ways:** use SSH instead (see
+  [SSH from the host](#ssh-from-the-host)).
+- **Shutting down:** run `poweroff` in the VM; QEMU closes when the system
+  has stopped. **Machine → Quit** also works, but cuts the power at once.
+
+## Step 6: Use the system
+
+The VM is a normal ZoiOS system, and Zoi is its package manager:
+
+```sh
+zoi sync
+zoi install @extra/fastfetch
+fastfetch
+```
+
+Changes made inside the VM are saved in `zoios-vm.img` and survive a
+reboot.
+
+## SSH from the host
+
+A terminal on the host is more comfortable than the QEMU window, and copy
+and paste work normally there. Forward a host port to the VM's SSH port by
+changing the network option:
+
+```sh
+-nic user,model=virtio-net-pci,hostfwd=tcp::2222-:22
+```
+
+Then, inside the VM, install and start the SSH server:
+
+```sh
+zoi install @core/openssh
+systemctl enable --now sshd
+```
+
+Create a user to log in with, or, for a throwaway test VM only, allow root
+logins with `PermitRootLogin yes` in `/etc/ssh/sshd_config` followed by
+`systemctl restart sshd`. Then connect from the host:
+
+```sh
+ssh -p 2222 root@localhost
+```
+
+## Rebuilding
+
+To change the system, either change it inside the VM, or change the folder
+from the host and create the image again:
+
+```sh
+sudo zoi install --root ./zoios-vm @extra/fastfetch
+rm -f zoios-vm.img && truncate -s 6G zoios-vm.img
+sudo mkfs.ext4 -q -F -L zoios -d ./zoios-vm zoios-vm.img
+```
+
+If the update touched the kernel or initramfs, copy them out again as in
+Step 4. Creating the image again replaces it, so anything changed only
+inside the VM is lost.
+
+To start over, remove everything (the folder belongs to root):
+
+```sh
+sudo rm -rf ./zoios-vm zoios-vm.img vmlinuz-linux initramfs-linux.img
+```
+
+## Troubleshooting
+
+<Callout title="Kernel panic: unable to mount root fs">
+  The kernel did not find a filesystem labelled `zoios`. Check that
+  `mkfs.ext4` was given `-L zoios`, that the command line says
+  `root=LABEL=zoios`, and that the disk is attached with `if=virtio` (the
+  initramfs includes the virtio drivers).
+</Callout>
+
+<Callout title="No login prompt on the screen">
+  Check the serial view (**View → serial0**). If neither has a prompt, enable
+  the console login in the folder and create the image again:
+  `sudo zoi system distro chroot ./zoios-vm --run "systemctl enable
+  getty@tty1.service"`.
+</Callout>
+
+<Callout title="No network in the VM">
+  Run `networkctl`. The interface (usually `ens3`) should be `routable` and
+  `configured`. If it is `unmanaged`, check
+  `/etc/systemd/network/20-wired.network`. `resolvectl query gitlab.com`
+  checks DNS. If names resolve but downloads fail now and then with TLS
+  errors, the connection itself is unreliable; retry `zoi sync`, which
+  resumes where it stopped.
+</Callout>
+
+<Callout title="QEMU cannot read the initramfs">
+  `qemu-system-x86_64: -initrd …: Permission denied` means it is reading the
+  root-only copy inside the folder. Use the copies from Step 4.
+</Callout>
