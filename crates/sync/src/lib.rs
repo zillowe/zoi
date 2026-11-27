@@ -104,155 +104,38 @@ fn refresh_registry_db(
         p.set_message(format!("Indexing {}", registry_handle.cyan()));
     }
 
-    let parsed_results: Vec<(
-        types::Package,
-        PathBuf,
-        Option<Vec<String>>,
-        Option<(u64, u64)>,
-        Option<String>
-    )> = pkg_files
+    // Recipes indexed by an earlier sync are reused while their content
+    // (and the platform) is unchanged: a version or revision bump, or any
+    // other edit, changes the fingerprint. Remote lookups that failed (an
+    // archive not published yet) are retried, and all of them are redone
+    // after a day, so an archive rebuilt in place is picked up.
+    let cache = db::load_index_cache(&conn).unwrap_or_default();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
+    let ctx = IndexContext {
+        registry_path,
+        client,
+        repo_config: repo_config.as_ref(),
+        platform: &platform
+    };
+
+    let entries: Vec<db::IndexCacheEntry> = pkg_files
         .par_iter()
         .filter_map(|path| {
             if let Some(p) = pb {
                 p.inc(1);
             }
-            let path_str = path.to_string_lossy();
-            if let Ok(mut pkg) =
-                lua_parser::parse_lua_package(&path_str, None, None, true)
-            {
-                if pkg.repo.is_empty()
-                    && let Ok(rel_path) = path.strip_prefix(registry_path)
-                    && let Some(parent) = rel_path.parent()
-                {
-                    let mut repo_path =
-                        parent.to_string_lossy().to_string().replace('\\', "/");
-                    let pkg_name_suffix = format!("/{}", pkg.name);
-                    if repo_path.ends_with(&pkg_name_suffix) {
-                        repo_path = repo_path
-                            [..repo_path.len() - pkg_name_suffix.len()]
-                            .to_string();
-                    } else if repo_path == pkg.name {
-                        repo_path = String::new();
-                    }
-                    pkg.repo = repo_path;
-                }
+            index_recipe(&ctx, path, &cache, now)
+        })
+        .collect();
 
-                let mut file_list = None;
-                if let Some(c) = &client
-                    && let Some(rc) = &repo_config
-                    && let Some(pkg_link) =
-                        rc.pkg.iter().find(|p| p.link_type == "main")
-                    && let Some(files_url_template) = &pkg_link.files
-                {
-                    let version = pkg
-                        .version
-                        .clone()
-                        .unwrap_or_else(|| "latest".to_string());
-                    let files_url = install_util::resolve_url_placeholders(
-                        files_url_template,
-                        &pkg.name,
-                        &pkg.repo,
-                        &version,
-                        &platform
-                    );
-
-                    if let Ok(response) = c.get(&files_url).send()
-                        && response.status().is_success()
-                        && let Ok(content) = response.text()
-                    {
-                        file_list = Some(
-                            content
-                                .lines()
-                                .map(|l| l.trim().to_string())
-                                .filter(|l| !l.is_empty())
-                                .collect()
-                        );
-                    }
-                }
-
-                let mut size_info = None;
-                if let Some(c) = &client
-                    && let Some(rc) = &repo_config
-                    && let Some(pkg_link) =
-                        rc.pkg.iter().find(|p| p.link_type == "main")
-                    && let Some(size_url_template) = &pkg_link.size
-                {
-                    let version = pkg
-                        .version
-                        .clone()
-                        .unwrap_or_else(|| "latest".to_string());
-                    let size_url = install_util::resolve_url_placeholders(
-                        size_url_template,
-                        &pkg.name,
-                        &pkg.repo,
-                        &version,
-                        &platform
-                    );
-
-                    if let Ok(response) = c.get(&size_url).send()
-                        && response.status().is_success()
-                        && let Ok(content) = response.text()
-                    {
-                        let mut download_size = 0u64;
-                        let mut installed_size = 0u64;
-                        for line in content.lines() {
-                            if let Some((key, val)) = line.split_once(':')
-                                && let Ok(num) = val.trim().parse::<u64>()
-                            {
-                                match key.trim() {
-                                    "down" => download_size = num,
-                                    "install" => installed_size = num,
-                                    _ => {}
-                                }
-                            }
-                        }
-                        if download_size > 0 || installed_size > 0 {
-                            size_info = Some((download_size, installed_size));
-                        }
-                    }
-                }
-
-                let mut hash_info = None;
-                if let Some(c) = &client
-                    && let Some(rc) = &repo_config
-                    && let Some(pkg_link) =
-                        rc.pkg.iter().find(|p| p.link_type == "main")
-                    && let Some(hash_url_template) = &pkg_link.hash
-                {
-                    let version = pkg
-                        .version
-                        .clone()
-                        .unwrap_or_else(|| "latest".to_string());
-                    let hash_url = install_util::resolve_url_placeholders(
-                        hash_url_template,
-                        &pkg.name,
-                        &pkg.repo,
-                        &version,
-                        &platform
-                    );
-
-                    if let Ok(response) = c.get(&hash_url).send()
-                        && response.status().is_success()
-                        && let Ok(content) = response.text()
-                    {
-                        let is_valid_hash = |s: &str| {
-                            let len = s.len();
-                            (len == 128 || len == 64 || len == 32)
-                                && s.chars().all(|c| c.is_ascii_hexdigit())
-                        };
-                        for word in content.split_whitespace() {
-                            if is_valid_hash(word) {
-                                hash_info = Some(word.to_string());
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                Some((pkg, path.clone(), file_list, size_info, hash_info))
-            } else {
-                None
-            }
+    let parsed_results: Vec<(types::Package, &db::IndexCacheEntry)> = entries
+        .iter()
+        .filter_map(|entry| {
+            serde_json::from_str::<types::Package>(&entry.package_json)
+                .ok()
+                .map(|pkg| (pkg, entry))
         })
         .collect();
 
@@ -275,32 +158,23 @@ fn refresh_registry_db(
 
     let tx = conn.transaction()?;
 
-    for (pkg, _path, file_list, size_info, hash_info) in parsed_results {
+    for (pkg, entry) in &parsed_results {
         let pkg_id =
-            db::update_package(&tx, &pkg, registry_handle, None, None, None)?;
+            db::update_package(&tx, pkg, registry_handle, None, None, None)?;
 
-        if let Some((down_size, install_size)) = size_info {
+        if let Some((down_size, install_size)) = entry.sizes {
             let _ = db::set_package_sizes(&tx, pkg_id, down_size, install_size);
         }
-
-        // The fetched hash is that of the package's plain archive. A package
-        // split into sub-packages ships one archive per sub-package instead
-        // (and its plain archive, if any, is a leftover from an older build),
-        // so no hash is recorded for it: the installer then fetches the
-        // `.hash` of the exact archive it downloads.
-        let has_subs = pkg.sub_packages.as_ref().is_some_and(|s| !s.is_empty());
-        // An empty hash also clears one recorded by an older sync.
-        let recorded_hash = hash_info
-            .as_deref()
-            .filter(|_| !has_subs)
-            .unwrap_or_default();
-        let _ = db::set_package_hash(&tx, pkg_id, recorded_hash);
+        // No archive hash is indexed: the installer fetches the `.hash` of
+        // the exact archive it downloads (one per sub-package). An empty
+        // value clears a hash recorded by an older Zoi.
+        let _ = db::set_package_hash(&tx, pkg_id, "");
 
         if let Some(subs) = &pkg.sub_packages {
             for sub in subs {
                 if let Err(e) = db::update_package(
                     &tx,
-                    &pkg,
+                    pkg,
                     registry_handle,
                     None,
                     Some(sub),
@@ -317,12 +191,12 @@ fn refresh_registry_db(
                     &pkg.repo,
                     registry_handle
                 ) {
-                    if let Some((down_size, install_size)) = &size_info {
+                    if let Some((down_size, install_size)) = entry.sizes {
                         let _ = db::set_package_sizes(
                             &tx,
                             sub_id,
-                            *down_size,
-                            *install_size
+                            down_size,
+                            install_size
                         );
                     }
                     let _ = db::set_package_hash(&tx, sub_id, "");
@@ -330,10 +204,12 @@ fn refresh_registry_db(
             }
         }
 
-        if let Some(list) = file_list {
-            let _ = db::index_package_files(&tx, pkg_id, &list);
+        if let Some(list) = &entry.files {
+            let _ = db::index_package_files(&tx, pkg_id, list);
         }
     }
+
+    let _ = db::store_index_cache(&tx, &entries);
 
     for (advisory, repo) in parsed_advisories {
         let _ = db::update_advisory(&tx, &advisory, &repo, registry_handle);
@@ -346,6 +222,169 @@ fn refresh_registry_db(
     }
 
     Ok(())
+}
+
+/// Cached index results older than this are fetched again.
+const INDEX_CACHE_MAX_AGE_SECS: i64 = 24 * 60 * 60;
+
+/// What [`index_recipe`] needs besides the recipe.
+struct IndexContext<'a> {
+    /// Root of the registry checkout.
+    registry_path: &'a Path,
+    /// HTTP client for the archive's `.files` and `.size`, when the registry
+    /// publishes them.
+    client: Option<&'a reqwest::blocking::Client>,
+    /// The registry's `repo.yaml`.
+    repo_config: Option<&'a types::RepoConfig>,
+    /// The platform archives are looked up for.
+    platform: &'a str
+}
+
+/// Indexes one recipe: reuses the cached result when the recipe and
+/// platform are unchanged and its remote lookups are complete and recent,
+/// else parses it (or reuses the parsed package) and fetches the archive's
+/// file list and sizes. `None` when the recipe cannot be read or parsed.
+fn index_recipe(
+    ctx: &IndexContext,
+    path: &Path,
+    cache: &HashMap<String, db::IndexCacheEntry>,
+    now: i64
+) -> Option<db::IndexCacheEntry> {
+    let content = fs::read(path).ok()?;
+    let rel = path
+        .strip_prefix(ctx.registry_path)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/");
+    let mut fingerprint_input = content;
+    fingerprint_input.extend_from_slice(ctx.platform.as_bytes());
+    let fingerprint = zoi_core::hash::bytes_digest(&fingerprint_input);
+
+    let cached = cache.get(&rel).filter(|e| e.fingerprint == fingerprint);
+    if let Some(entry) = cached
+        && entry.complete
+        && now - entry.fetched_at < INDEX_CACHE_MAX_AGE_SECS
+    {
+        return Some(entry.clone());
+    }
+
+    let pkg = match cached.and_then(|e| {
+        serde_json::from_str::<types::Package>(&e.package_json).ok()
+    }) {
+        Some(pkg) => pkg,
+        None => parse_recipe(ctx.registry_path, path)?
+    };
+
+    let (files, files_ok) = fetch_archive_info(ctx, &pkg, |p| p.files.as_ref())
+        .map_or((None, false), |text| {
+            let list = text
+                .lines()
+                .map(|l| l.trim().to_string())
+                .filter(|l| !l.is_empty())
+                .collect();
+            (Some(list), true)
+        });
+    let (sizes, sizes_ok) = fetch_archive_info(ctx, &pkg, |p| p.size.as_ref())
+        .map_or((None, false), |text| (parse_size_file(&text), true));
+    let wants_files = archive_template(ctx, |p| p.files.as_ref()).is_some();
+    let wants_sizes = archive_template(ctx, |p| p.size.as_ref()).is_some();
+
+    Some(db::IndexCacheEntry {
+        path: rel,
+        fingerprint,
+        package_json: serde_json::to_string(&pkg).ok()?,
+        files,
+        sizes,
+        complete: (files_ok || !wants_files) && (sizes_ok || !wants_sizes),
+        fetched_at: now
+    })
+}
+
+/// Parses a recipe, filling in its repository from its path when the
+/// recipe does not name one.
+fn parse_recipe(registry_path: &Path, path: &Path) -> Option<types::Package> {
+    let mut pkg = lua_parser::parse_lua_package(
+        &path.to_string_lossy(),
+        None,
+        None,
+        true
+    )
+    .ok()?;
+    if pkg.repo.is_empty()
+        && let Ok(rel_path) = path.strip_prefix(registry_path)
+        && let Some(parent) = rel_path.parent()
+    {
+        let mut repo_path =
+            parent.to_string_lossy().to_string().replace('\\', "/");
+        let pkg_name_suffix = format!("/{}", pkg.name);
+        if let Some(stripped) = repo_path.strip_suffix(&pkg_name_suffix) {
+            repo_path = stripped.to_string();
+        } else if repo_path == pkg.name {
+            repo_path = String::new();
+        }
+        pkg.repo = repo_path;
+    }
+    Some(pkg)
+}
+
+/// The `repo.yaml` URL template `pick` selects from the main archive link.
+fn archive_template<'a>(
+    ctx: &'a IndexContext,
+    pick: impl Fn(&'a types::PkgLink) -> Option<&'a String>
+) -> Option<&'a String> {
+    ctx.repo_config?
+        .pkg
+        .iter()
+        .find(|p| p.link_type == "main")
+        .and_then(pick)
+}
+
+/// Fetches a text file published next to the package's archive (`.files`,
+/// `.size`). `None` when the registry publishes none or the fetch fails.
+fn fetch_archive_info<'a>(
+    ctx: &'a IndexContext,
+    pkg: &types::Package,
+    pick: impl Fn(&'a types::PkgLink) -> Option<&'a String>
+) -> Option<String> {
+    let template = archive_template(ctx, pick)?;
+    let version = pkg.version.as_deref().unwrap_or("latest");
+    let url = install_util::resolve_url_placeholders(
+        template,
+        &pkg.name,
+        &pkg.repo,
+        version,
+        ctx.platform
+    );
+    let response = ctx.client?.get(&url).send().ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    response.text().ok()
+}
+
+/// Parses a `.size` file (`down: N` / `install: N` lines, or a bare
+/// number of bytes to download).
+fn parse_size_file(content: &str) -> Option<(u64, u64)> {
+    let mut down = 0u64;
+    let mut install = 0u64;
+    for line in content.lines() {
+        if let Some((key, val)) = line.split_once(':')
+            && let Ok(num) = val.trim().parse::<u64>()
+        {
+            match key.trim() {
+                "down" => down = num,
+                "install" => install = num,
+                _ => {}
+            }
+        }
+    }
+    if down == 0
+        && install == 0
+        && let Ok(num) = content.trim().parse::<u64>()
+    {
+        down = num;
+    }
+    (down > 0 || install > 0).then_some((down, install))
 }
 
 /// Checks a downloaded pre-indexed database against the `db_hash` digest from

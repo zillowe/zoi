@@ -225,3 +225,44 @@ fn list_runtime_dependencies_returns_each_package_with_its_runtime_deps() {
     let zlib = entries.get(1).expect("zlib entry");
     assert_eq!(zlib.runtime, [] as [std::string::String; 0]);
 }
+
+#[test]
+fn index_cache_round_trips_and_drops_removed_recipes() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("tempdir");
+    ctx.set_env_var("ZOI_DB_DIR", tmp.path());
+    let conn = db::open_connection("local").expect("open db");
+
+    let entry = |path: &str, files: Option<Vec<&str>>| db::IndexCacheEntry {
+        path: path.to_string(),
+        fingerprint: format!("sha512-{path}"),
+        package_json: "{}".to_string(),
+        files: files.map(|f| f.into_iter().map(String::from).collect()),
+        sizes: Some((10, 20)),
+        complete: true,
+        fetched_at: 1_700_000_000
+    };
+    let first = [
+        entry("core/a/a.pkg.lua", Some(vec!["usr/bin/a", "usr/share/a"])),
+        entry("core/b/b.pkg.lua", None)
+    ];
+    db::store_index_cache(&conn, &first).expect("store");
+    let loaded = db::load_index_cache(&conn).expect("load");
+    assert_eq!(loaded.len(), 2);
+    assert_eq!(loaded.get("core/a/a.pkg.lua"), first.first());
+    assert_eq!(loaded.get("core/b/b.pkg.lua"), first.get(1));
+
+    // Clearing the index for a re-sync keeps the cache.
+    db::clear_registry(&conn).expect("clear");
+    assert_eq!(db::load_index_cache(&conn).expect("load").len(), 2);
+
+    // Storing again replaces it: recipes no longer present are dropped.
+    db::store_index_cache(&conn, &[entry("core/a/a.pkg.lua", None)])
+        .expect("store again");
+    let loaded = db::load_index_cache(&conn).expect("load");
+    assert_eq!(loaded.len(), 1);
+    assert_eq!(
+        loaded.get("core/a/a.pkg.lua").and_then(|e| e.files.clone()),
+        None
+    );
+}

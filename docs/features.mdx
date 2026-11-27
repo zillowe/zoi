@@ -783,6 +783,8 @@ If the package is installed more than once across scopes or registries, Zoi will
 
 Downloads or updates the package database from the remote repository.
 
+Indexing is incremental: a recipe that has not changed since the last sync is reused, so a sync only parses and looks up (archive file lists and sizes) the packages whose recipe changed, for example through a version or revision bump. Lookups that failed are retried on the next sync, and all of them are refreshed after a day.
+
 **Flags:**
 
 - `-v`, `--verbose`: Show detailed git output and intermediate sync steps.

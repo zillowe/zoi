@@ -4,6 +4,7 @@
 //! metadata, including package information, file indexing, and security
 //! advisories.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -289,6 +290,23 @@ fn setup_schema(conn: &Connection) -> Result<()> {
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_package_files_path ON \
          package_files(path)",
+        []
+    )?;
+
+    // Per-recipe results of the last index (parsed package, archive file
+    // list and sizes), keyed by recipe path and reused while the recipe's
+    // fingerprint is unchanged. `clear_registry` leaves it alone.
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS index_cache (
+            path TEXT PRIMARY KEY,
+            fingerprint TEXT NOT NULL,
+            package_json TEXT NOT NULL,
+            files TEXT,
+            size_down INTEGER,
+            size_install INTEGER,
+            complete INTEGER NOT NULL,
+            fetched_at INTEGER NOT NULL
+        )",
         []
     )?;
 
@@ -1097,6 +1115,104 @@ pub fn delete_package(
 pub fn clear_registry(conn: &Connection) -> Result<()> {
     conn.execute("DELETE FROM packages", [])?;
     conn.execute("DELETE FROM package_advisories", [])?;
+    Ok(())
+}
+
+/// What indexing one recipe produced, cached so an unchanged recipe is not
+/// parsed and fetched again (see [`load_index_cache`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexCacheEntry {
+    /// Recipe path, relative to the registry.
+    pub path: String,
+    /// Digest of the recipe and the platform it was indexed for.
+    pub fingerprint: String,
+    /// The parsed package, as JSON.
+    pub package_json: String,
+    /// The archive's file list, if it was fetched.
+    pub files: Option<Vec<String>>,
+    /// Download and installed size, if they were fetched.
+    pub sizes: Option<(u64, u64)>,
+    /// Whether every remote lookup succeeded (otherwise the next sync
+    /// fetches again).
+    pub complete: bool,
+    /// When the remote lookups ran, in seconds since the Unix epoch.
+    pub fetched_at: i64
+}
+
+/// Loads the cached per-recipe index results, keyed by recipe path.
+///
+/// # Errors
+///
+/// Returns an error if the query fails.
+pub fn load_index_cache(
+    conn: &Connection
+) -> Result<HashMap<String, IndexCacheEntry>> {
+    let mut stmt = conn.prepare(
+        "SELECT path, fingerprint, package_json, files, size_down, \
+         size_install, complete, fetched_at FROM index_cache"
+    )?;
+    let rows = stmt.query_map([], |row| {
+        let files: Option<String> = row.get(3)?;
+        let down: Option<i64> = row.get(4)?;
+        let install: Option<i64> = row.get(5)?;
+        Ok(IndexCacheEntry {
+            path: row.get(0)?,
+            fingerprint: row.get(1)?,
+            package_json: row.get(2)?,
+            files: files.map(|f| f.lines().map(str::to_string).collect()),
+            sizes: down.zip(install).map(|(d, i)| {
+                (
+                    u64::try_from(d).unwrap_or_default(),
+                    u64::try_from(i).unwrap_or_default()
+                )
+            }),
+            complete: row.get::<_, i64>(6)? != 0,
+            fetched_at: row.get(7)?
+        })
+    })?;
+    Ok(rows
+        .filter_map(std::result::Result::ok)
+        .map(|entry| (entry.path.clone(), entry))
+        .collect())
+}
+
+/// Replaces the cached per-recipe index results with `entries`, so recipes
+/// that no longer exist are dropped.
+///
+/// # Errors
+///
+/// Returns an error if the update fails.
+pub fn store_index_cache(
+    conn: &Connection,
+    entries: &[IndexCacheEntry]
+) -> Result<()> {
+    conn.execute("DELETE FROM index_cache", [])?;
+    let mut stmt = conn.prepare(
+        "INSERT INTO index_cache (path, fingerprint, package_json, files, \
+         size_down, size_install, complete, fetched_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"
+    )?;
+    for e in entries {
+        let (down, install) = e
+            .sizes
+            .map(|(d, i)| {
+                (
+                    Some(i64::try_from(d).unwrap_or(i64::MAX)),
+                    Some(i64::try_from(i).unwrap_or(i64::MAX))
+                )
+            })
+            .unwrap_or_default();
+        stmt.execute(params![
+            e.path,
+            e.fingerprint,
+            e.package_json,
+            e.files.as_ref().map(|f| f.join("\n")),
+            down,
+            install,
+            i64::from(e.complete),
+            e.fetched_at
+        ])?;
+    }
     Ok(())
 }
 
