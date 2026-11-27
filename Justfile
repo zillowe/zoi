@@ -238,6 +238,26 @@ nix *args:
 bump *args:
     @./scripts/bump.sh {{ args }}
 
+# Builds the C helper with CC (default clang) and CFLAGS/LDFLAGS, then runs
+# scripts/distro-check/distro-check.sh with ARGS, e.g. `--root ./basetest`
+# (add LDFLAGS=-static to run the C checks inside the root, as root).
+# Check a Linux system against freedesktop.org, FHS 3.0 and POSIX.1-2024
+distro-check *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cc="${CC:-clang}"
+    out="{{ DEBUGDIR }}/distro-check"
+    mkdir -p "$out"
+    syscheck=()
+    # shellcheck disable=SC2086 # CFLAGS and LDFLAGS hold several flags
+    if $cc -std=c17 ${CFLAGS:--O2 -Wall -Wextra} ${LDFLAGS:-} \
+        -o "$out/syscheck" scripts/distro-check/syscheck.c; then
+        syscheck=(--syscheck "$out/syscheck")
+    else
+        echo "warning: could not build the C helper with $cc; C library checks are skipped" >&2
+    fi
+    exec sh scripts/distro-check/distro-check.sh "${syscheck[@]}" --cc "$cc" {{ args }}
+
 # Print this help message
 help:
     @just --list

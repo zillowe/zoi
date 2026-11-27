@@ -163,26 +163,43 @@ reboot.
 
 ## Checking how complete the system is
 
-`scripts/distro-check.sh` in the Zoi repository checks a system for what
-POSIX, the FHS and mainstream distributions lead users and programs to
-expect: utilities, directories, system files, accounts, and on a running
-system, runtime features such as cgroup v2 and a working `/bin/sh`. Each
-result is `PASS`, `FAIL`, `WARN` or `INFO`, followed by a summary.
+`scripts/distro-check/` in the Zoi repository checks a system against the
+specifications programs and users rely on, section by section:
 
-Check the folder from the host, before creating the image:
+| Section | Checked against |
+| --- | --- |
+| os-release | freedesktop.org `os-release(5)`: syntax, ID rules, URLs, `ANSI_COLOR`, and that `LOGO` names an installed icon |
+| System identity files | `machine-id(5)`, `hostname(5)`, `machine-info(5)`, `locale.conf(5)` (and that `LANG` is generated), `vconsole.conf(5)` (and that the keymap exists), `localtime(5)` |
+| Filesystem layout | FHS 3.0: required and optional directories, `/tmp` and `/var/tmp` permissions, `/var/run` and `/var/lock` links, the dynamic loader |
+| systemd hierarchy | systemd `file-hierarchy(7)` |
+| freedesktop.org desktop | XDG Base Directory, Icon Theme (`hicolor`), Shared MIME-info, Desktop Entry, the D-Bus system bus |
+| POSIX utilities | POSIX.1-2024: the utilities of each option group, and the shell's built-in utilities |
+| POSIX behaviour | about 40 checks that run the shell and utilities and compare their output with what POSIX requires |
+| POSIX system interfaces | the C library's POSIX and X/Open versions, mandatory and optional options, limits against the POSIX minimums, the locales and clocks (through the C helper), and that every POSIX header compiles |
+| Common practice | accounts, system configuration, boot files, common Linux utilities and, on a running system, mounts, devices, cgroup v2, NSS and failed systemd units |
+
+Each result is `PASS`, `FAIL`, `WARN` or `INFO`, with a summary per section.
+It checks presence, validity and a set of behaviours; it is not a POSIX
+certification.
+
+From the Zoi repository, `just distro-check` builds the C helper with clang
+(set `CC`, `CFLAGS` and `LDFLAGS` to change that) and runs the check. Check the
+folder from the host, before creating the image:
 
 ```sh
-sh scripts/distro-check.sh --root ./zoios-vm
+just distro-check --root ./zoios-vm
 ```
 
-Or copy the script into the VM and check the running system, including DNS
-and HTTPS:
+With `--root`, nothing from the folder is run. The C library checks run
+inside the folder only as root with a static helper:
+`sudo env LDFLAGS=-static just distro-check --root ./zoios-vm`.
+
+In the VM, copy `scripts/distro-check/distro-check.sh` over (for example with
+`scp`) and run it with `sh`; `--network` adds DNS and HTTPS checks:
 
 ```sh
 sh distro-check.sh --network
 ```
-
-With `--root`, only files are checked; nothing from the folder is run.
 
 ## SSH from the host
 
