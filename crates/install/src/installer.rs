@@ -26,8 +26,9 @@ fn archive_lock(path: &Path) -> std::sync::Arc<std::sync::Mutex<()>> {
             >
         >
     > = std::sync::LazyLock::new(Default::default);
-    let mut locks =
-        LOCKS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut locks = LOCKS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     std::sync::Arc::clone(locks.entry(path.to_path_buf()).or_default())
 }
 
