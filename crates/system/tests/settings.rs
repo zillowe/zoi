@@ -97,6 +97,9 @@ fn every_setting_is_written_under_the_root() {
     assert!(keyboard.contains("Option \"XkbLayout\" \"de\"\n"));
     assert!(keyboard.contains("Option \"XkbOptions\" \"ctrl:nocaps\"\n"));
     assert!(!keyboard.contains("XkbVariant"));
+    // Not formatted: `format_strings` would rewrap this string and split an
+    // escape such as `\n` across lines, changing its value.
+    #[rustfmt::skip]
     assert_eq!(
         read(r, "etc/systemd/network/20-wired.network"),
         "# Written by Zoi from system.lua; changes are overwritten.\n\
