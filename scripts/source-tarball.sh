@@ -19,6 +19,10 @@
 
 set -euo pipefail
 
+# Globs below (man/*.adoc) sort by the locale's collation; the C locale
+# keeps the generated files identical on every machine.
+export LC_ALL=C
+
 OUTPUT_DIR="${1:-./scripts/release/source}"
 
 VERSION=$(sed -n '/^\[workspace\.package\]/,/^\[/s/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -n 1)
