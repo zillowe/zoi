@@ -635,6 +635,17 @@ a setting. See the online configuration reference for every key.
   User data directory (database, store, and caches). Falls back to
   *~/.local/share/zoi/* on most systems.
 
+*$XDG_STATE_HOME/zoi/*, *$XDG_CACHE_HOME/zoi/*::
+  User state (transactions, pins, history, the user install record and the
+  store lock) and cache (downloaded archives). Fall back to
+  *~/.local/state/zoi/* and *~/.cache/zoi/*.
+
+*/var/lib/zoi/state/*, */var/cache/zoi/*::
+  State and cache when Zoi runs as root, including under *sudo*: root never
+  uses a home directory for them, and *HOME* and the XDG variables are not
+  consulted. The first root run copies the state root used before (in
+  root's home, or under *sudo* the invoking user's).
+
 *./zoi.lua*::
   Unified project and repository configuration: metadata, packages, tasks,
   environments, pinned imports, and selectable package exports.

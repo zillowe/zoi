@@ -289,3 +289,70 @@ fn copy_dir_all_should_preserve_symbolic_links() {
         std::path::Path::new("target")
     );
 }
+
+#[test]
+fn state_migration_copies_the_previous_state_once_without_the_lock() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let previous = dir.path().join("home/.local/state/zoi");
+    std::fs::create_dir_all(previous.join("pkgs")).expect("previous dirs");
+    std::fs::write(previous.join("pinned.json"), "[]").expect("pins");
+    std::fs::write(previous.join("pkgs/zoi.lock"), "lock").expect("record");
+    std::fs::write(previous.join("pkgs/lock"), "1234").expect("store lock");
+    let target = dir.path().join("var/lib/zoi/state");
+
+    assert!(
+        utils::migrate_state_dir(&previous, &target).expect("migrate"),
+        "the first run copies"
+    );
+    assert_eq!(
+        std::fs::read_to_string(target.join("pinned.json")).expect("pins"),
+        "[]"
+    );
+    assert_eq!(
+        std::fs::read_to_string(target.join("pkgs/zoi.lock")).expect("record"),
+        "lock"
+    );
+    assert!(
+        !target.join("pkgs/lock").exists(),
+        "the store lock must not be copied"
+    );
+    assert!(previous.join("pinned.json").exists(), "the original stays");
+    let leftovers: Vec<_> = std::fs::read_dir(dir.path().join("var/lib/zoi"))
+        .expect("parent")
+        .filter_map(Result::ok)
+        .filter(|e| e.file_name().to_string_lossy().starts_with(".state-"))
+        .collect();
+    assert!(leftovers.is_empty(), "no staging directory is left behind");
+
+    // Later state in the target is never overwritten by a second run.
+    std::fs::write(target.join("pinned.json"), "[\"new\"]").expect("update");
+    assert!(!utils::migrate_state_dir(&previous, &target).expect("again"));
+    assert_eq!(
+        std::fs::read_to_string(target.join("pinned.json")).expect("pins"),
+        "[\"new\"]"
+    );
+}
+
+#[test]
+fn state_migration_without_previous_state_does_nothing() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let target = dir.path().join("var/lib/zoi/state");
+    assert!(
+        !utils::migrate_state_dir(&dir.path().join("missing"), &target)
+            .expect("migrate")
+    );
+    assert!(!target.exists(), "nothing to copy creates nothing");
+}
+
+#[test]
+fn the_system_state_directory_is_under_var_lib_zoi_in_the_sysroot() {
+    let _ctx = common::TestContextGuard::acquire();
+    let root = tempfile::tempdir().expect("temp dir");
+    common::TestContextGuard::set_sysroot(root.path().to_path_buf());
+    if cfg!(target_os = "linux") {
+        assert_eq!(
+            utils::get_system_state_dir(),
+            root.path().join("var/lib/zoi/state")
+        );
+    }
+}

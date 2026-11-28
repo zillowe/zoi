@@ -53,8 +53,17 @@ On Linux, Zoi follows the Filesystem Hierarchy Standard:
 
 - Configuration and system hooks: `/etc/zoi`
 - Package data and registry database: `/var/lib/zoi`
+- State (transactions, pins, history, the install record and the store
+  lock): `/var/lib/zoi/state`
 - Cache files: `/var/cache/zoi`
 - Command shims: `/usr/bin`
+
+When Zoi runs as root, including under `sudo` (and `sudo -E`), it always uses
+`/var/lib/zoi/state` and `/var/cache/zoi` for its state and cache, never a
+home directory: every root invocation then shares one install record, lock,
+pin list and history, and no root-owned files end up in the invoking user's
+home. The first root run copies the state root kept before (in `/root`, or
+under `sudo` in the invoking user's `~/.local/state/zoi`) to the new location.
 
 On macOS, system command shims are placed in `/usr/local/bin` because
 `/usr/bin` is protected by System Integrity Protection (SIP).

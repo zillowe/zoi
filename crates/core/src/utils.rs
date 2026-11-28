@@ -252,6 +252,9 @@ pub fn get_host_user_data_dir() -> Result<PathBuf> {
 ///
 /// Returns an error if no suitable user cache directory can be found.
 pub fn get_user_cache_dir() -> Result<PathBuf> {
+    if root_uses_system_dirs() {
+        return Ok(get_system_cache_dir());
+    }
     Ok(crate::sysroot::apply_sysroot(get_host_user_cache_dir()?))
 }
 
@@ -271,15 +274,107 @@ pub fn get_host_user_cache_dir() -> Result<PathBuf> {
 
 /// Returns Zoi's user state directory, honoring `XDG_STATE_HOME` first.
 ///
+/// As root it is the system state directory instead (see
+/// [`root_uses_system_dirs`]); state from the home directory root used
+/// before is copied there the first time.
+///
 /// # Errors
 ///
 /// Returns an error if no suitable user state directory can be found.
 pub fn get_user_state_dir() -> Result<PathBuf> {
+    if root_uses_system_dirs() {
+        let dir = get_system_state_dir();
+        if !dir.exists()
+            && let Ok(previous) = home_state_dir()
+            && let Err(e) = migrate_state_dir(&previous, &dir)
+        {
+            eprintln!(
+                "Warning: could not copy Zoi's previous state from {} to {}: \
+                 {e}",
+                previous.display(),
+                dir.display()
+            );
+        }
+        return Ok(dir);
+    }
+    home_state_dir()
+}
+
+/// The state directory in the home directory (`$XDG_STATE_HOME/zoi` or the
+/// platform equivalent), whoever runs Zoi.
+fn home_state_dir() -> Result<PathBuf> {
     let root =
         xdg_or_platform_dir("XDG_STATE_HOME", dirs::data_local_dir, |home| {
             home.join(".local/state")
         })?;
     Ok(crate::sysroot::apply_sysroot(root.join("zoi")))
+}
+
+/// Whether Zoi keeps its cache and state in the system directories
+/// ([`get_system_cache_dir`], [`get_system_state_dir`]) instead of a home
+/// directory: when it runs as root, including under `sudo`. Root's install
+/// record, store lock, pins and history are then shared by every root
+/// invocation, and no root-owned file lands in a home directory (under
+/// `sudo`, the invoking user's, which [`get_user_home`] resolves to). `HOME`
+/// and the XDG variables are not consulted, so `sudo -E` cannot point root
+/// back into a user's home either.
+///
+/// Zoi's own test suite (`ZOI_TEST`), which CI runs as root, keeps each
+/// test's state under its own `HOME` instead.
+fn root_uses_system_dirs() -> bool {
+    is_effective_root() && std::env::var_os("ZOI_TEST").is_none()
+}
+
+/// Returns the system state directory, where Zoi keeps its state when run
+/// as root: `/var/lib/zoi/state` on Linux (inside the sysroot, if one is
+/// active).
+#[must_use]
+pub fn get_system_state_dir() -> PathBuf {
+    get_system_data_dir().join("state")
+}
+
+/// Copies the state directory `previous` to `target`, once: only when
+/// `target` does not exist yet and `previous` is a directory.
+///
+/// The copy is made in a staging directory next to `target` and renamed into
+/// place, so `target` never holds a partial copy and of two processes doing
+/// this at once only one wins. The store lock (`pkgs/lock`) is not copied.
+///
+/// Returns whether a copy was made.
+///
+/// # Errors
+///
+/// Returns an error if copying or renaming fails; the staging directory is
+/// removed then.
+pub fn migrate_state_dir(
+    previous: &Path,
+    target: &Path
+) -> std::io::Result<bool> {
+    if target.exists() || !previous.is_dir() {
+        return Ok(false);
+    }
+    let parent = target.parent().ok_or_else(|| {
+        std::io::Error::other("the state directory has no parent directory")
+    })?;
+    fs::create_dir_all(parent)?;
+    let staging =
+        parent.join(format!(".state-migrating-{}", std::process::id()));
+    let result = copy_dir_all(previous, &staging).and_then(|()| {
+        // The lock belongs to the processes that held it, never to a copy.
+        let lock = staging.join("pkgs").join("lock");
+        if lock.exists() {
+            fs::remove_file(lock)?;
+        }
+        fs::rename(&staging, target)
+    });
+    match result {
+        Ok(()) => Ok(true),
+        Err(e) => {
+            let _ = fs::remove_dir_all(&staging);
+            // Another process created the directory first: its copy stands.
+            if target.exists() { Ok(false) } else { Err(e) }
+        }
+    }
 }
 
 /// Resolves an XDG directory, falling back to the native platform convention.
