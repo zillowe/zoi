@@ -153,7 +153,7 @@ zbus = { version = "6.5.0", default-features = false, features = [
 ] }
 async-io = "2.6.0"
 zfvm = "0.1.0"
-spdx = "0.13.6"
+spdx = "0.13.7"
 tar = { version = "0.4.46", features = ["xattr"] }
 tempfile = "3.27.0"
 toml = "1.2.3"
